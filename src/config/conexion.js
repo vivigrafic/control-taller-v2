@@ -12,7 +12,7 @@
     key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtrdnp6aGVjY25pY2xmd3F6aXZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzOTM3NzYsImV4cCI6MjEwMTk2OTc3Nn0.u_rFohdMJtNoXGnj_OYdcfhGqVY7UlgBUiCivxPFWQg',
     publishableKey: 'sb_publishable_d5502ZSvf9nA_d3AVYWt2Q_9jajS8-r',
     empresaId: 'vvgrafic-principal',
-    sandboxBridgeUrl: 'https://script.google.com/macros/s/AKfycbxZRgkQsjWTyG9ta8pDT2Jz9_FTP3971uqInVOaaGaXR2bjAzCRgVOcT0yBJvU-idhH/exec'
+    sandboxBridgeUrl: 'https://script.google.com/macros/s/AKfycbwyqBeRS80Q2mg7CCFSt2736LQlnRcc73eXxaADOJk1PSkGcTcioYw2n__dnLBNWoc-AA/exec'
   };
 
   const CONFIG_REAL = {

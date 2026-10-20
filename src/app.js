@@ -2717,13 +2717,20 @@ export function inicializarEventosUI() {
   });
 
   document.getElementById("btnSyncDriveSandbox")?.addEventListener("click", async () => {
+    const btn = document.getElementById("btnSyncDriveSandbox");
+    if (btn) { btn.disabled = true; btn.textContent = "⏳ Sincronizando..."; }
+    toast("⏳ Sincronizando archivos con Google Drive...");
     const url = window.VG_CONEXION?.sandboxBridgeUrl;
-    toast("Sincronizando...");
     if (url) {
-      try { await fetch(`${url}?action=sync_drive`, { mode: "no-cors" }); } catch (_) {}
+      try {
+        await fetch(`${url}?action=sync_drive`);
+      } catch (err) {
+        console.warn("Sync fetch error:", err);
+      }
     }
     await cargarDatosTodo();
-    toast("✅ Sincronizado.");
+    if (btn) { btn.disabled = false; btn.textContent = "Sincronizar"; }
+    toast(`✔️ Sincronizado. ${STATE.pendientesDrive.length} archivos en cola.`);
   });
 
   const inpFileDpi = document.getElementById("inpInspectorArchivosLocales");
