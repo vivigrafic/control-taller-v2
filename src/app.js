@@ -838,17 +838,17 @@ function renderTablaImpresionesConBloques() {
 
       html += `
         <tr>
-          <td>${actionBtn}</td>
-          <td>${fmtDateHora(row.fecha_hora)}</td>
-          <td>${formatearAnidadosHTML(row.cliente_archivo)}</td>
-          <td style="text-align:center;">${renderMiniaturaDiseno60(row.file_id, row.diseno, row.cliente_archivo)}</td>
-          <td>${escHtml(row.tela_destino || "")}</td>
-          <td>${escHtml(row.num_rollo_tela || "")}</td>
-          <td>${escHtml(row.color_tela || "")}</td>
-          <td style="color:var(--accent); font-weight:bold;">${m}m</td>
-          <td>${escHtml(row.perfil || "")}</td>
-          <td><span class="badge">${escHtml(row.ruta || "Solo Calandrado")}</span></td>
-          <td>${row.observaciones ? `<span style="color:var(--accent-orange); font-weight:bold;">📝 ${escHtml(row.observaciones)}</span>` : "-"}</td>
+          <td data-label="Acción">${actionBtn}</td>
+          <td data-label="Fecha">${fmtDateHora(row.fecha_hora)}</td>
+          <td data-label="Cliente/Archivo">${formatearAnidadosHTML(row.cliente_archivo)}</td>
+          <td data-label="Diseño" style="text-align:center;">${renderMiniaturaDiseno60(row.file_id, row.diseno, row.cliente_archivo)}</td>
+          <td data-label="Tela">${escHtml(row.tela_destino || "")}</td>
+          <td data-label="Nº Rollo">${escHtml(row.num_rollo_tela || "")}</td>
+          <td data-label="Color">${escHtml(row.color_tela || "")}</td>
+          <td data-label="Metros" style="color:var(--accent); font-weight:bold;">${m}m</td>
+          <td data-label="Perfil">${escHtml(row.perfil || "")}</td>
+          <td data-label="Ruta"><span class="badge">${escHtml(row.ruta || "Solo Calandrado")}</span></td>
+          <td data-label="Notas">${row.observaciones ? `<span style="color:var(--accent-orange); font-weight:bold;">📝 ${escHtml(row.observaciones)}</span>` : "-"}</td>
         </tr>
       `;
     });
@@ -979,77 +979,6 @@ function renderModuloCalandrado() {
       `;
     }
     contRollos.innerHTML = html;
-
-    // Listeners directos inmediatos e inmunes a bubbling
-    contRollos.querySelectorAll(".btn-cal-montar-rollo").forEach(btn => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const rId = btn.getAttribute("data-rollo");
-        STATE.rolloMontadoCalandra = STATE.rolloMontadoCalandra === rId ? "" : rId;
-        localStorage.setItem("vg_rollo_calandra_montado", STATE.rolloMontadoCalandra);
-        STATE.rollosCalandraAbiertos.add(rId);
-        renderModuloCalandrado();
-      });
-    });
-
-    contRollos.querySelectorAll(".btn-cal-procesar-rollo").forEach(btn => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const rId = btn.getAttribute("data-rollo");
-        procesarRolloCompletoCalandrado(rId);
-      });
-    });
-
-    contRollos.querySelectorAll(".btn-cal-pdf-rollo").forEach(btn => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const rId = btn.getAttribute("data-rollo");
-        emitirPDFCalandrado(rId);
-      });
-    });
-
-    contRollos.querySelectorAll(".btn-cal-kiosco-rollo").forEach(btn => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const rId = btn.getAttribute("data-rollo");
-        abrirKioscoCalandra(null, rId);
-      });
-    });
-
-    contRollos.querySelectorAll(".btn-cal-terminar").forEach(btn => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        finalizarTrabajoCalandrado(btn.getAttribute("data-id"));
-      });
-    });
-
-    contRollos.querySelectorAll(".btn-cal-kiosco").forEach(btn => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        abrirKioscoCalandra(btn.getAttribute("data-id"));
-      });
-    });
-
-    contRollos.querySelectorAll(".btn-cal-falla").forEach(btn => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const reg = STATE.colaCalandrado.find(c => c.id === btn.getAttribute("data-id"));
-        reportarFallaConReposicion(reg, "Calandrado");
-      });
-    });
-
-    contRollos.querySelectorAll(".rollo-header[data-toggle-rollo]").forEach(hdr => {
-      hdr.addEventListener("click", (e) => {
-        if (e.target.closest("button")) return;
-        const rId = hdr.getAttribute("data-toggle-rollo");
-        const bodyEl = document.getElementById(`body_rollo_${rId}`);
-        if (bodyEl) {
-          bodyEl.classList.toggle("open");
-          if (bodyEl.classList.contains("open")) STATE.rollosCalandraAbiertos.add(rId);
-          else STATE.rollosCalandraAbiertos.delete(rId);
-        }
-      });
-    });
   }
 
   // Previsión de Telas Requeridas
@@ -1626,6 +1555,14 @@ async function procesarImpresionLote() {
 
   for (const s of seleccionados) {
     await sb().from("prod_pendientes_drive").update({ estado_impreso: "SI" }).eq("id", s.id);
+  }
+
+  // Notificar al puente de Google Drive para mover físicamente los archivos a la subcarpeta IMPRESOS
+  const bridgeUrl = window.VG_CONEXION?.sandboxBridgeUrl;
+  if (bridgeUrl && fileIdsUnidos) {
+    try {
+      fetch(`${bridgeUrl}?action=mover_a_impresos&file_ids=${encodeURIComponent(fileIdsUnidos)}`, { mode: "no-cors" }).catch(() => {});
+    } catch (_) {}
   }
 
   await Promise.all([
@@ -2291,7 +2228,7 @@ function renderContenidoModalKiosco() {
     </div>
 
     <!-- Reproductor Principal de 2 Columnas (igual a panelReproductorCalandra original) -->
-    <div style="display:grid; grid-template-columns: 1fr 1.6fr; gap:16px; align-items:center; background:#141720; padding:14px; border-radius:8px; border:1px solid #2a324b; margin-bottom:14px;">
+    <div class="kiosk-player-grid">
       <div style="text-align:center;">
         ${imgPreviewHtml}
         <div style="font-size:34px; font-weight:bold; color:var(--accent-magenta); line-height:1;">${fmtNum(trabActual.metros)} m</div>
@@ -2385,8 +2322,19 @@ function renderContenidoModalKiosco() {
 
   const btnSig = document.getElementById("btnKioscoSiguienteTrabajo");
   const btnDesc = document.getElementById("btnKioscoDescartarSiguiente");
-  if (btnSig) btnSig.style.display = trabajos.length > 1 ? "block" : "none";
-  if (btnDesc) btnDesc.style.display = "block";
+  const btnFin = document.getElementById("btnKioscoFinalizar");
+
+  if (btnSig) {
+    btnSig.innerHTML = pendientesRestantes.length > 1 ? "✔️ TERMINAR ESTE Y SIGUIENTE ➔" : "✔️ FINALIZAR TRABAJO";
+    btnSig.style.display = "block";
+  }
+  if (btnDesc) {
+    btnDesc.innerHTML = pendientesRestantes.length > 1 ? "✂️ DESECHAR PAPEL Y SIGUIENTE" : "✂️ DESECHAR PAPEL Y FINALIZAR";
+    btnDesc.style.display = "block";
+  }
+  if (btnFin) {
+    btnFin.style.display = pendientesRestantes.length > 1 ? "block" : "none";
+  }
 
   modal.querySelectorAll(".kiosco-item-card").forEach(card => {
     card.onclick = () => {
@@ -2411,79 +2359,41 @@ function renderContenidoModalKiosco() {
 }
 
 function abrirKioscoCalandra(idCal, rolloId = null) {
-  const esModoRolloGeneral = Boolean(rolloId);
+  const modal = document.getElementById("modalKioscoOperativo");
+  if (!modal) return;
 
-  // Si ya estaba corriendo en segundo plano para el mismo rollo/trabajo, restauramos la ventana correspondiente
+  // Si ya estaba corriendo en segundo plano para el mismo rollo/trabajo, restauramos la ventana
   if (STATE.kiosco.corriendoEnFondo) {
-    if ((esModoRolloGeneral && STATE.kiosco.modo === "ROLLO" && STATE.kiosco.rolloId === rolloId) ||
-        (!esModoRolloGeneral && STATE.kiosco.modo === "INDIVIDUAL" && STATE.kiosco.registroIds.includes(idCal))) {
+    if ((rolloId && STATE.kiosco.rolloId === rolloId) || (!rolloId && STATE.kiosco.registroIds.includes(idCal))) {
       restaurarKioscoDesdeFondo();
       return;
     }
   }
 
-  if (!esModoRolloGeneral) {
-    // ========================================================================
-    // MODO ENFOQUE INDIVIDUAL (1 SOLO TRABAJO - #modalEnfoqueCalandra)
-    // ========================================================================
+  let trabajos = [];
+  let idxInicial = 0;
+  let rolloNombre = rolloId || "Sin Rollo";
+
+  if (rolloId) {
+    trabajos = STATE.colaCalandrado.filter(c => c.id_rollo_papel === rolloId && !String(c.estado).toLowerCase().includes("terminado"));
+  } else {
     const r = STATE.colaCalandrado.find(c => c.id === idCal);
     if (!r) return;
-    const modalE = document.getElementById("modalEnfoqueCalandra");
-    if (!modalE) return;
-
-    STATE.kiosco.modo = "INDIVIDUAL";
-    STATE.kiosco.abierto = true;
-    STATE.kiosco.corriendoEnFondo = false;
-    STATE.kiosco.pausado = false;
-    STATE.kiosco.acumuladoMs = 0;
-    STATE.kiosco.ultimoInicioMs = Date.now();
-    STATE.kiosco.inicioMs = Date.now();
-    STATE.kiosco.rolloId = r.id_rollo_papel || "Sin Rollo";
-    STATE.kiosco.trabajos = [r];
-    STATE.kiosco.indiceActual = 0;
-    STATE.kiosco.registroIds = [r.id];
-    STATE.kiosco.completadosIds = new Set();
-    STATE.kiosco.descartadosIds = new Set();
-
-    document.getElementById("enfVel").value = r.velocidad || 50;
-    document.getElementById("enfTemp").value = r.temperatura || 205;
-
-    renderContenidoModalEnfoqueIndividual();
-    modalE.classList.add("open");
-    actualizarDisplayCronometroKiosco();
-
-    if (STATE.kiosco.timerInterval) clearInterval(STATE.kiosco.timerInterval);
-    STATE.kiosco.timerInterval = setInterval(actualizarDisplayCronometroKiosco, 1000);
-
-    document.getElementById("btnEnfPausaReanudar").onclick = alternarPausaKiosco;
-    document.getElementById("btnEnfMinimizar").onclick = minimizarKioscoAFondo;
-    document.getElementById("btnEnfCerrar").onclick = () => {
-      if (confirm("¿Salir del Modo Enfoque y detener el cronómetro sin guardar?")) {
-        cerrarKioscoDefinitivo();
-      }
-    };
-    document.getElementById("btnEnfFallaCal").onclick = () => reportarFallaConReposicion(r, "Calandrado");
-    document.getElementById("btnEnfFallaImp").onclick = () => reportarFallaConReposicion(r, "Impresión");
-    document.getElementById("btnEnfTerminar").onclick = async () => {
-      const min = Math.max(1, Math.round(obtenerMsTranscurridosKiosco() / 60000));
-      const vel = parseFloat(document.getElementById("enfVel")?.value) || 50;
-      const temp = parseFloat(document.getElementById("enfTemp")?.value) || 205;
-      cerrarKioscoDefinitivo();
-      await finalizarTrabajoCalandrado(r.id, min, true, vel, temp);
-      toast(`✅ Trabajo finalizado (${min} min | Vel: ${vel} | Temp: ${temp}°C).`);
-      await cargarDatosTodo();
-    };
-    return;
+    rolloNombre = r.id_rollo_papel || "Sin Rollo";
+    const delMismoRollo = STATE.colaCalandrado.filter(c => c.id_rollo_papel === r.id_rollo_papel && !String(c.estado).toLowerCase().includes("terminado"));
+    if (delMismoRollo.length > 0) {
+      trabajos = delMismoRollo;
+      idxInicial = Math.max(0, delMismoRollo.findIndex(t => t.id === idCal));
+    } else {
+      trabajos = [r];
+      idxInicial = 0;
+    }
   }
 
-  // ==========================================================================
-  // MODO KIOSKO GENERAL DE ROLLO COMPLETO (#modalKioscoOperativo)
-  // ==========================================================================
-  const modal = document.getElementById("modalKioscoOperativo");
-  if (!modal) return;
-
-  const trabajos = STATE.colaCalandrado.filter(c => c.id_rollo_papel === rolloId && !String(c.estado).toLowerCase().includes("terminado"));
-  if (trabajos.length === 0) return;
+  if (trabajos.length === 0) {
+    toast("No hay trabajos pendientes en esta bobina.", "warn");
+    return;
+  }
 
   STATE.kiosco.modo = "ROLLO";
   STATE.kiosco.abierto = true;
@@ -2492,9 +2402,9 @@ function abrirKioscoCalandra(idCal, rolloId = null) {
   STATE.kiosco.acumuladoMs = 0;
   STATE.kiosco.ultimoInicioMs = Date.now();
   STATE.kiosco.inicioMs = Date.now();
-  STATE.kiosco.rolloId = rolloId || trabajos[0].id_rollo_papel || "Sin Rollo";
+  STATE.kiosco.rolloId = rolloNombre;
   STATE.kiosco.trabajos = trabajos;
-  STATE.kiosco.indiceActual = 0;
+  STATE.kiosco.indiceActual = idxInicial;
   STATE.kiosco.registroIds = trabajos.map(t => t.id);
   STATE.kiosco.completadosIds = new Set();
   STATE.kiosco.descartadosIds = new Set();
@@ -2506,106 +2416,121 @@ function abrirKioscoCalandra(idCal, rolloId = null) {
   if (STATE.kiosco.timerInterval) clearInterval(STATE.kiosco.timerInterval);
   STATE.kiosco.timerInterval = setInterval(actualizarDisplayCronometroKiosco, 1000);
 
-  document.getElementById("btnKioscoPausarReanudar").onclick = alternarPausaKiosco;
-  document.getElementById("btnKioscoMinimizar").onclick = minimizarKioscoAFondo;
-  document.getElementById("btnKioscoMinimizar2").onclick = minimizarKioscoAFondo;
-  document.getElementById("btnKioscoCancelarDefinitivo").onclick = () => {
-    if (confirm("¿Cerrar el Modo Kiosko y detener el cronómetro sin guardar?")) {
-      cerrarKioscoDefinitivo();
-    }
-  };
+  const btnPausa = document.getElementById("btnKioscoPausarReanudar");
+  if (btnPausa) btnPausa.onclick = alternarPausaKiosco;
 
-  document.getElementById("btnKioscoSiguienteTrabajo").onclick = async () => {
-    const trabActual = STATE.kiosco.trabajos[STATE.kiosco.indiceActual];
-    if (!trabActual) return;
+  const btnMin = document.getElementById("btnKioscoMinimizar");
+  if (btnMin) btnMin.onclick = minimizarKioscoAFondo;
 
-    const min = Math.max(1, Math.round(obtenerMsTranscurridosKiosco() / 60000));
-    const vel = parseFloat(document.getElementById("kioscoInputVelocidad")?.value) || 50;
-    const temp = parseFloat(document.getElementById("kioscoInputTemperatura")?.value) || 205;
+  const btnCerrar = document.getElementById("btnKioscoCancelarDefinitivo");
+  if (btnCerrar) {
+    btnCerrar.onclick = () => {
+      if (confirm("¿Cerrar el Modo Kiosko y detener el cronómetro sin guardar?")) {
+        cerrarKioscoDefinitivo();
+      }
+    };
+  }
 
-    await finalizarTrabajoCalandrado(trabActual.id, min, true, vel, temp);
-    STATE.kiosco.completadosIds.add(trabActual.id);
+  const btnSig = document.getElementById("btnKioscoSiguienteTrabajo");
+  if (btnSig) {
+    btnSig.onclick = async () => {
+      const trabActual = STATE.kiosco.trabajos[STATE.kiosco.indiceActual];
+      if (!trabActual) return;
 
-    const sigIdx = buscarSiguienteIndicePendienteKiosco(STATE.kiosco.indiceActual);
-    if (sigIdx === -1) {
-      cerrarKioscoDefinitivo();
-      toast(`✅ ¡Todos los trabajos del rollo fueron calandrados!`);
+      const min = Math.max(1, Math.round(obtenerMsTranscurridosKiosco() / 60000));
+      const vel = parseFloat(document.getElementById("kioscoInputVelocidad")?.value) || 50;
+      const temp = parseFloat(document.getElementById("kioscoInputTemperatura")?.value) || 205;
+
+      await finalizarTrabajoCalandrado(trabActual.id, min, true, vel, temp);
+      STATE.kiosco.completadosIds.add(trabActual.id);
+
+      const sigIdx = buscarSiguienteIndicePendienteKiosco(STATE.kiosco.indiceActual);
+      if (sigIdx === -1) {
+        cerrarKioscoDefinitivo();
+        toast(`✅ ¡Todos los trabajos del rollo fueron calandrados!`);
+        await cargarDatosTodo();
+        return;
+      }
+
+      STATE.kiosco.indiceActual = sigIdx;
+      STATE.kiosco.acumuladoMs = 0;
+      STATE.kiosco.ultimoInicioMs = Date.now();
+      STATE.kiosco.pausado = false;
+      toast(`✅ "${trabActual.cliente_archivo}" guardado (${min} min | Vel: ${vel}m/min | Temp: ${temp}°C). Pasando al siguiente trabajo.`);
+      renderContenidoModalKiosco();
+      actualizarDisplayCronometroKiosco();
       await cargarDatosTodo();
-      return;
-    }
+    };
+  }
 
-    STATE.kiosco.indiceActual = sigIdx;
-    STATE.kiosco.acumuladoMs = 0;
-    STATE.kiosco.ultimoInicioMs = Date.now();
-    STATE.kiosco.pausado = false;
-    toast(`✅ "${trabActual.cliente_archivo}" guardado (${min} min). Pasando al siguiente trabajo.`);
-    renderContenidoModalKiosco();
-    actualizarDisplayCronometroKiosco();
-    await cargarDatosTodo();
-  };
+  const btnDesc = document.getElementById("btnKioscoDescartarSiguiente");
+  if (btnDesc) {
+    btnDesc.onclick = async () => {
+      const trabActual = STATE.kiosco.trabajos[STATE.kiosco.indiceActual];
+      if (!trabActual) return;
 
-  document.getElementById("btnKioscoDescartarSiguiente").onclick = async () => {
-    const trabActual = STATE.kiosco.trabajos[STATE.kiosco.indiceActual];
-    if (!trabActual) return;
+      const motivo = prompt(`Vas a desechar el papel de "${trabActual.cliente_archivo}" (${fmtNum(trabActual.metros)}m).\nMotivo del descarte / falla:`, "Papel desechado en Calandra");
+      if (motivo === null) return;
 
-    const motivo = prompt(`Vas a desechar el papel de "${trabActual.cliente_archivo}" (${fmtNum(trabActual.metros)}m).\nMotivo del descarte / falla:`, "Papel desechado en Calandra");
-    if (motivo === null) return;
+      await sb().from("prod_fallas_reposiciones").insert({
+        empresa_id: "vvgrafic-principal",
+        tipo_registro: "ALERTA_REPOSICION",
+        estacion: "Calandrado",
+        id_rollo: trabActual.id_rollo_papel,
+        batch_id: trabActual.batch_id,
+        archivo_afectado: trabActual.cliente_archivo,
+        tela: trabActual.tela_destino,
+        metros_merma: Number(trabActual.metros) || 0,
+        detalle_reposicion: `Papel desechado (${fmtNum(trabActual.metros)}m)`,
+        motivo: motivo || "Papel desechado en Calandra",
+        estado: "Pendiente"
+      });
 
-    await sb().from("prod_fallas_reposiciones").insert({
-      empresa_id: "vvgrafic-principal",
-      tipo_registro: "ALERTA_REPOSICION",
-      estacion: "Calandrado",
-      id_rollo: trabActual.id_rollo_papel,
-      batch_id: trabActual.batch_id,
-      archivo_afectado: trabActual.cliente_archivo,
-      tela: trabActual.tela_destino,
-      metros_merma: Number(trabActual.metros) || 0,
-      detalle_reposicion: `Papel desechado (${fmtNum(trabActual.metros)}m)`,
-      motivo: motivo || "Papel desechado en Calandra",
-      estado: "Pendiente"
-    });
+      await sb().from("prod_cola_calandrado").update({
+        estado: "Terminado",
+        fecha_terminado: new Date().toISOString(),
+        observaciones: `[PAPEL DESECHADO: ${motivo}] ${trabActual.observaciones || ""}`.trim()
+      }).eq("id", trabActual.id);
 
-    await sb().from("prod_cola_calandrado").update({
-      estado: "Terminado",
-      fecha_terminado: new Date().toISOString(),
-      observaciones: `[PAPEL DESECHADO: ${motivo}] ${trabActual.observaciones || ""}`.trim()
-    }).eq("id", trabActual.id);
+      STATE.kiosco.descartadosIds.add(trabActual.id);
 
-    STATE.kiosco.descartadosIds.add(trabActual.id);
+      const sigIdx = buscarSiguienteIndicePendienteKiosco(STATE.kiosco.indiceActual);
+      if (sigIdx === -1) {
+        cerrarKioscoDefinitivo();
+        toast(`✂️ Papel desechado registrado. Fin del rollo.`);
+        await cargarDatosTodo();
+        return;
+      }
 
-    const sigIdx = buscarSiguienteIndicePendienteKiosco(STATE.kiosco.indiceActual);
-    if (sigIdx === -1) {
-      cerrarKioscoDefinitivo();
-      toast(`✂️ Papel desechado registrado. No quedan más trabajos en el rollo.`);
+      STATE.kiosco.indiceActual = sigIdx;
+      STATE.kiosco.acumuladoMs = 0;
+      STATE.kiosco.ultimoInicioMs = Date.now();
+      toast(`✂️ Papel desechado registrado. Avanzando al siguiente trabajo.`);
+      renderContenidoModalKiosco();
+      actualizarDisplayCronometroKiosco();
       await cargarDatosTodo();
-      return;
-    }
+    };
+  }
 
-    STATE.kiosco.indiceActual = sigIdx;
-    STATE.kiosco.acumuladoMs = 0;
-    STATE.kiosco.ultimoInicioMs = Date.now();
-    toast(`✂️ Papel desechado registrado. Avanzando al siguiente trabajo.`);
-    renderContenidoModalKiosco();
-    actualizarDisplayCronometroKiosco();
-    await cargarDatosTodo();
-  };
+  const btnFin = document.getElementById("btnKioscoFinalizar");
+  if (btnFin) {
+    btnFin.onclick = async () => {
+      const min = Math.max(1, Math.round(obtenerMsTranscurridosKiosco() / 60000));
+      const vel = parseFloat(document.getElementById("kioscoInputVelocidad")?.value) || 50;
+      const temp = parseFloat(document.getElementById("kioscoInputTemperatura")?.value) || 205;
 
-  document.getElementById("btnKioscoFinalizar").onclick = async () => {
-    const min = Math.max(1, Math.round(obtenerMsTranscurridosKiosco() / 60000));
-    const vel = parseFloat(document.getElementById("kioscoInputVelocidad")?.value) || 50;
-    const temp = parseFloat(document.getElementById("kioscoInputTemperatura")?.value) || 205;
+      const pendientesIds = STATE.kiosco.trabajos
+        .map(t => t.id)
+        .filter(id => !STATE.kiosco.completadosIds.has(id) && !STATE.kiosco.descartadosIds.has(id));
 
-    const pendientesIds = STATE.kiosco.trabajos
-      .map(t => t.id)
-      .filter(id => !STATE.kiosco.completadosIds.has(id) && !STATE.kiosco.descartadosIds.has(id));
-
-    cerrarKioscoDefinitivo();
-    for (const id of pendientesIds) {
-      await finalizarTrabajoCalandrado(id, min, true, vel, temp);
-    }
-    toast(`✅ Kiosko finalizado (${pendientesIds.length} trabajo(s) guardados con Vel: ${vel}m/min y Temp: ${temp}°C).`);
-    await cargarDatosTodo();
-  };
+      cerrarKioscoDefinitivo();
+      for (const id of pendientesIds) {
+        await finalizarTrabajoCalandrado(id, min, true, vel, temp);
+      }
+      toast(`✅ Kiosko finalizado (${pendientesIds.length} trabajo(s) guardados con Vel: ${vel}m/min y Temp: ${temp}°C).`);
+      await cargarDatosTodo();
+    };
+  }
 }
 
 async function reportarFallaConReposicion(reg, estacion) {
@@ -2921,7 +2846,49 @@ export function inicializarEventosUI() {
     await cargarDatosTodo();
   });
 
+  document.getElementById("btnGuardarCompraFinanzas")?.addEventListener("click", async () => {
+    const tipo = document.getElementById("finCompraTipo")?.value || "Papel";
+    const detalle = document.getElementById("finCompraDetalle")?.value.trim() || "Insumo general";
+    const cant = parseFloat(document.getElementById("finCompraCant")?.value) || 1;
+    const costo = parseFloat(document.getElementById("finCompraCosto")?.value) || 0;
+
+    if (costo <= 0) {
+      toast("Por favor ingresá un costo válido.", "warn");
+      return;
+    }
+
+    const { error } = await sb().from("v3_movimientos_caja").insert({
+      tipo_movimiento: "egreso",
+      metodo_pago: "Efectivo",
+      monto: costo,
+      fecha_pago: new Date().toISOString(),
+      notas: `[COMPRA INSUMOS: ${tipo}] ${detalle} (Cant: ${cant})`
+    });
+
+    if (error) {
+      toast("Error al registrar compra: " + error.message, "error");
+      return;
+    }
+
+    document.getElementById("finCompraDetalle").value = "";
+    document.getElementById("finCompraCosto").value = "";
+    toast(`🛒 Compra de ${tipo} registrada ($${fmtNum(costo)}).`);
+    await cargarDatosTodo();
+  });
+
   document.body.addEventListener("click", async (e) => {
+    const hdrCal = e.target.closest(".rollo-header[data-toggle-rollo]");
+    if (hdrCal && !e.target.closest("button")) {
+      const rId = hdrCal.getAttribute("data-toggle-rollo");
+      const bodyEl = document.getElementById(`body_rollo_${rId}`);
+      if (bodyEl) {
+        bodyEl.classList.toggle("open");
+        if (bodyEl.classList.contains("open")) STATE.rollosCalandraAbiertos.add(rId);
+        else STATE.rollosCalandraAbiertos.delete(rId);
+      }
+      return;
+    }
+
     const btnEdit = e.target.closest(".btn-crud-edit");
     if (btnEdit) { abrirModalCrudUniversal(btnEdit.getAttribute("data-table"), btnEdit.getAttribute("data-id")); return; }
 

@@ -213,7 +213,7 @@
       </div>
       <input type="text" id="searchHistorialImpLocal" class="search-input" placeholder="🔍 Buscar cliente, archivo o tela..." />
       <div style="overflow-x: auto;">
-        <table>
+        <table class="tabla-tarjetas">
           <thead>
             <tr>
               <th>Acción</th>
@@ -704,6 +704,26 @@
 
       <div style="padding:14px 18px; overflow-y:auto; flex:1;">
         <div id="kioscoSubtitulo"></div>
+      </div>
+
+      <!-- Barra de Cronómetro y Acciones Fijas del Reproductor -->
+      <div style="background:#11141c; padding:12px 18px; border-top:1px solid #2a324b; display:flex; flex-direction:column; gap:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; background:#000; padding:10px 14px; border-radius:8px; border:1px solid #4CAF50;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-size:11px; color:#aaa; font-weight:bold;">CRONÓMETRO:</span>
+            <span id="kioscoCronometro" style="font-family:monospace; font-size:28px; font-weight:bold; color:#00E676;">00:00:00</span>
+            <span id="kioscoEstadoPausaBadge" class="badge" style="background:#ff9800; color:#000; display:none;">EN PAUSA</span>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button type="button" id="btnKioscoPausarReanudar" style="background:#ff9800; color:#000; border:none; padding:10px 18px; border-radius:6px; font-weight:bold; font-size:14px; cursor:pointer;">⏸️ PAUSAR</button>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 2fr 1.2fr 1fr; gap:10px;">
+          <button type="button" id="btnKioscoSiguienteTrabajo" class="btn-main" style="margin:0; padding:14px; font-size:15px; font-weight:bold; background:#00E676; color:#000;">✔️ TERMINAR ESTE Y SIGUIENTE ➔</button>
+          <button type="button" id="btnKioscoDescartarSiguiente" style="margin:0; padding:14px; font-size:13px; font-weight:bold; background:rgba(255,82,82,0.18); border:1px solid #ff5252; color:#ff5252; border-radius:6px; cursor:pointer;">✂️ DESECHAR PAPEL Y SIGUIENTE</button>
+          <button type="button" id="btnKioscoFinalizar" style="margin:0; padding:14px; font-size:13px; font-weight:bold; background:#2196F3; color:#fff; border:none; border-radius:6px; cursor:pointer;">🏁 TERMINAR TODO</button>
+        </div>
       </div>
     </div>
   </div>

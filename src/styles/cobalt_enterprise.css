@@ -117,43 +117,91 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
   align-items: center;
 }
 
-/* ESTILOS TARJETAS RESPONSIVAS MÓVIL */
+/* Reproductor Kiosko a 2 columnas */
+.kiosk-player-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.6fr;
+  gap: 16px;
+  align-items: center;
+  background: #141720;
+  padding: 14px;
+  border-radius: 8px;
+  border: 1px solid #2a324b;
+  margin-bottom: 14px;
+}
+
+/* ESTILOS TARJETAS RESPONSIVAS MÓVIL (Rescate exacto de Estilos.html líneas 98-164 + Ergonomía Táctil) */
 @media (max-width: 768px) {
+  body { padding: 8px; }
   .vg-route-group { grid-template-columns: 1fr; }
+  
+  /* Encabezados de bobina adaptados a celular */
+  .rollo-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+    padding: 12px 10px !important;
+  }
+  .rollo-header > div:last-child {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+  .rollo-header button {
+    min-height: 44px !important;
+    font-size: 14px !important;
+    padding: 10px !important;
+    width: 100% !important;
+    margin-left: 0 !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Acciones de cada fila convertidas a botones táctiles grandes */
   .cal-actions-grid {
     width: 100% !important;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 8px !important;
   }
   .cal-actions-grid button {
     width: 100% !important;
+    min-height: 46px !important;
     padding: 10px 6px !important;
-    font-size: 13px !important;
-    justify-content: center;
+    font-size: 14px !important;
+    font-weight: bold !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
   }
-  .tabla-tarjetas thead { display: none; }
+
+  /* Transformación de tabla a tarjetas verticales */
+  .tabla-tarjetas thead { display: none !important; }
   .tabla-tarjetas { min-width: 100% !important; }
-  .tabla-tarjetas, .tabla-tarjetas tbody, .tabla-tarjetas tr { display: block; width: 100%; }
+  .tabla-tarjetas, .tabla-tarjetas tbody, .tabla-tarjetas tr { display: block !important; width: 100% !important; }
   .tabla-tarjetas tr {
-    background: #1a1c23;
-    border: 1px solid #333;
-    border-radius: 8px;
-    margin-bottom: 15px;
-    padding: 15px 10px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-    position: relative;
+    background: #1a1c23 !important;
+    border: 1px solid #333 !important;
+    border-radius: 8px !important;
+    margin-bottom: 15px !important;
+    padding: 14px 10px !important;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3) !important;
+    position: relative !important;
+    box-sizing: border-box !important;
   }
   .tabla-tarjetas td {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    border: none;
-    padding: 8px 0;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    border: none !important;
+    padding: 8px 0 !important;
     text-align: left !important;
-    border-bottom: 1px dashed #333;
-    width: 100%;
+    border-bottom: 1px dashed #2a2a2a !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
-  .tabla-tarjetas td:last-child { border-bottom: none; }
+  .tabla-tarjetas td:last-child { border-bottom: none !important; }
   .tabla-tarjetas td:before {
     content: attr(data-label);
     font-weight: bold;
@@ -162,6 +210,32 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
     font-size: 12px;
     margin-bottom: 4px;
     text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
+  .tabla-tarjetas td img {
+    width: 100% !important;
+    max-width: 240px !important;
+    height: auto !important;
+    max-height: 140px !important;
+    object-fit: contain !important;
+    border-radius: 8px !important;
+    margin-top: 5px;
+  }
+
+  /* Modo Kiosko optimizado para pantalla completa en celular */
+  #modalKioscoOperativo .modal-content {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+  }
+  .kiosk-player-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+    padding: 10px !important;
+  }
+
   #tabCalandrado .tabla-normal { min-width: 500px; }
 }
