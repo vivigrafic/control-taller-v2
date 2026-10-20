@@ -1,0 +1,7 @@
+node_modules/
+.env
+supabase/seed_sandbox.js
+supabase/check_existing_data.sql
+gas_sandbox_bridge/
+watchdog_flexiprint.js
+flexiprint_spool_test/
