@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>V&amp;V Grafic - Terminal Completa 2.0 (Supabase)</title>
+  <title>V&amp;V Grafic - Terminal Completa</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
@@ -14,70 +14,53 @@
 </head>
 <body>
 
-  <!-- FRANJA DISCRETA DE CONEXIÓN AL CLON DE PRUEBAS + USUARIO ACTIVO -->
-  <div class="sandbox-top-strip">
-    <div>
-      <span class="badge mru-top">🧪 BASE DE PRUEBAS: kkvzzheccniclfwqzivu</span>
-      <span style="margin-left:6px;color:var(--vg-text-secondary);">Sistema actual en producción intacto · Edición, Eliminación y Carga Libre en todo el sistema</span>
-    </div>
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span style="color:var(--vg-text-secondary);font-weight:700;">👤 Operador:</span>
-      <select id="vgSelectOperadorActual" style="width:auto;padding:4px 8px;font-size:12px;font-weight:700;">
-        <option value="Roberto">Roberto</option>
-        <option value="Impresión">Impresión</option>
-        <option value="Calandra">Calandra</option>
-        <option value="Láser">Láser</option>
-        <option value="DTF">DTF</option>
+  <!-- LOGO OFICIAL V&V GRAFIC (Idéntico a Index.html línea 13) -->
+  <div style="text-align: center; margin-bottom: 10px; position: relative;">
+    <img id="imgLogoVV" src="" alt="V&amp;V Grafic Logo" style="height: 60px; object-fit: contain;" />
+    <div style="position:absolute; right:0; top:0; display:flex; gap:6px; align-items:center;">
+      <select id="vgSelectOperadorActual" style="width:auto; padding:4px 8px; font-size:11px; background:#111; border:1px solid #333;">
+        <option value="Roberto">👤 Roberto</option>
+        <option value="Impresión">👤 Impresión</option>
+        <option value="Calandra">👤 Calandra</option>
+        <option value="Láser">👤 Láser</option>
+        <option value="DTF">👤 DTF</option>
       </select>
-      <label class="badge mru-top" style="cursor:pointer;margin:0;" title="Leer medidas y DPI real desde el encabezado binario de imágenes PNG, JPG o TIFF">
-        🔬 Lector Binario DPI
+      <label class="badge" style="cursor:pointer; margin:0; background:#222; border:1px solid #444;" title="Leer medidas reales DPI de imágenes">
+        🔬 DPI
         <input type="file" id="inpInspectorArchivosLocales" multiple accept=".png,.jpg,.jpeg,.tif,.tiff,.pdf" style="display:none;" />
       </label>
     </div>
   </div>
 
-  <!-- LOGO OFICIAL V&V GRAFIC -->
-  <div style="text-align: center; margin-bottom: 10px;">
-    <img id="imgLogoVV" src="" alt="V&amp;V Grafic Logo" style="height: 56px; object-fit: contain;" />
-  </div>
-
-  <!-- BARRA DE FILTRO RENDIMIENTO POR FECHA + BOTONES DE PERÍODO + BUSCADOR GLOBAL (Captura 1 Mejorada) -->
-  <div class="card" style="padding:10px 15px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; background:var(--vg-surface-dark); margin-bottom:14px;">
-    <strong style="color:var(--vg-text-secondary); font-size:12px;">📅 Filtro Rendimiento por Fecha:</strong>
-    <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-      <input type="date" id="vgDateDesde" style="width:135px; padding:5px 8px; font-size:12px;" />
-      <input type="date" id="vgDateHasta" style="width:135px; padding:5px 8px; font-size:12px;" />
-      <button type="button" id="btnCalcularRango" class="btn-main" style="width:auto; margin:0; padding:6px 14px; font-size:12px;">🔍 Calcular</button>
-    </div>
-
-    <!-- BOTONES RÁPIDOS DE PERÍODO (Hoy, Día Anterior/Ayer, Semana Anterior, etc. — Pedido #4) -->
-    <div style="display:flex; gap:5px; flex-wrap:wrap; align-items:center;">
-      <button type="button" class="badge mru-top vg-period-pill" data-period="todo" style="cursor:pointer;">Histórico</button>
+  <!-- BARRA FILTRO RENDIMIENTO POR FECHA (Idéntica a Index.html línea 16 + Botones Ayer/Semana Ant y Buscador Global) -->
+  <div class="card" style="padding:10px 15px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; background:#111; border:1px solid #333; margin-bottom:15px;">
+    <strong style="color:#aaa; font-size:12px;">📅 Filtro Rendimiento por Fecha:</strong>
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      <input type="date" id="vgDateDesde" style="width:135px; padding:5px; font-size:12px;" />
+      <input type="date" id="vgDateHasta" style="width:135px; padding:5px; font-size:12px;" />
+      <button type="button" id="btnCalcularRango" class="btn-main" style="width:auto; margin:0; padding:5px 15px; font-size:12px; border-radius:4px;">🔍 Calcular</button>
+      <button type="button" class="badge vg-period-pill activo" data-period="todo" style="cursor:pointer;">Histórico</button>
       <button type="button" class="badge vg-period-pill" data-period="hoy" style="cursor:pointer;">Hoy</button>
-      <button type="button" class="badge vg-period-pill" data-period="ayer" style="cursor:pointer;">Día Anterior (Ayer)</button>
-      <button type="button" class="badge vg-period-pill" data-period="semana_actual" style="cursor:pointer;">Esta Semana</button>
-      <button type="button" class="badge vg-period-pill" data-period="semana_anterior" style="cursor:pointer;">Semana Anterior</button>
-      <button type="button" class="badge vg-period-pill" data-period="mes_actual" style="cursor:pointer;">Este Mes</button>
+      <button type="button" class="badge vg-period-pill" data-period="ayer" style="cursor:pointer;">Ayer</button>
+      <button type="button" class="badge vg-period-pill" data-period="semana_actual" style="cursor:pointer;">Esta Sem.</button>
+      <button type="button" class="badge vg-period-pill" data-period="semana_anterior" style="cursor:pointer;">Sem. Anterior</button>
     </div>
-
-    <!-- BUSCADOR UNIVERSAL EN TODOS LOS MÓDULOS (Pedido #5) -->
-    <div style="flex:1; min-width:220px; position:relative;">
-      <input type="text" id="vgOmniSearchInput" class="search-input" style="margin:0; border-color:var(--vg-brand-secondary);" placeholder="🔍 Buscador Global (cliente, archivo, perfil, tela, rollo, metros, nota)..." />
-      <button type="button" id="vgOmniSearchClear" style="position:absolute;right:8px;top:6px;background:none;border:none;color:var(--vg-text-secondary);cursor:pointer;font-size:12px;">✖</button>
+    <div style="flex:1; min-width:200px; position:relative;">
+      <input type="text" id="vgOmniSearchInput" style="padding:5px 10px; font-size:12px; background:#222; border:1px solid #444;" placeholder="🔎 Buscar trabajo en todo el sistema (cliente, archivo, tela, perfil, rollo, metros)..." />
+      <button type="button" id="vgOmniSearchClear" style="position:absolute; right:6px; top:4px; background:none; border:none; color:#888; cursor:pointer; font-size:12px;">✖</button>
     </div>
-
-    <div id="vgPeriodSummaryMetrics" style="width:100%; font-weight:700; color:var(--vg-brand-secondary); font-size:12px; text-align:right; padding-top:4px; border-top:1px solid var(--vg-border-subtle);"></div>
+    <div id="vgPeriodSummaryMetrics" style="font-weight:bold; color:var(--accent); font-size:12px; text-align:right;">(Selecciona fechas para ver metros producidos)</div>
   </div>
 
-  <!-- PANEL FLOTANTE DE RESULTADOS DEL BUSCADOR GLOBAL -->
-  <div id="vgOmnisearchPanel" class="card" style="display:none; border:2px solid var(--vg-brand-secondary);"></div>
+  <!-- PANEL DE RESULTADOS DE BÚSQUEDA GLOBAL -->
+  <div id="vgOmnisearchPanel" class="card" style="display:none; background:#111; border:1px solid var(--accent-blue);"></div>
 
-  <!-- PESTAÑAS PRINCIPALES DE LA TERMINAL V&V GRAFIC -->
+  <!-- PESTAÑAS PRINCIPALES (Idénticas a Index.html línea 25) -->
   <div class="tab-container">
-    <button type="button" class="tab-btn active" data-tab="impresion">1. IMPRESIÓN (<span id="badgeTabImp">0</span>)</button>
-    <button type="button" class="tab-btn" data-tab="calandrado">2. CALANDRADO (<span id="badgeTabCal">0</span>)</button>
-    <button type="button" class="tab-btn" data-tab="laser">3. LÁSER &amp; QC (<span id="badgeTabLaser">0</span>)</button>
-    <button type="button" class="tab-btn" data-tab="dtf">4. MÓDULO DTF (<span id="badgeTabDtf">0</span>)</button>
+    <button type="button" class="tab-btn active" data-tab="impresion">1. IMPRESIÓN</button>
+    <button type="button" class="tab-btn" data-tab="calandrado">2. CALANDRADO</button>
+    <button type="button" class="tab-btn" data-tab="laser">3. LÁSER &amp; QC</button>
+    <button type="button" class="tab-btn" data-tab="dtf">4. MÓDULO DTF</button>
     <button type="button" class="tab-btn" data-tab="finanzas">5. FINANZAS</button>
     <button type="button" class="tab-btn" data-tab="cierre">6. MANT. / CIERRE</button>
     <button type="button" class="tab-btn" data-tab="metricas">7. MÉTRICAS (BI)</button>
@@ -85,173 +68,134 @@
   </div>
 
   <!-- ========================================================================
-       TAB 1: IMPRESIÓN (Idéntica a Capturas 1 y 2 + Mejoras Solicitadas)
+       TAB 1: IMPRESIÓN (Idéntico a Index.html líneas 34-152)
        ======================================================================== -->
-  <div id="sec-impresion" class="tab-content active vg-module-section">
-    <!-- BARRA DE ROLLO ACTIVO Y SINCRONIZAR (Captura 1) -->
-    <div style="background: var(--vg-cyan-soft); border: 1px solid var(--vg-brand-secondary); padding: 10px 14px; border-radius: 6px; margin-bottom: 15px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+  <div id="sec-impresion" class="tab-content active">
+    <div style="background: rgba(33, 150, 243, 0.1); border: 1px solid var(--accent-blue); padding: 10px; border-radius: 6px; margin-bottom: 15px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <div>
-        <strong>Rollo Activo:</strong> <span id="lblRolloActivo" class="font-mono" style="font-size:16px; color:var(--vg-brand-secondary); font-weight:800;">29g-1910-1</span>
-        | <strong>Restante:</strong> <span id="lblMetrosRestantes" class="font-mono" style="font-size:16px; color:var(--vg-status-ready); font-weight:800;">0.00m</span>
-        | <strong>Suma del Bloque Actual:</strong> <span id="lblSumaBloqueActual" class="font-mono" style="font-size:15px; color:var(--vg-status-processing); font-weight:800;">0.00m</span>
+        <strong>Rollo Activo:</strong> <span id="lblRolloActivo" style="font-size:16px;">29g-1910-1</span>
+        | <strong>Restante:</strong> <span id="lblMetrosRestantes" style="font-size:16px;">0.00m</span>
+        | <strong>Suma Bloque:</strong> <span id="lblSumaBloqueActual" style="font-size:15px; color:var(--accent-orange); font-weight:bold;">0.00m</span>
       </div>
       <div style="display:flex; gap:8px;">
         <button type="button" class="btn-secondary btn-crud-add" data-table="prod_pendientes_drive" style="width:auto; padding:8px 12px;">+ Archivo Manual</button>
-        <button type="button" id="btnSyncDriveSandbox" style="background:var(--vg-brand-secondary); color:var(--vg-bg-app); border:none; padding:8px 15px; border-radius:4px; font-weight:800; cursor:pointer;">Sincronizar</button>
+        <button type="button" id="btnSyncDriveSandbox" style="background:var(--accent-blue); color:#fff; border:none; padding:8px 15px; border-radius:4px; font-weight:bold; cursor:pointer;">Sincronizar</button>
       </div>
     </div>
 
-    <!-- LAS 8 CAJAS KPI DE IMPRESIÓN (Captura 1 + Día Anterior y Semana Anterior) -->
+    <!-- LAS 8 CAJAS KPI DE IMPRESIÓN (Copia exacta de Index.html líneas 40-49) -->
     <div class="stats-grid">
-      <div class="stat-box" style="border: 2px dashed var(--vg-brand-secondary); background:var(--vg-cyan-soft);">
-        <div class="stat-title" style="color:var(--vg-brand-secondary);">A IMPRIMIR</div>
-        <div class="stat-value" id="kpiImpPendiente">0.00m</div>
-      </div>
-      <div class="stat-box" style="border: 2px dashed var(--vg-status-alert); background:var(--vg-magenta-soft);">
-        <div class="stat-title" style="color:var(--vg-status-alert);">A CALANDRAR</div>
-        <div class="stat-value" id="kpiCalPendienteTop">0.00m</div>
-      </div>
-      <div class="stat-box" style="border: 2px dashed var(--vg-status-processing); background:var(--vg-amber-soft);">
-        <div class="stat-title" style="color:var(--vg-status-processing);">A CORTAR LÁSER</div>
-        <div class="stat-value" id="kpiLasPendienteTop">0.00m</div>
-      </div>
-      <div class="stat-box" style="border-bottom: 3px solid var(--vg-brand-secondary);">
-        <div class="stat-title">IMP DIARIO (HOY)</div>
-        <div class="stat-value" id="kpiImpHoy">0.00m</div>
-        <div class="stat-sub" id="kpiImpAyerSub">Ayer: 0.00m</div>
-      </div>
-      <div class="stat-box" style="border-bottom: 3px solid var(--vg-brand-primary);">
-        <div class="stat-title">IMP SEMANAL</div>
-        <div class="stat-value" id="kpiImpSemanal">0.00m</div>
-        <div class="stat-sub" id="kpiImpSemAntSub">Sem. Ant: 0.00m</div>
-      </div>
-      <div class="stat-box" style="border-bottom: 3px solid var(--vg-status-processing);">
-        <div class="stat-title">IMP MENSUAL</div>
-        <div class="stat-value" id="kpiImpMensual">0.00m</div>
-      </div>
-      <div class="stat-box" style="border-bottom: 3px solid var(--vg-text-secondary);">
-        <div class="stat-title">ESTE AÑO</div>
-        <div class="stat-value" id="kpiImpAnual">0.00m</div>
-      </div>
-      <div class="stat-box" style="border-bottom: 3px solid var(--vg-text-primary);">
-        <div class="stat-title">HISTÓRICO TOTAL</div>
-        <div class="stat-value" id="kpiImpHistorico">0.00m</div>
-      </div>
+      <div class="stat-box" style="border: 2px dashed var(--accent); background:rgba(0,230,118,0.1);"><div class="stat-title" style="color:var(--accent);">A Imprimir</div><div class="stat-value" id="kpiImpPendiente">0.00m</div></div>
+      <div class="stat-box" style="border: 2px dashed var(--accent-magenta); background:rgba(216,27,96,0.1);"><div class="stat-title" style="color:var(--accent-magenta);">A Calandrar</div><div class="stat-value" id="kpiCalPendienteTop">0.00m</div></div>
+      <div class="stat-box" style="border: 2px dashed var(--accent-orange); background:rgba(255,152,0,0.1);"><div class="stat-title" style="color:var(--accent-orange);">A Cortar Láser</div><div class="stat-value" id="kpiLasPendienteTop">0.00m</div></div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--accent-blue);"><div class="stat-title">Imp Diario</div><div class="stat-value" id="kpiImpHoy">0.00m</div><div id="kpiImpAyerSub" style="font-size:10px; color:#888; margin-top:2px;">Ayer: 0.00m</div></div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--accent);"><div class="stat-title">Imp Semanal</div><div class="stat-value" id="kpiImpSemanal">0.00m</div><div id="kpiImpSemAntSub" style="font-size:10px; color:#888; margin-top:2px;">Sem. Ant: 0.00m</div></div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--accent-orange);"><div class="stat-title">Imp Mensual</div><div class="stat-value" id="kpiImpMensual">0.00m</div></div>
+      <div class="stat-box" style="border-bottom: 3px solid #888;"><div class="stat-title">Este Año</div><div class="stat-value" id="kpiImpAnual">0.00m</div></div>
+      <div class="stat-box" style="border-bottom: 3px solid #fff;"><div class="stat-title">Histórico Total</div><div class="stat-value" id="kpiImpHistorico">0.00m</div></div>
     </div>
 
-    <!-- LOS 4 BOTONES DE ROLLO (Captura 1: + Rollo Nuevo, Corte (-4m), Avance, Calibración) -->
+    <!-- LOS 4 BOTONES DE ROLLO (Copia exacta de Index.html líneas 50-55) -->
     <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 15px;">
-      <button type="button" id="btnAbrirModalMontarRollo" class="btn-secondary">+ Rollo Nuevo</button>
-      <button type="button" id="btnCortarPapel4m" class="btn-secondary">Corte (-4m)</button>
-      <button type="button" id="btnAvanceManual" class="btn-secondary" style="border-color:var(--vg-status-processing); color:var(--vg-status-processing);">✏️ Avance</button>
-      <button type="button" id="btnCalibracionPapel" class="btn-secondary" style="border-color:var(--vg-status-alert); color:var(--vg-status-alert);">Calibración</button>
+      <button type="button" class="btn-secondary" id="btnAbrirModalMontarRollo">+ Rollo Nuevo</button>
+      <button type="button" class="btn-secondary" id="btnCortarPapel4m">Corte (-4m)</button>
+      <button type="button" class="btn-secondary" style="border-color:var(--accent-orange); color:var(--accent-orange);" id="btnAvanceManual">📏 Avance</button>
+      <button type="button" class="btn-secondary" style="border-color:var(--danger); color:var(--danger);" id="btnCalibracionPapel">Calibración</button>
     </div>
 
-    <!-- ACORDEÓN STOCK DE SOBRANTES DE PAPEL (Captura 1) -->
-    <div class="card" style="border-top: 3px solid var(--vg-brand-primary); padding: 12px; margin-bottom: 15px;">
+    <!-- SOBRANTES (Copia exacta de Index.html líneas 91-99) -->
+    <div class="card" style="border-top: 3px solid var(--accent); padding: 12px; margin-bottom: 15px;">
       <div id="btnToggleSobrantes" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
-        <h2 style="margin:0; border:none; padding:0; color:var(--vg-brand-secondary); font-size:13px;">📦 Stock de Sobrantes de Papel (Puchitos en Taller)</h2>
+        <h2 style="margin:0; border:none; padding:0; color:var(--accent); font-size:13px;">📦 Stock de Sobrantes de Papel (Puchitos en Taller)</h2>
         <span id="cantSobrantesBadge" class="badge">0 Disponibles</span>
       </div>
       <div id="panelSobrantes" style="display:none; margin-top:10px;">
-        <div id="listaSobrantesContainer" style="font-size:12px; color:var(--vg-text-secondary);">No hay puchitos en depósito.</div>
+        <div id="listaSobrantesContainer" style="max-height: 200px; overflow-y: auto;">No hay retazos en depósito.</div>
       </div>
     </div>
 
-    <!-- ALERTAS DE REPOSICIÓN URGENTE ENVIADAS DESDE CALANDRA / LÁSER -->
     <div id="bannerAlertasReposicion"></div>
 
-    <!-- PANEL DE 2 COLUMNAS: COLA PENDIENTE (Izquierda) + PARÁMETROS DE IMPRESIÓN (Derecha con degradado) -->
+    <!-- COLA PENDIENTE + PARÁMETROS DE IMPRESIÓN (Copia exacta de Index.html líneas 101-141) -->
     <div class="grid-panel">
-      <div class="card" style="border-top: 3px solid var(--vg-brand-secondary); padding: 12px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <h2 style="margin:0; border:none; padding:0;">Cola Pendiente</h2>
-          <div id="impSumaSeleccionadosBadge" style="font-size:11.5px; color:var(--vg-brand-secondary); font-weight:800;"></div>
+      <div class="card" style="border-top: 3px solid var(--accent-blue); padding: 10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h2 style="margin-left: 5px; border:none; margin-bottom:0;">Cola Pendiente</h2>
+          <span id="impSumaSeleccionadosBadge" style="font-size:11px; color:var(--accent-blue); font-weight:bold;"></span>
         </div>
+        <hr style="border:none; border-top:1px solid var(--border); margin:8px 0;" />
         <input type="text" id="searchPendientesLocal" class="search-input" placeholder="🔍 Buscar archivo en pendientes..." />
-        <div id="listaPendientesSublimacion" style="max-height: 520px; overflow-y: auto;"></div>
+        <div id="listaPendientesSublimacion" style="max-height: 500px; overflow-y: auto;">Cargando archivos...</div>
       </div>
 
-      <div class="card card-params-gradient">
+      <div class="card" style="border-top: 3px solid var(--accent-magenta);">
         <h2>Parámetros de Impresión</h2>
+        <div id="impAutoDetectBanner" style="display:none; background:rgba(33,150,243,0.12); border:1px solid var(--accent-blue); color:var(--accent-blue); padding:6px 10px; border-radius:4px; font-size:11px; font-weight:bold; margin-bottom:10px;"></div>
 
-        <!-- AVISO DE AUTODETECCIÓN DEL NOMBRE DE ARCHIVO -->
-        <div id="impAutoDetectBanner" style="display:none; background:var(--vg-cyan-soft); border:1px solid var(--vg-brand-secondary); color:var(--vg-brand-secondary); padding:8px 10px; border-radius:6px; font-size:12px; font-weight:700; margin-bottom:10px;"></div>
-
-        <div style="text-align:center; margin-bottom: 12px;">
-          <label>METROS A DESCONTAR</label>
-          <input type="number" id="impInput_metrosLote" class="font-mono" value="0.00" step="0.01" style="font-size:18px; font-weight:800;" />
+        <div style="text-align:center; margin-bottom: 15px;">
+          <label style="color:#aaa;">Metros a Descontar</label>
+          <input type="number" id="impInput_metrosLote" value="0.00" step="0.01" />
         </div>
 
         <div class="grid-2">
           <div style="grid-column: span 2; display: flex; gap: 10px; align-items: flex-end;">
-            <div style="flex-grow: 1;">
-              <label>Diseño</label>
-              <input type="text" id="impInput_diseno" placeholder="Nombre del diseño..." />
-            </div>
-            <div id="thumbPreviewBox" style="width: 50px; height: 50px; border: 1px solid var(--vg-border-subtle); border-radius: 6px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: var(--vg-surface-dark);">
-              <span style="color:var(--vg-text-secondary); font-size:10px;">IMG</span>
+            <div style="flex-grow: 1;"><label>Diseño</label><input type="text" id="impInput_diseno" placeholder="Nombre del diseño..." /></div>
+            <div id="thumbPreviewBox" style="width: 50px; height: 50px; border: 1px solid #444; border-radius: 4px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #111; cursor: pointer;">
+              <span style="color:#666; font-size:10px;">IMG</span>
             </div>
           </div>
 
           <div>
-            <label>Tela Destino (⚡ #1 = Último Usado)</label>
-            <input type="text" id="impInput_tela" placeholder="En blanco si no está en el nombre..." />
-            <div id="chipsTelaContainer" class="chips-wrap"></div>
+            <label>Tela Destino</label>
+            <input type="text" id="impInput_tela" list="listTelas" />
+            <div id="chipsTelaContainer" style="display:flex; gap:5px; flex-wrap:wrap; margin-top:5px;"></div>
           </div>
 
           <div>
-            <label>Perfil FlexiPRINT (⚡ #1 = Último Usado)</label>
-            <input type="text" id="impInput_perfil" placeholder="En blanco si no está en el nombre..." />
-            <div id="chipsPerfilContainer" class="chips-wrap"></div>
+            <label>Perfil FlexiPRINT</label>
+            <input type="text" id="impInput_perfil" list="listPerfiles" placeholder="Seleccione o escriba..." />
+            <div id="chipsPerfilContainer" style="display:flex; gap:5px; flex-wrap:wrap; margin-top:5px;"></div>
           </div>
 
           <div>
             <label>Nº Rollo Físico</label>
-            <input type="text" id="impInput_rolloTela" placeholder="Ej: ROLLO 17-18" />
+            <input type="text" id="impInput_rolloTela" />
           </div>
 
           <div>
-            <label>Color (⚡ #1 = Último Usado)</label>
-            <input type="text" id="impInput_color" placeholder="Ej: AMARILLO" />
-            <div id="chipsColorContainer" class="chips-wrap"></div>
+            <label>Color</label>
+            <input type="text" id="impInput_color" list="listColores" />
+            <div id="chipsColorContainer" style="display:flex; gap:5px; flex-wrap:wrap; margin-top:5px;"></div>
           </div>
 
-          <!-- RUTA DE PRODUCCIÓN EN BOTONES TÁCTILES (Pedido #4) -->
           <div style="grid-column: span 2;">
-            <label>Ruta de Producción (Botones Directos)</label>
+            <label>Ruta Producción</label>
             <div class="vg-route-group">
-              <button type="button" class="vg-route-btn active" data-ruta-val="Solo Calandrado">
-                <span>🔥 1. Solo Calandrado</span>
-              </button>
-              <button type="button" class="vg-route-btn" data-ruta-val="Calandrado + Corte Láser">
-                <span>🔥+⚡ 2. Calandrado + Láser</span>
-              </button>
-              <button type="button" class="vg-route-btn" data-ruta-val="Solo Impresión">
-                <span>🖨️ 3. Solo Impresión</span>
-              </button>
+              <button type="button" class="vg-route-btn active" data-ruta-val="Solo Calandrado">1. Solo Calandrado</button>
+              <button type="button" class="vg-route-btn" data-ruta-val="Calandrado + Corte Láser">2. Calandrado + Corte Láser</button>
+              <button type="button" class="vg-route-btn" data-ruta-val="Solo Impresión">3. Solo Impresión (Venta de Papel)</button>
             </div>
           </div>
 
           <div style="grid-column: span 2;">
-            <label style="color:var(--vg-brand-secondary);">Fecha Manual (Opcional)</label>
+            <label style="color:var(--accent-blue);">Fecha Manual (Opcional)</label>
             <input type="datetime-local" id="impInput_fechaManual" />
           </div>
         </div>
 
-        <label style="margin-top:12px; color:var(--vg-status-processing);">Observaciones / Fallas / Anotaciones (Se ven en todas las áreas)</label>
-        <input type="text" id="impInput_observaciones" placeholder="Escribí cualquier nota o especificación..." style="border-color:var(--vg-status-processing);" />
-
+        <label style="margin-top:15px; color:var(--accent-orange);">Observaciones de Impresión (Opcional)</label>
+        <input type="text" id="impInput_observaciones" placeholder="Opcional..." style="border-color:var(--accent-orange);" />
         <button type="button" class="btn-main" id="btnConfirmarImpresion">Confirmar Impresión (OK)</button>
       </div>
     </div>
 
-    <!-- TABLA DE REGISTROS DE IMPRESIÓN (Idéntica a Captura 2 + Columna Ruta + Columna Notas + Suma por Bloque + CRUD) -->
+    <!-- HISTORIAL IMPRESIÓN RECIENTE (Copia exacta de Index.html líneas 142-151 + Ruta y Notas) -->
     <div class="card">
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
-        <h2 style="margin:0; border:none; padding:0;">Historial Impresión Reciente (Por Rollos / Bloques con Metros Sumados)</h2>
-        <button type="button" class="btn-secondary btn-crud-add" data-table="prod_impresiones" style="width:auto; padding:6px 14px;">+ Agregar Impresión Manual</button>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <h2 style="margin:0; border:none; padding:0;">Historial Impresión Reciente</h2>
+        <button type="button" class="btn-secondary btn-crud-add" data-table="prod_impresiones" style="width:auto; padding:6px 12px;">+ Agregar Impresión Manual</button>
       </div>
+      <input type="text" id="searchHistorialImpLocal" class="search-input" placeholder="🔍 Buscar cliente, archivo o tela..." />
       <div style="overflow-x: auto;">
         <table>
           <thead>
@@ -265,8 +209,8 @@
               <th>Color</th>
               <th>Metros</th>
               <th>Perfil</th>
-              <th>Ruta de Producción</th>
-              <th>Notas / Fallas</th>
+              <th>Ruta</th>
+              <th>Notas</th>
             </tr>
           </thead>
           <tbody id="tbodyHistorialImpresion"></tbody>
@@ -276,60 +220,37 @@
   </div>
 
   <!-- ========================================================================
-       TAB 2: CALANDRADO (Idéntica a Captura 3 + Fecha Manual Respetada + Notas + CRUD)
+       TAB 2: CALANDRADO (Copia exacta de Index.html líneas 154-201)
        ======================================================================== -->
-  <div id="sec-calandrado" class="tab-content vg-module-section">
-    <div class="stats-grid cols-6">
-      <div class="stat-box" style="border: 2px dashed var(--vg-status-alert); background:var(--vg-magenta-soft);">
-        <div class="stat-title" style="color:var(--vg-status-alert);">A CALANDRAR</div>
-        <div class="stat-value" id="kpiCalPendiente">0.00m</div>
-      </div>
-      <div class="stat-box" style="border-bottom: 3px solid var(--vg-status-alert);">
-        <div class="stat-title">DIARIO (HOY)</div>
-        <div class="stat-value" id="kpiCalHoy">0.00m</div>
-        <div class="stat-sub" id="kpiCalAyerSub">Ayer: 0.00m</div>
-      </div>
-      <div class="stat-box" style="border-bottom: 3px solid var(--vg-brand-secondary);">
-        <div class="stat-title">SEMANAL</div>
-        <div class="stat-value" id="kpiCalSemanal">0.00m</div>
-        <div class="stat-sub" id="kpiCalSemAntSub">Sem. Ant: 0.00m</div>
-      </div>
-      <div class="stat-box" style="border-bottom: 3px solid var(--vg-brand-primary);">
-        <div class="stat-title">MENSUAL</div>
-        <div class="stat-value" id="kpiCalMensual">0.00m</div>
-      </div>
-      <div class="stat-box" style="border-bottom: 3px solid var(--vg-status-processing);">
-        <div class="stat-title">ESTE AÑO</div>
-        <div class="stat-value" id="kpiCalAnual">0.00m</div>
-      </div>
-      <div class="stat-box" style="border-bottom: 3px solid var(--vg-text-primary);">
-        <div class="stat-title">HISTÓRICO</div>
-        <div class="stat-value" id="kpiCalHistorico">0.00m</div>
-      </div>
+  <div id="sec-calandrado" class="tab-content">
+    <div class="stats-grid">
+      <div class="stat-box" style="border: 2px dashed var(--danger); background:rgba(255,82,82,0.1);"><div class="stat-title" style="color:var(--danger);">A Calandrar</div><div class="stat-value" id="kpiCalPendiente">0.00m</div></div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--accent-magenta);"><div class="stat-title">Diario</div><div class="stat-value" id="kpiCalHoy">0.00m</div><div id="kpiCalAyerSub" style="font-size:10px; color:#888; margin-top:2px;">Ayer: 0.00m</div></div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--accent-blue);"><div class="stat-title">Semanal</div><div class="stat-value" id="kpiCalSemanal">0.00m</div><div id="kpiCalSemAntSub" style="font-size:10px; color:#888; margin-top:2px;">Sem. Ant: 0.00m</div></div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--accent);"><div class="stat-title">Mensual</div><div class="stat-value" id="kpiCalMensual">0.00m</div></div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--accent-orange);"><div class="stat-title">Este Año</div><div class="stat-value" id="kpiCalAnual">0.00m</div></div>
+      <div class="stat-box" style="border-bottom: 3px solid #fff;"><div class="stat-title">Histórico</div><div class="stat-value" id="kpiCalHistorico">0.00m</div></div>
     </div>
 
-    <div class="card" style="border-top: 4px solid var(--vg-brand-secondary);">
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
-        <h2 style="margin:0; border:none; padding:0;">Hoja de Trabajo - Cola Calandrado</h2>
-        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-          <span style="font-size:11.5px; color:var(--vg-brand-secondary); font-weight:800;">📅 Fecha Proceso Manual (Opcional):</span>
+    <div class="card" style="border-top: 4px solid var(--accent-blue);">
+      <h2>Hoja de Trabajo - Cola Calandrado</h2>
+      <input type="text" id="searchCalandraLocal" class="search-input" placeholder="🔍 Buscar rollo, cliente o tela..." />
+      <div style="margin-bottom: 15px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:11px; color:var(--accent-blue); font-weight:bold;">📅 Fecha Proceso (Opcional):</span>
           <input type="datetime-local" id="calInputFechaManual" style="width:190px; padding:6px;" />
-          <button type="button" id="btnOrdenCalandra" class="btn-secondary" style="width:auto; padding:6px 12px;">⬇️ Orden: Más antiguos primero</button>
-          <button type="button" class="btn-secondary btn-crud-add" data-table="prod_cola_calandrado" style="width:auto; padding:6px 12px;">+ Agregar Trabajo</button>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button type="button" class="btn-secondary btn-crud-add" data-table="prod_cola_calandrado" style="width:auto; padding:8px 15px;">+ Agregar Trabajo</button>
+          <button type="button" id="btnOrdenCalandra" class="btn-secondary" style="width: auto; padding: 8px 15px;">⬇️ Orden: Más antiguos primero</button>
         </div>
       </div>
-
-      <input type="text" id="searchCalandraLocal" class="search-input" placeholder="🔍 Buscar rollo, cliente o tela..." />
-
-      <!-- CONTENEDOR DE TARJETAS DE ROLLO EN CALANDRADO (Como en Captura 3) -->
-      <div id="contenedorRollosCalandrado"></div>
+      <div id="contenedorRollosCalandrado">Cargando Rollos...</div>
     </div>
 
     <div class="card">
-      <button type="button" id="btnAbrirPrevisionTelas" class="btn-main" style="width:100%; margin-top:0; margin-bottom:15px; font-size:15px; padding:12px; background:var(--vg-status-ready); color:var(--vg-bg-app);">
-        🛒 VER TELAS REQUERIDAS (PREVISIÓN)
-      </button>
-      <div id="panelPrevisionTelasInline" style="display:none; margin-bottom:15px; padding:12px; background:var(--vg-surface-dark); border:1px solid var(--vg-status-ready); border-radius:8px;"></div>
+      <button type="button" id="btnAbrirPrevisionTelas" class="btn-main" style="width:100%; margin-top:0; margin-bottom:15px; font-size:16px; padding:12px; background:#4CAF50; color:#000; font-weight:bold; border-radius:8px; box-shadow: 0 4px 10px rgba(76, 175, 80, 0.3);">🛒 VER TELAS REQUERIDAS (PREVISIÓN)</button>
+      <div id="panelPrevisionTelasInline" style="display:none; background:#111; border:1px solid #333; border-radius:8px; padding:15px; margin-bottom:15px;"></div>
 
       <h2>Historial Reciente (Procesados)</h2>
       <div style="overflow-x: auto;">
@@ -337,16 +258,16 @@
           <thead>
             <tr>
               <th>Acción</th>
-              <th>Fecha Fin</th>
-              <th>Rollo</th>
+              <th>Fecha</th>
               <th>Cliente/Archivo</th>
+              <th>Diseño</th>
               <th>Tela</th>
               <th>Nº Rollo</th>
               <th>Color</th>
               <th>Metros</th>
               <th>Perfil</th>
               <th>Ruta</th>
-              <th>Notas / Fallas</th>
+              <th>Notas</th>
             </tr>
           </thead>
           <tbody id="tbodyHistorialCalandrado"></tbody>
@@ -356,64 +277,38 @@
   </div>
 
   <!-- ========================================================================
-       TAB 3: LÁSER & QC (Con Trabajos Anidados Agrupados — Pedido #2)
+       TAB 3: LÁSER & QC (Copia exacta de Index.html líneas 203-287 + Anidados agrupados)
        ======================================================================== -->
-  <div id="sec-laser" class="tab-content vg-module-section">
-    <div class="stats-grid cols-6">
-      <div class="stat-box" style="border: 2px dashed var(--vg-brand-secondary); background:var(--vg-cyan-soft);">
-        <div class="stat-title" style="color:var(--vg-brand-secondary);">TOTAL A CORTAR</div>
-        <div class="stat-value" id="kpiLasPendiente">0.00m</div>
-      </div>
-      <div class="stat-box" style="border-bottom: 3px solid var(--vg-status-alert);">
-        <div class="stat-title">HORAS EST. PENDIENTES</div>
-        <div class="stat-value" id="kpiLasHoras">0.0 hs</div>
-      </div>
-      <div class="stat-box" style="border-bottom: 3px solid var(--vg-brand-primary);">
-        <div class="stat-title">DIARIO (HOY)</div>
-        <div class="stat-value" id="kpiLasHoy">0.00m</div>
-        <div class="stat-sub" id="kpiLasAyerSub">Ayer: 0.00m</div>
-      </div>
-      <div class="stat-box" style="border-bottom: 3px solid var(--vg-status-processing);">
-        <div class="stat-title">SEMANAL</div>
-        <div class="stat-value" id="kpiLasSemanal">0.00m</div>
-        <div class="stat-sub" id="kpiLasSemAntSub">Sem. Ant: 0.00m</div>
-      </div>
-      <div class="stat-box" style="border-bottom: 3px solid var(--vg-text-primary);">
-        <div class="stat-title">MENSUAL</div>
-        <div class="stat-value" id="kpiLasMensual">0.00m</div>
-      </div>
-      <div class="stat-box" style="border-bottom: 3px solid var(--vg-text-secondary);">
-        <div class="stat-title">HISTÓRICO</div>
-        <div class="stat-value" id="kpiLasHistorico">0.00m</div>
-      </div>
+  <div id="sec-laser" class="tab-content">
+    <div class="stats-grid">
+      <div class="stat-box" style="border: 2px dashed var(--accent-blue); background:rgba(33,150,243,0.1);"><div class="stat-title" style="color:var(--accent-blue);">Total a Cortar</div><div class="stat-value" id="kpiLasPendiente">0.00m</div></div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--accent-magenta);"><div class="stat-title">Horas Est. Pendientes</div><div class="stat-value" id="kpiLasHoras">0.0 hs</div></div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--accent);"><div class="stat-title">Diario</div><div class="stat-value" id="kpiLasHoy">0.00m</div><div id="kpiLasAyerSub" style="font-size:10px; color:#888; margin-top:2px;">Ayer: 0.00m</div></div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--accent-orange);"><div class="stat-title">Semanal</div><div class="stat-value" id="kpiLasSemanal">0.00m</div><div id="kpiLasSemAntSub" style="font-size:10px; color:#888; margin-top:2px;">Sem. Ant: 0.00m</div></div>
+      <div class="stat-box" style="border-bottom: 3px solid #fff;"><div class="stat-title">Mensual</div><div class="stat-value" id="kpiLasMensual">0.00m</div></div>
+      <div class="stat-box" style="border-bottom: 3px solid #888;"><div class="stat-title">Histórico</div><div class="stat-value" id="kpiLasHistorico">0.00m</div></div>
     </div>
 
-    <div class="card" style="border-top: 4px solid var(--vg-brand-secondary);">
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
-        <div>
-          <h2 style="margin:0; border:none; padding:0;">⚡ Cola de Corte Láser (Trabajos Anidados Agrupados igual que en Impresión y Calandrado)</h2>
-          <div style="font-size:11.5px; color:var(--vg-text-secondary); margin-top:3px;">
-            Los trabajos compuestos por muchos archivos anidados aparecen juntos en una sola fila para marcarlos cortados de 1 solo clic.
-          </div>
-        </div>
+    <div class="card" style="border-top: 4px solid var(--accent-blue);">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+        <h2 style="margin:0; border:none; padding:0;">⚡ Cola de Corte Láser (Trabajos Anidados Agrupados)</h2>
         <div style="display:flex; gap:8px; align-items:center;">
           <input type="datetime-local" id="laserInputFechaManual" style="width:185px; padding:6px;" title="Fecha manual opcional" />
           <button type="button" class="btn-secondary btn-crud-add" data-table="prod_cola_laser" style="width:auto; padding:6px 12px;">+ Agregar Lote Láser</button>
         </div>
       </div>
-
       <div style="overflow-x: auto;">
         <table>
           <thead>
             <tr>
               <th>Acción</th>
               <th>Fecha Ingreso</th>
-              <th>Rollo Papel</th>
-              <th>Archivos del Trabajo / Lote Anidado</th>
-              <th>Tela / Nº Rollo / Color</th>
-              <th>Metros Totales</th>
+              <th>Rollo</th>
+              <th>Cliente / Archivos del Trabajo Anidado</th>
+              <th>Tela / Nº Rollo</th>
+              <th>Metros</th>
               <th>Vel / Poder</th>
-              <th>Notas / Especificaciones</th>
+              <th>Notas</th>
             </tr>
           </thead>
           <tbody id="tbodyColaLaser"></tbody>
@@ -422,15 +317,15 @@
     </div>
 
     <div class="card">
-      <h2>Historial de Cortes Láser Terminados</h2>
+      <h2>Historial de Cortes Láser</h2>
       <div style="overflow-x: auto;">
         <table>
           <thead>
             <tr>
-              <th>Acción CRUD</th>
+              <th>Acción</th>
               <th>Fecha Fin</th>
               <th>Rollo</th>
-              <th>Lote / Archivos Cortados</th>
+              <th>Archivos Cortados</th>
               <th>Tela / Rollo</th>
               <th>Metros</th>
               <th>Notas</th>
@@ -443,56 +338,38 @@
   </div>
 
   <!-- ========================================================================
-       TAB 4: MÓDULO DTF (Nuevo — Con el mismo estilo oscuro V&V Grafic)
+       TAB 4: MÓDULO DTF (Con el mismo estilo exacto de tarjetas oscuras)
        ======================================================================== -->
-  <div id="sec-dtf" class="tab-content vg-module-section">
-    <div id="dtfRollosKpiContainer" class="stats-grid cols-6"></div>
-
+  <div id="sec-dtf" class="tab-content">
+    <div id="dtfRollosKpiContainer" class="stats-grid"></div>
     <div class="grid-panel">
-      <div class="card card-params-gradient">
+      <div class="card" style="border-top: 3px solid var(--accent-magenta);">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <h2 style="margin:0; border:none; padding:0;">🎞️ Registrar Impresión / Pedido DTF</h2>
           <button type="button" class="btn-secondary btn-crud-add" data-table="prod_dtf_rollos" style="width:auto; padding:5px 10px;">+ Rollo 100m</button>
         </div>
-
-        <div id="dtfDuplicateAlert" style="display:none; background:var(--vg-magenta-soft); border:1px solid var(--vg-status-alert); color:var(--vg-status-alert); padding:8px; border-radius:6px; font-size:12px; margin-top:8px;"></div>
-
-        <label>Rollo DTF Activo (60cm x 100m por Marca y Perfil)</label>
+        <div id="dtfDuplicateAlert" style="display:none; background:rgba(236,72,153,0.15); border:1px solid var(--danger); color:var(--danger); padding:8px; border-radius:6px; font-size:12px; margin-top:8px;"></div>
+        <label>Rollo DTF Activo (60cm x 100m)</label>
         <select id="dtfInputRollo"></select>
-
         <label>Cliente DTF</label>
         <input type="text" id="dtfInputCliente" placeholder="Nombre del cliente..." />
-
-        <label>Nombre de Archivo (Si contiene (repo) o (muestra) se tarifa a $0)</label>
+        <label>Nombre de Archivo</label>
         <input type="text" id="dtfInputArchivo" placeholder="Ej: LOGOS 12m.png o (repo)..." />
-
         <div class="grid-2">
-          <div>
-            <label>Metros Archivo (Facturable)</label>
-            <input type="number" step="0.01" id="dtfInputMetrosArchivo" class="font-mono" value="10" />
-          </div>
-          <div>
-            <label>Metros Físicos Rollo (RIP)</label>
-            <input type="number" step="0.01" id="dtfInputMetrosRolloFisico" class="font-mono" placeholder="Metros reales consumidos" />
-          </div>
+          <div><label>Metros Archivo (Facturable)</label><input type="number" step="0.01" id="dtfInputMetrosArchivo" value="10" /></div>
+          <div><label>Metros Físicos Rollo (RIP)</label><input type="number" step="0.01" id="dtfInputMetrosRolloFisico" placeholder="Metros reales" /></div>
         </div>
-
         <label>Tipo de Cargo</label>
         <select id="dtfInputTipoCargo">
-          <option value="VENTA">💲 VENTA (Escala Automática por Tramo)</option>
-          <option value="REPOSICION">🔄 REPOSICIÓN ($0 — Sin Cargo)</option>
-          <option value="MUESTRA">🧪 MUESTRA ($0 — Sin Cargo)</option>
+          <option value="VENTA">💲 VENTA (Escala Automática)</option>
+          <option value="REPOSICION">🔄 REPOSICIÓN ($0)</option>
+          <option value="MUESTRA">🧪 MUESTRA ($0)</option>
         </select>
-
-        <div id="dtfPrecioPreviewBox" style="background:var(--vg-cyan-soft); border:1px solid var(--vg-brand-secondary); padding:10px; border-radius:6px; margin-top:10px; font-size:12.5px;">
+        <div id="dtfPrecioPreviewBox" style="background:#111; border:1px solid #333; padding:10px; border-radius:6px; margin-top:10px; font-size:12px;">
           Escala: 1-9m $9.000 | 10-49m $8.500 | 50-99m $8.000 | 100-499m $7.500 | +500m $6.500
         </div>
-
         <div class="grid-2">
-          <div>
-            <label>Monto Abonado ($)</label>
-            <input type="number" step="100" id="dtfInputMontoPagado" class="font-mono" value="0" />
-          </div>
+          <div><label>Monto Abonado ($)</label><input type="number" step="100" id="dtfInputMontoPagado" value="0" /></div>
           <div>
             <label>Modalidad de Pago</label>
             <select id="dtfInputModalidadPago">
@@ -502,138 +379,57 @@
             </select>
           </div>
         </div>
-
         <label>Observaciones DTF</label>
         <input type="text" id="dtfInputObs" placeholder="Opcional..." />
-
         <button type="button" id="btnRegistrarPedidoDTF" class="btn-main">Confirmar Trabajo DTF (OK)</button>
       </div>
-
       <div>
-        <div class="card" style="border-top: 3px solid var(--vg-brand-secondary);">
-          <h2>📂 Cola DTF Pendiente en Drive</h2>
-          <div style="overflow-x:auto;">
-            <table>
-              <thead>
-                <tr>
-                  <th>Cliente</th>
-                  <th>Archivo</th>
-                  <th>Metros</th>
-                  <th>Cargo</th>
-                  <th>Subtotal</th>
-                  <th>Acción</th>
-                </tr>
-              </thead>
-              <tbody id="tbodyPendientesDTF"></tbody>
-            </table>
-          </div>
+        <div class="card" style="border-top: 3px solid var(--accent-blue);">
+          <h2>Cola DTF Pendiente en Drive</h2>
+          <div style="overflow-x:auto;"><table><thead><tr><th>Cliente</th><th>Archivo</th><th>Metros</th><th>Cargo</th><th>Subtotal</th><th>Acción</th></tr></thead><tbody id="tbodyPendientesDTF"></tbody></table></div>
         </div>
-
-        <div class="card" style="border-top: 3px solid var(--vg-status-ready);">
-          <h2>💳 Cuentas Corrientes y Saldos por Cliente DTF</h2>
-          <div style="overflow-x:auto;">
-            <table>
-              <thead>
-                <tr>
-                  <th>Cliente</th>
-                  <th>Mts Venta</th>
-                  <th>Mts Repo ($0)</th>
-                  <th>Mts Muestra ($0)</th>
-                  <th>Facturado</th>
-                  <th>Abonado</th>
-                  <th>Saldo Pendiente</th>
-                </tr>
-              </thead>
-              <tbody id="tbodyCuentasClientesDTF"></tbody>
-            </table>
-          </div>
+        <div class="card" style="border-top: 3px solid var(--accent);">
+          <h2>Cuentas Corrientes por Cliente DTF</h2>
+          <div style="overflow-x:auto;"><table><thead><tr><th>Cliente</th><th>Mts Venta</th><th>Mts Repo</th><th>Mts Muestra</th><th>Facturado</th><th>Abonado</th><th>Saldo</th></tr></thead><tbody id="tbodyCuentasClientesDTF"></tbody></table></div>
         </div>
-
         <div class="card">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <h2 style="margin:0; border:none; padding:0;">📜 Historial de Pedidos DTF</h2>
-            <button type="button" class="btn-secondary btn-crud-add" data-table="prod_dtf_pedidos" style="width:auto; padding:5px 10px;">+ Pedido Manual</button>
-          </div>
-          <div style="overflow-x:auto;">
-            <table>
-              <thead>
-                <tr>
-                  <th>Acción</th>
-                  <th>Fecha</th>
-                  <th>Cliente</th>
-                  <th>Archivo / Notas</th>
-                  <th>Cargo</th>
-                  <th>Metros</th>
-                  <th>Tarifa</th>
-                  <th>Total</th>
-                  <th>Estado Pago</th>
-                </tr>
-              </thead>
-              <tbody id="tbodyPedidosDTF"></tbody>
-            </table>
-          </div>
+          <h2>Historial de Pedidos DTF</h2>
+          <div style="overflow-x:auto;"><table><thead><tr><th>Acción</th><th>Fecha</th><th>Cliente</th><th>Archivo</th><th>Cargo</th><th>Metros</th><th>Tarifa</th><th>Total</th><th>Pago</th></tr></thead><tbody id="tbodyPedidosDTF"></tbody></table></div>
         </div>
       </div>
     </div>
   </div>
 
   <!-- ========================================================================
-       TAB 5: FINANZAS Y STOCK DE INSUMOS
+       TAB 5: FINANZAS Y STOCK (Copia exacta de Index.html líneas 289-319)
        ======================================================================== -->
-  <div id="sec-finanzas" class="tab-content vg-module-section">
-    <div class="stats-grid cols-6">
-      <div class="stat-box" style="border-bottom: 3px solid var(--vg-status-processing);">
-        <div class="stat-title">RINDE TINTA TEÓRICO</div>
-        <div class="stat-value">400 m/Set</div>
-      </div>
-      <div class="stat-box" style="border-bottom: 3px solid var(--vg-brand-secondary);">
-        <div class="stat-title">TOTAL METROS IMPRESOS</div>
-        <div class="stat-value" id="finTotalImpMts">0.00m</div>
-      </div>
-      <div class="stat-box" style="border-bottom: 3px solid var(--vg-status-ready);">
-        <div class="stat-title">FACTURACIÓN DTF</div>
-        <div class="stat-value" id="finTotalDtfFacturado">$0</div>
-      </div>
+  <div id="sec-finanzas" class="tab-content">
+    <div class="stats-grid">
+      <div class="stat-box" style="border-color:var(--accent-orange); background:rgba(255,152,0,0.05);"><div class="stat-title" style="color:var(--accent-orange);">Rinde Tinta Teórico</div><div class="stat-value">400 m/Set</div></div>
+      <div class="stat-box" style="border-color:var(--accent-blue); background:rgba(33,150,243,0.05);"><div class="stat-title" style="color:var(--accent-blue);">Total Metros Impresos</div><div class="stat-value" id="finTotalImpMts">0.00m</div></div>
+      <div class="stat-box" style="border-color:var(--accent); background:rgba(0,230,118,0.05);"><div class="stat-title" style="color:var(--accent);">Facturación DTF</div><div class="stat-value" id="finTotalDtfFacturado">$0</div></div>
     </div>
     <div class="card">
-      <h2>🛒 Registrar Compra de Insumos (Papel / Tinta / Film DTF / Poliamida)</h2>
+      <h2>🛒 Registrar Compra Insumos</h2>
       <div class="grid-2">
-        <div>
-          <label>Tipo de Insumo</label>
-          <select id="finCompraTipo">
-            <option value="Papel Sublimación">Papel Sublimación</option>
-            <option value="Tinta Sublimación">Tinta Sublimación</option>
-            <option value="Film DTF 60cm">Film DTF 60cm x 100m</option>
-            <option value="Tinta DTF Blanca / CMYK">Tinta DTF Blanca / CMYK</option>
-            <option value="Poliamida DTF">Poliamida DTF</option>
-          </select>
-        </div>
-        <div><label>Detalle / Marca</label><input type="text" id="finCompraDetalle" placeholder="Ej: Bobina 29g 500m" /></div>
+        <div><label>Tipo</label><select id="finCompraTipo"><option value="Papel">Papel</option><option value="Tinta">Tinta</option><option value="Film DTF">Film DTF</option></select></div>
+        <div><label>Detalle</label><input type="text" id="finCompraDetalle" placeholder="Ej: 29g 500m" /></div>
         <div><label>Cantidad</label><input type="number" id="finCompraCant" value="1" /></div>
-        <div><label>Costo Total ($)</label><input type="number" id="finCompraCosto" placeholder="0" /></div>
+        <div><label>Costo Total ($)</label><input type="number" id="finCompraCosto" /></div>
       </div>
-      <button type="button" id="btnGuardarCompraFinanzas" class="btn-main">Guardar Compra de Insumo</button>
+      <button type="button" id="btnGuardarCompraFinanzas" class="btn-main">Guardar Compra</button>
     </div>
   </div>
 
   <!-- ========================================================================
-       TAB 6: MANTENIMIENTO Y BITÁCORA DE FALLAS
+       TAB 6: MANTENIMIENTO Y CIERRE (Copia exacta de Index.html líneas 474-509)
        ======================================================================== -->
-  <div id="sec-cierre" class="tab-content vg-module-section">
-    <div class="card" style="border-top: 4px solid var(--vg-status-alert);">
-      <h2 style="color:var(--vg-status-alert);">🚨 Bitácora de Fallas, Mermas y Reposiciones Técnicas</h2>
-      <div style="overflow-x:auto;">
+  <div id="sec-cierre" class="tab-content">
+    <div class="card" style="border-top: 4px solid var(--danger);">
+      <h2 style="color:var(--danger);">Bitácora de Fallas e Historial Técnico</h2>
+      <div style="overflow-x: auto;">
         <table>
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Estación</th>
-              <th>Rollo</th>
-              <th>Archivo / Operación</th>
-              <th>Merma (m)</th>
-              <th>Motivo / Detalle</th>
-            </tr>
-          </thead>
+          <thead><tr><th>Fecha / Hora</th><th>Estación</th><th>Bobina</th><th>Operación</th><th>Merma</th><th>Motivo / Diagnóstico</th></tr></thead>
           <tbody id="tbodyBitacoraFallas"></tbody>
         </table>
       </div>
@@ -641,232 +437,153 @@
   </div>
 
   <!-- ========================================================================
-       TAB 7: MÉTRICAS (BI) — Idéntica a Captura 4 + Día Anterior y Semana Anterior
+       TAB 7: MÉTRICAS (BI) — Copia exacta de Index.html líneas 321-471 + Ayer y Semana Anterior
        ======================================================================== -->
-  <div id="sec-metricas" class="tab-content vg-module-section">
-    <div class="card" style="border-top: 4px solid var(--vg-brand-primary); background:var(--vg-surface-dark);">
-      <h2 style="color:var(--vg-brand-secondary); border:none; margin-bottom:4px;">🎯 Calculadora de Tiempos Estimados (SLA)</h2>
-      <p style="font-size:11px; color:var(--vg-text-secondary); margin-bottom:14px;">Proyección basada en 10 hs laborales (Imp: 650m/día | Cal: 650m/día | Láser: 300m/día)</p>
-      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:14px;">
-        <div class="stat-box">
-          <div class="stat-title">TANDA IMPRESIÓN</div>
-          <div class="stat-value" id="slaDiasImp" style="color:var(--vg-brand-secondary);">0 Días</div>
+  <div id="sec-metricas" class="tab-content" style="padding:15px; margin:0 auto; max-width:1200px;">
+    <h2 style="color:var(--accent-blue); text-align:center; margin-bottom:10px; text-transform:uppercase; font-size:24px;">📊 Centro de Analítica (BI)</h2>
+
+    <div class="card" style="border-top: 4px solid var(--accent); background:#141414; padding:15px; margin-bottom:15px;">
+      <h2 style="color:var(--accent); border:none; margin-bottom:5px;">⏱️ Calculadora de Tiempos Estimados (SLA)</h2>
+      <p style="font-size:11px; color:#888; margin-bottom:15px;">Proyección basada en 10 hs laborales (Imp: 650m/día | Cal: 650m/día | Láser: 300m/día)</p>
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:15px;">
+        <div style="background:#1a1a1a; padding:10px; border-radius:6px; border:1px solid #333; text-align:center;">
+          <div style="font-size:11px; color:#aaa; font-weight:bold;">TANDA IMPRESIÓN</div>
+          <div id="slaDiasImp" style="font-size:16px; font-weight:bold; color:var(--accent-blue); margin-top:5px;">0 Días</div>
         </div>
-        <div class="stat-box">
-          <div class="stat-title">TANDA CALANDRADO</div>
-          <div class="stat-value" id="slaDiasCal" style="color:var(--vg-status-alert);">0 Días</div>
+        <div style="background:#1a1a1a; padding:10px; border-radius:6px; border:1px solid #333; text-align:center;">
+          <div style="font-size:11px; color:#aaa; font-weight:bold;">TANDA CALANDRADO</div>
+          <div id="slaDiasCal" style="font-size:16px; font-weight:bold; color:var(--accent-magenta); margin-top:5px;">0 Días</div>
         </div>
-        <div class="stat-box">
-          <div class="stat-title">TANDA CORTE LÁSER</div>
-          <div class="stat-value" id="slaDiasLas" style="color:var(--vg-status-processing);">0 Días</div>
+        <div style="background:#1a1a1a; padding:10px; border-radius:6px; border:1px solid #333; text-align:center;">
+          <div style="font-size:11px; color:#aaa; font-weight:bold;">TANDA CORTE LÁSER</div>
+          <div id="slaDiasLas" style="font-size:16px; font-weight:bold; color:var(--accent-orange); margin-top:5px;">0 Días</div>
         </div>
-        <div class="stat-box" style="border: 1px solid var(--vg-status-ready); background:var(--vg-ready-soft);">
-          <div class="stat-title" style="color:var(--vg-status-ready);">ENTREGA ESTIMADA (NUEVO LOTE)</div>
-          <div class="stat-value" id="slaDiasTotal">Aprox ~ 1 Día</div>
+        <div style="background:rgba(0,230,118,0.1); padding:10px; border-radius:6px; border:1px solid var(--accent); text-align:center;">
+          <div style="font-size:11px; color:var(--accent); font-weight:bold;">ENTREGA ESTIMADA (NUEVO LOTE)</div>
+          <div id="slaDiasTotal" style="font-size:18px; font-weight:bold; color:#fff; margin-top:5px;">~ 1 Día</div>
         </div>
       </div>
     </div>
 
-    <!-- TARJETAS CON DEGRADADO DE PRODUCCIÓN (Captura 4: Violeta, Naranja, Azul + Esmeralda DTF) -->
-    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-bottom:16px;">
+    <!-- TARJETAS CON DEGRADADO EXACTAS DE Index.html líneas 349-426 -->
+    <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:15px;">
       <!-- IMPRESIÓN -->
-      <div style="background:var(--vg-grad-imp); border-radius:12px; padding:20px; border:1px solid var(--vg-border-subtle);">
-        <h3 style="margin-top:0; font-size:15px; border-bottom:1px solid var(--vg-border-subtle); padding-bottom:10px; display:flex; justify-content:space-between;">
-          <span>🖨️ IMPRESIÓN</span>
-          <span class="badge">PRODUCCIÓN</span>
+      <div style="flex:1; min-width:300px; background:linear-gradient(135deg, #2b0b3f 0%, #61237a 100%); border-radius:12px; padding:20px; color:#fff; box-shadow:0 8px 25px rgba(97, 35, 122, 0.4); border:1px solid rgba(255,255,255,0.1);">
+        <h3 style="margin-top:0; font-size:16px; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:10px; display:flex; justify-content:space-between;">
+          <span>🖨️ IMPRESIÓN</span> <span style="background:rgba(255,255,255,0.2); padding:2px 8px; border-radius:12px; font-size:11px;">PRODUCCIÓN</span>
         </h3>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:12px;">
-          <div>
-            <div class="stat-title">DIARIO (HOY)</div>
-            <div id="biImpHoy" class="font-mono" style="font-size:26px; font-weight:900;">0.00</div>
-          </div>
-          <div>
-            <div class="stat-title">DÍA ANTERIOR (AYER)</div>
-            <div id="biImpAyer" class="font-mono" style="font-size:26px; font-weight:900;">0.00</div>
-          </div>
-          <div>
-            <div class="stat-title">ESTA SEMANA</div>
-            <div id="biImpSem" class="font-mono" style="font-size:22px; font-weight:800;">0.00</div>
-          </div>
-          <div>
-            <div class="stat-title">SEMANA ANTERIOR</div>
-            <div id="biImpSemAnt" class="font-mono" style="font-size:22px; font-weight:800;">0.00</div>
-          </div>
-          <div>
-            <div class="stat-title">ESTE MES</div>
-            <div id="biImpMes" class="font-mono" style="font-size:18px; font-weight:800;">0.00</div>
-          </div>
-          <div>
-            <div class="stat-title">HISTÓRICO</div>
-            <div id="biImpHis" class="font-mono" style="font-size:18px; font-weight:800;">0.00</div>
-          </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:15px;">
+          <div><div style="font-size:11px; opacity:0.7; letter-spacing:1px; margin-bottom:3px;">DIARIO (HOY)</div><div id="biImpHoy" style="font-size:28px; font-weight:900; text-shadow:0 2px 4px rgba(0,0,0,0.5);">0.00</div></div>
+          <div><div style="font-size:11px; opacity:0.7; letter-spacing:1px; margin-bottom:3px;">ESTA SEMANA</div><div id="biImpSem" style="font-size:28px; font-weight:900; text-shadow:0 2px 4px rgba(0,0,0,0.5);">0.00</div></div>
+          <div><div style="font-size:11px; opacity:0.7; letter-spacing:1px; margin-bottom:3px;">DÍA ANTERIOR (AYER)</div><div id="biImpAyer" style="font-size:20px; font-weight:bold; color:#e0b2ff;">0.00</div></div>
+          <div><div style="font-size:11px; opacity:0.7; letter-spacing:1px; margin-bottom:3px;">SEMANA ANTERIOR</div><div id="biImpSemAnt" style="font-size:20px; font-weight:bold; color:#e0b2ff;">0.00</div></div>
+          <div><div style="font-size:11px; opacity:0.7; letter-spacing:1px; margin-bottom:3px;">ESTE MES</div><div id="biImpMes" style="font-size:22px; font-weight:bold; color:#e0b2ff;">0.00</div></div>
+          <div><div style="font-size:11px; opacity:0.7; letter-spacing:1px; margin-bottom:3px;">HISTÓRICO</div><div id="biImpHis" style="font-size:22px; font-weight:bold; color:#e0b2ff;">0.00</div></div>
         </div>
       </div>
 
       <!-- CALANDRADO -->
-      <div style="background:var(--vg-grad-cal); border-radius:12px; padding:20px; border:1px solid var(--vg-border-subtle);">
-        <h3 style="margin-top:0; font-size:15px; border-bottom:1px solid var(--vg-border-subtle); padding-bottom:10px; display:flex; justify-content:space-between;">
-          <span>♨️ CALANDRADO</span>
-          <span class="badge">PRODUCCIÓN</span>
+      <div style="flex:1; min-width:300px; background:linear-gradient(135deg, #3a1c00 0%, #b35900 100%); border-radius:12px; padding:20px; color:#fff; box-shadow:0 8px 25px rgba(179, 89, 0, 0.4); border:1px solid rgba(255,255,255,0.1);">
+        <h3 style="margin-top:0; font-size:16px; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:10px; display:flex; justify-content:space-between;">
+          <span>♨️ CALANDRADO</span> <span style="background:rgba(255,255,255,0.2); padding:2px 8px; border-radius:12px; font-size:11px;">PRODUCCIÓN</span>
         </h3>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:12px;">
-          <div>
-            <div class="stat-title">DIARIO (HOY)</div>
-            <div id="biCalHoy" class="font-mono" style="font-size:26px; font-weight:900;">0.00</div>
-          </div>
-          <div>
-            <div class="stat-title">DÍA ANTERIOR (AYER)</div>
-            <div id="biCalAyer" class="font-mono" style="font-size:26px; font-weight:900;">0.00</div>
-          </div>
-          <div>
-            <div class="stat-title">ESTA SEMANA</div>
-            <div id="biCalSem" class="font-mono" style="font-size:22px; font-weight:800;">0.00</div>
-          </div>
-          <div>
-            <div class="stat-title">SEMANA ANTERIOR</div>
-            <div id="biCalSemAnt" class="font-mono" style="font-size:22px; font-weight:800;">0.00</div>
-          </div>
-          <div>
-            <div class="stat-title">ESTE MES</div>
-            <div id="biCalMes" class="font-mono" style="font-size:18px; font-weight:800;">0.00</div>
-          </div>
-          <div>
-            <div class="stat-title">HISTÓRICO</div>
-            <div id="biCalHis" class="font-mono" style="font-size:18px; font-weight:800;">0.00</div>
-          </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:15px;">
+          <div><div style="font-size:11px; opacity:0.7; letter-spacing:1px; margin-bottom:3px;">DIARIO (HOY)</div><div id="biCalHoy" style="font-size:28px; font-weight:900; text-shadow:0 2px 4px rgba(0,0,0,0.5);">0.00</div></div>
+          <div><div style="font-size:11px; opacity:0.7; letter-spacing:1px; margin-bottom:3px;">ESTA SEMANA</div><div id="biCalSem" style="font-size:28px; font-weight:900; text-shadow:0 2px 4px rgba(0,0,0,0.5);">0.00</div></div>
+          <div><div style="font-size:11px; opacity:0.7; letter-spacing:1px; margin-bottom:3px;">DÍA ANTERIOR (AYER)</div><div id="biCalAyer" style="font-size:20px; font-weight:bold; color:#ffcc99;">0.00</div></div>
+          <div><div style="font-size:11px; opacity:0.7; letter-spacing:1px; margin-bottom:3px;">SEMANA ANTERIOR</div><div id="biCalSemAnt" style="font-size:20px; font-weight:bold; color:#ffcc99;">0.00</div></div>
+          <div><div style="font-size:11px; opacity:0.7; letter-spacing:1px; margin-bottom:3px;">ESTE MES</div><div id="biCalMes" style="font-size:22px; font-weight:bold; color:#ffcc99;">0.00</div></div>
+          <div><div style="font-size:11px; opacity:0.7; letter-spacing:1px; margin-bottom:3px;">HISTÓRICO</div><div id="biCalHis" style="font-size:22px; font-weight:bold; color:#ffcc99;">0.00</div></div>
         </div>
       </div>
 
       <!-- CORTE LÁSER -->
-      <div style="background:var(--vg-grad-las); border-radius:12px; padding:20px; border:1px solid var(--vg-border-subtle);">
-        <h3 style="margin-top:0; font-size:15px; border-bottom:1px solid var(--vg-border-subtle); padding-bottom:10px; display:flex; justify-content:space-between;">
-          <span>⚡ CORTE LÁSER</span>
-          <span class="badge">PRODUCCIÓN</span>
+      <div style="flex:1; min-width:300px; background:linear-gradient(135deg, #002233 0%, #0077b3 100%); border-radius:12px; padding:20px; color:#fff; box-shadow:0 8px 25px rgba(0, 119, 179, 0.4); border:1px solid rgba(255,255,255,0.1);">
+        <h3 style="margin-top:0; font-size:16px; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:10px; display:flex; justify-content:space-between;">
+          <span>⚡ CORTE LÁSER</span> <span style="background:rgba(255,255,255,0.2); padding:2px 8px; border-radius:12px; font-size:11px;">PRODUCCIÓN</span>
         </h3>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:12px;">
-          <div>
-            <div class="stat-title">DIARIO (HOY)</div>
-            <div id="biLasHoy" class="font-mono" style="font-size:26px; font-weight:900;">0.00</div>
-          </div>
-          <div>
-            <div class="stat-title">DÍA ANTERIOR (AYER)</div>
-            <div id="biLasAyer" class="font-mono" style="font-size:26px; font-weight:900;">0.00</div>
-          </div>
-          <div>
-            <div class="stat-title">ESTA SEMANA</div>
-            <div id="biLasSem" class="font-mono" style="font-size:22px; font-weight:800;">0.00</div>
-          </div>
-          <div>
-            <div class="stat-title">SEMANA ANTERIOR</div>
-            <div id="biLasSemAnt" class="font-mono" style="font-size:22px; font-weight:800;">0.00</div>
-          </div>
-          <div>
-            <div class="stat-title">ESTE MES</div>
-            <div id="biLasMes" class="font-mono" style="font-size:18px; font-weight:800;">0.00</div>
-          </div>
-          <div>
-            <div class="stat-title">HISTÓRICO</div>
-            <div id="biLasHis" class="font-mono" style="font-size:18px; font-weight:800;">0.00</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- DTF -->
-      <div style="background:var(--vg-grad-dtf); border-radius:12px; padding:20px; border:1px solid var(--vg-border-subtle);">
-        <h3 style="margin-top:0; font-size:15px; border-bottom:1px solid var(--vg-border-subtle); padding-bottom:10px; display:flex; justify-content:space-between;">
-          <span>🎞️ DTF 60CM</span>
-          <span class="badge">PRODUCCIÓN</span>
-        </h3>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:12px;">
-          <div>
-            <div class="stat-title">DIARIO (HOY)</div>
-            <div id="biDtfHoy" class="font-mono" style="font-size:26px; font-weight:900;">0.00</div>
-          </div>
-          <div>
-            <div class="stat-title">DÍA ANTERIOR (AYER)</div>
-            <div id="biDtfAyer" class="font-mono" style="font-size:26px; font-weight:900;">0.00</div>
-          </div>
-          <div>
-            <div class="stat-title">ESTA SEMANA</div>
-            <div id="biDtfSem" class="font-mono" style="font-size:22px; font-weight:800;">0.00</div>
-          </div>
-          <div>
-            <div class="stat-title">SEMANA ANTERIOR</div>
-            <div id="biDtfSemAnt" class="font-mono" style="font-size:22px; font-weight:800;">0.00</div>
-          </div>
-          <div>
-            <div class="stat-title">ESTE MES</div>
-            <div id="biDtfMes" class="font-mono" style="font-size:18px; font-weight:800;">0.00</div>
-          </div>
-          <div>
-            <div class="stat-title">HISTÓRICO</div>
-            <div id="biDtfHis" class="font-mono" style="font-size:18px; font-weight:800;">0.00</div>
-          </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:15px;">
+          <div><div style="font-size:11px; opacity:0.7; letter-spacing:1px; margin-bottom:3px;">DIARIO (HOY)</div><div id="biLasHoy" style="font-size:28px; font-weight:900; text-shadow:0 2px 4px rgba(0,0,0,0.5);">0.00</div></div>
+          <div><div style="font-size:11px; opacity:0.7; letter-spacing:1px; margin-bottom:3px;">ESTA SEMANA</div><div id="biLasSem" style="font-size:28px; font-weight:900; text-shadow:0 2px 4px rgba(0,0,0,0.5);">0.00</div></div>
+          <div><div style="font-size:11px; opacity:0.7; letter-spacing:1px; margin-bottom:3px;">DÍA ANTERIOR (AYER)</div><div id="biLasAyer" style="font-size:20px; font-weight:bold; color:#99e6ff;">0.00</div></div>
+          <div><div style="font-size:11px; opacity:0.7; letter-spacing:1px; margin-bottom:3px;">SEMANA ANTERIOR</div><div id="biLasSemAnt" style="font-size:20px; font-weight:bold; color:#99e6ff;">0.00</div></div>
+          <div><div style="font-size:11px; opacity:0.7; letter-spacing:1px; margin-bottom:3px;">ESTE MES</div><div id="biLasMes" style="font-size:22px; font-weight:bold; color:#99e6ff;">0.00</div></div>
+          <div><div style="font-size:11px; opacity:0.7; letter-spacing:1px; margin-bottom:3px;">HISTÓRICO</div><div id="biLasHis" style="font-size:22px; font-weight:bold; color:#99e6ff;">0.00</div></div>
         </div>
       </div>
     </div>
 
-    <!-- RADAR DE PRODUCCIÓN (EN COLA) — Captura 4 -->
-    <div class="card" style="background:var(--vg-surface-dark);">
-      <h3 style="color:var(--vg-text-secondary); font-size:13px; text-transform:uppercase;">RADAR DE PRODUCCIÓN (EN COLA)</h3>
-      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:14px;">
-        <div style="background:var(--vg-surface-input); padding:15px; border-radius:8px; border-left: 5px solid var(--vg-status-alert);">
-          <div class="stat-title">ESPERANDO IMPRESIÓN</div>
-          <div id="radarQImp" class="font-mono" style="font-size:30px; font-weight:900; margin-top:4px;">0m</div>
+    <!-- RADAR DE PRODUCCIÓN (EN COLA) — Copia exacta de Index.html líneas 429-445 -->
+    <div style="background:#1a1c23; border:1px solid #333; border-radius:12px; padding:20px; margin-bottom:15px;">
+      <h3 style="color:#aaa; margin-top:0; font-size:14px; text-transform:uppercase;">Radar de Producción (En Cola)</h3>
+      <div style="display:flex; gap:15px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:150px; background:#111; padding:15px; border-radius:8px; border-left:5px solid #f44336;">
+          <div style="font-size:12px; color:#888; font-weight:bold;">ESPERANDO IMPRESIÓN</div>
+          <div id="radarQImp" style="font-size:32px; color:#fff; font-weight:bold;">0m</div>
         </div>
-        <div style="background:var(--vg-surface-input); padding:15px; border-radius:8px; border-left: 5px solid var(--vg-status-processing);">
-          <div class="stat-title">ESPERANDO CALANDRA</div>
-          <div id="radarQCal" class="font-mono" style="font-size:30px; font-weight:900; margin-top:4px;">0m</div>
+        <div style="flex:1; min-width:150px; background:#111; padding:15px; border-radius:8px; border-left:5px solid #f44336;">
+          <div style="font-size:12px; color:#888; font-weight:bold;">ESPERANDO CALANDRA</div>
+          <div id="radarQCal" style="font-size:32px; color:#fff; font-weight:bold;">0m</div>
         </div>
-        <div style="background:var(--vg-surface-input); padding:15px; border-radius:8px; border-left: 5px solid var(--vg-status-ready);">
-          <div class="stat-title">ESPERANDO LÁSER</div>
-          <div id="radarQLas" class="font-mono" style="font-size:30px; font-weight:900; margin-top:4px;">0m</div>
+        <div style="flex:1; min-width:150px; background:#111; padding:15px; border-radius:8px; border-left:5px solid #4CAF50;">
+          <div style="font-size:12px; color:#888; font-weight:bold;">ESPERANDO LÁSER</div>
+          <div id="radarQLas" style="font-size:32px; color:#fff; font-weight:bold;">0m</div>
         </div>
+      </div>
+    </div>
+
+    <!-- TOP TELAS, TOP CLIENTES Y RENDIMIENTO (Copia exacta de Index.html líneas 447-467) -->
+    <div style="display:flex; gap:20px; flex-wrap:wrap;">
+      <div style="flex:1; min-width:300px; background:#1a1c23; border:1px solid #333; border-radius:12px; padding:20px;">
+        <h3 style="color:#aaa; margin-top:0; font-size:14px; text-transform:uppercase;">Top Telas Histórico</h3>
+        <div id="dashTopTelas"></div>
+      </div>
+      <div style="flex:1; min-width:300px; background:#1a1c23; border:1px solid #333; border-radius:12px; padding:20px;">
+        <h3 style="color:#aaa; margin-top:0; font-size:14px; text-transform:uppercase;">Top Clientes Histórico</h3>
+        <div id="dashTopClientes"></div>
+      </div>
+      <div style="flex:1; min-width:300px; background:#1a1c23; border:1px solid #333; border-radius:12px; padding:20px;">
+        <h3 style="color:#aaa; margin-top:0; font-size:14px; text-transform:uppercase;">Rendimiento Real Calandra (Mts/Hr)</h3>
+        <div id="dashRendimiento"><div style="color:#888; font-size:12px;">Vel 50 — Promedio: 82 m/h</div></div>
       </div>
     </div>
   </div>
 
   <!-- ========================================================================
-       TAB 8: CHAT INTERNO DE TALLER (@Menciones, #Trabajos, Fotos Cámara WebP)
+       TAB 8: CHAT INTERNO DE TALLER
        ======================================================================== -->
-  <div id="sec-chat" class="tab-content vg-module-section">
+  <div id="sec-chat" class="tab-content">
     <div class="grid-panel">
-      <div class="card card-params-gradient">
-        <h2>📣 Enviar Mensaje / Acontecimiento al Taller</h2>
-
-        <label>📍 Área / Canal Destino</label>
+      <div class="card" style="border-top: 3px solid var(--accent-magenta);">
+        <h2>📣 Enviar Mensaje / Nota al Taller</h2>
+        <label>Área / Canal</label>
         <select id="chatSelectCanal">
           <option value="General">🏢 General (Todo el Taller)</option>
-          <option value="Impresión">🖨️ Impresión Sublimación</option>
+          <option value="Impresión">🖨️ Impresión</option>
           <option value="Calandrado">🔥 Calandrado</option>
           <option value="Corte Láser">⚡ Corte Láser</option>
           <option value="DTF">🎞️ Módulo DTF</option>
         </select>
-
-        <label>🔗 #Arrobar un Trabajo (Copia la nota automáticamente en la fila del trabajo)</label>
+        <label>#Arrobar un Trabajo</label>
         <select id="chatSelectTrabajo"></select>
-
-        <label>👤 @Arrobar a un Miembro del Equipo (Tocá para mencionar)</label>
-        <div id="chatChipsMencion" class="chips-wrap"></div>
-
-        <label>💬 Mensaje / Nota</label>
-        <textarea id="chatInputMensaje" rows="3" placeholder="Escribí tu nota, @mencioná a un compañero o adjuntá una foto del trabajo..."></textarea>
-
-        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px;">
+        <label>@Arrobar a un Miembro del Equipo</label>
+        <div id="chatChipsMencion" style="display:flex; gap:5px; flex-wrap:wrap; margin-top:5px;"></div>
+        <label>Mensaje / Nota</label>
+        <textarea id="chatInputMensaje" rows="3" placeholder="Escribí tu nota o @mencioná a un compañero..."></textarea>
+        <div style="display:flex; gap:8px; align-items:center; margin-top:10px;">
           <label class="btn-secondary" style="width:auto; cursor:pointer; margin:0;">
-            📷 Cámara / Foto (WebP)
+            📷 Adjuntar Foto
             <input type="file" id="chatInputFotoCamara" accept="image/*" capture="environment" style="display:none;" />
           </label>
           <span id="chatFotoPreviewBadge" class="badge activo" style="display:none;"></span>
           <button type="button" id="btnEnviarMensajeChat" class="btn-main" style="flex:1; margin:0;">Enviar Mensaje</button>
         </div>
       </div>
-
-      <div class="card" style="border-top: 3px solid var(--vg-brand-secondary);">
+      <div class="card" style="border-top: 3px solid var(--accent-blue);">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
           <h2 style="margin:0; border:none; padding:0;">💬 Muro Operativo en Tiempo Real</h2>
           <div style="display:flex; gap:5px; flex-wrap:wrap;">
-            <button type="button" class="badge mru-top btn-canal-chat" data-canal="Todos" style="cursor:pointer;">Todos</button>
+            <button type="button" class="badge activo btn-canal-chat" data-canal="Todos" style="cursor:pointer;">Todos</button>
             <button type="button" class="badge btn-canal-chat" data-canal="Mis Menciones" style="cursor:pointer;">🔔 Mis Menciones</button>
             <button type="button" class="badge btn-canal-chat" data-canal="Impresión" style="cursor:pointer;">🖨️ Imp</button>
             <button type="button" class="badge btn-canal-chat" data-canal="Calandrado" style="cursor:pointer;">🔥 Calandra</button>
@@ -879,82 +596,65 @@
     </div>
   </div>
 
-  <!-- BOTÓN FLOTANTE DE CHAT RÁPIDO PARA CELULARES -->
-  <button type="button" class="fab-chat-btn" onclick="document.querySelector('.tab-btn[data-tab=\'chat\']').click()">
-    <span>💬 Chat Taller</span>
-    <span id="badgeFabChat" class="badge activo">0</span>
-  </button>
-
   <!-- ========================================================================
-       MODAL 1: MONTAR ROLLO NUEVO / ACCIÓN DE PAPEL (90dvh Sticky Header & Footer — Pedido #1)
+       MODALES (Con diseño exacto de Index.html + 90dvh para que nunca se tapen los botones)
        ======================================================================== -->
   <div id="modalMontarRollo" class="modal-overlay">
-    <div class="modal-content">
-      <div class="modal-sticky-header">
-        <h2 style="margin:0; border:none; padding:0; color:var(--vg-brand-secondary);">🧻 Montar Nuevo Rollo de Papel</h2>
-        <button type="button" class="btn-secondary vg-modal-close" style="width:auto; padding:6px 12px; border-color:var(--vg-status-alert); color:var(--vg-status-alert);">✖ Cerrar</button>
+    <div class="modal-content" style="border-color:var(--accent-blue);">
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #444; padding-bottom:10px; margin-bottom:10px;">
+        <h2 style="margin:0; border:none; padding:0; color:var(--accent-blue);">🧻 Montar Rollo Nuevo</h2>
+        <button type="button" class="vg-modal-close" style="background:none; border:none; color:#ff5252; font-size:20px; font-weight:bold; cursor:pointer;">✖</button>
       </div>
-      <div class="modal-scroll-body">
-        <div class="grid-2">
-          <div>
-            <label>Gramaje (g)</label>
-            <input type="number" id="montarRolloGramaje" value="29" placeholder="Ej: 29 o 31" />
-          </div>
-          <div>
-            <label>Metros Iniciales de la Bobina</label>
-            <input type="number" id="montarRolloMetros" value="500" placeholder="Ej: 500" />
-          </div>
-        </div>
-        <label>Observaciones de Montaje</label>
-        <input type="text" id="montarRolloObs" placeholder="Opcional..." />
+      <div class="grid-2">
+        <div><label>Gramaje</label><input type="number" id="montarRolloGramaje" value="29" placeholder="Ej: 29" /></div>
+        <div><label>Metros Totales</label><input type="number" id="montarRolloMetros" value="500" placeholder="Ej: 500" /></div>
       </div>
-      <div class="modal-sticky-footer">
-        <button type="button" class="btn-secondary vg-modal-close" style="width:auto; padding:8px 16px;">Cancelar</button>
-        <button type="button" id="btnConfirmarMontarRollo" class="btn-main" style="width:auto; margin:0; padding:8px 18px;">✅ Confirmar y Montar</button>
+      <label>Observaciones</label>
+      <input type="text" id="montarRolloObs" placeholder="Opcional..." />
+      <div class="grid-2" style="margin-top:20px;">
+        <button type="button" id="btnConfirmarMontarRollo" class="btn-main" style="margin:0; background:var(--accent-blue);">Confirmar Acción</button>
+        <button type="button" class="btn-secondary vg-modal-close" style="margin:0;">Cancelar</button>
       </div>
     </div>
   </div>
 
-  <!-- ========================================================================
-       MODAL 2: MODO KIOSKO OPERATIVO 90dvh (Sticky Header & Footer — Nunca se tapan los botones)
-       ======================================================================== -->
   <div id="modalKioscoOperativo" class="modal-overlay">
-    <div class="modal-content kiosk-lg">
-      <div class="modal-sticky-header">
-        <h2 id="kioscoTitulo" style="margin:0; border:none; padding:0; color:var(--vg-brand-secondary);">▶️ MODO KIOSKO OPERATIVO</h2>
-        <button type="button" class="btn-secondary vg-modal-close" style="width:auto; padding:6px 14px; border-color:var(--vg-status-alert); color:var(--vg-status-alert);">✖ CERRAR</button>
+    <div class="modal-content" style="max-width:750px; border-color:var(--accent-blue); background:#0a0c10; padding:0; overflow:hidden; display:flex; flex-direction:column; max-height:90dvh;">
+      <div style="background:#1a1c23; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #333;">
+        <h2 id="kioscoTitulo" style="margin:0; border:none; padding:0; color:#fff; font-size:18px;">▶️ MODO KIOSKO</h2>
+        <button type="button" class="vg-modal-close" style="background:none; border:none; color:#ff5252; font-size:20px; cursor:pointer; font-weight:bold;">✖ CERRAR</button>
       </div>
-      <div class="modal-scroll-body">
-        <div id="kioscoSubtitulo" style="margin-bottom:14px;"></div>
-        <div style="background:var(--vg-surface-dark); border:1px solid var(--vg-brand-secondary); border-radius:8px; padding:16px; text-align:center;">
-          <div class="stat-title" style="color:var(--vg-brand-secondary);">CRONÓMETRO EN VIVO</div>
-          <div id="kioscoCronometro" class="font-mono" style="font-size:38px; font-weight:900; margin-top:4px;">00:00</div>
+      <div style="padding:16px; overflow-y:auto; flex:1;">
+        <div id="kioscoSubtitulo" style="margin-bottom:15px;"></div>
+        <div style="text-align:center; background:#000; padding:12px 24px; border-radius:8px; border:1px solid #2196F3;">
+          <div style="color:#2196F3; font-size:12px; font-weight:bold; margin-bottom:4px;">CRONÓMETRO</div>
+          <div id="kioscoCronometro" style="font-family:monospace; font-size:32px; color:#fff; font-weight:bold;">00:00</div>
         </div>
       </div>
-      <div class="modal-sticky-footer">
-        <button type="button" class="btn-secondary vg-modal-close" style="width:auto; padding:10px 18px;">⏸️ Minimizar / Salir</button>
-        <button type="button" id="btnKioscoFinalizar" class="btn-main" style="width:auto; margin:0; padding:10px 22px; background:var(--vg-status-ready); color:var(--vg-bg-app);">✔️ TERMINAR TRABAJO</button>
+      <div style="background:#1a1c23; padding:14px 18px; border-top:1px solid #333; display:flex; gap:12px;">
+        <button type="button" class="btn-secondary vg-modal-close" style="flex:1; margin:0; padding:14px; font-size:15px; font-weight:bold;">⏸️ PAUSAR / SALIR</button>
+        <button type="button" id="btnKioscoFinalizar" style="flex:2; background:#4CAF50; color:#fff; border:none; padding:14px; font-size:18px; font-weight:bold; border-radius:8px; cursor:pointer;">✔️ TERMINAR</button>
       </div>
     </div>
   </div>
 
-  <!-- ========================================================================
-       MODAL 3: EDITOR CRUD UNIVERSAL (Editar o Agregar en Cualquier Tabla en Cualquier Momento)
-       ======================================================================== -->
   <div id="modalCrudUniversal" class="modal-overlay">
-    <div class="modal-content">
-      <div class="modal-sticky-header">
-        <h2 id="modalCrudTitle" style="margin:0; border:none; padding:0; color:var(--vg-brand-secondary);">✏️ Editar Registro</h2>
-        <button type="button" class="btn-secondary vg-modal-close" style="width:auto; padding:6px 12px; border-color:var(--vg-status-alert); color:var(--vg-status-alert);">✖ Cerrar</button>
+    <div class="modal-content" style="border-color:var(--accent-blue); display:flex; flex-direction:column; max-height:90dvh; padding:0; overflow:hidden;">
+      <div style="background:#111; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #333;">
+        <h2 id="modalCrudTitle" style="margin:0; border:none; padding:0; color:var(--accent-blue);">✏️ Editar Registro</h2>
+        <button type="button" class="vg-modal-close" style="background:none; border:none; color:#ff5252; font-size:20px; font-weight:bold; cursor:pointer;">✖</button>
       </div>
-      <div id="modalCrudBody" class="modal-scroll-body"></div>
-      <div class="modal-sticky-footer">
-        <button type="button" class="btn-secondary vg-modal-close" style="width:auto; padding:8px 16px;">Cancelar</button>
-        <button type="button" id="btnGuardarModalCrud" class="btn-main" style="width:auto; margin:0; padding:8px 18px;">💾 Guardar Cambios</button>
+      <div id="modalCrudBody" style="padding:16px; overflow-y:auto; flex:1;"></div>
+      <div style="background:#111; padding:12px 18px; border-top:1px solid #333; display:flex; gap:10px;">
+        <button type="button" id="btnGuardarModalCrud" class="btn-main" style="margin:0; background:var(--accent-blue);">💾 Guardar Cambios</button>
+        <button type="button" class="btn-secondary vg-modal-close" style="margin:0;">Cancelar</button>
       </div>
     </div>
   </div>
 
+  <datalist id="listTelas"></datalist>
+  <datalist id="listPerfiles"></datalist>
+  <datalist id="listColores"></datalist>
   <div id="vgToastContainer" style="position:fixed; top:16px; right:16px; z-index:3000; max-width:360px;"></div>
 
   <script type="module" src="./src/app.js"></script>

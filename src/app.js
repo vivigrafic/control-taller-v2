@@ -1,7 +1,7 @@
 // ============================================================================
 // CONTROL DE TALLER Y PRODUCCIÓN 2.0 — V&V GRAFIC (MOTOR PRINCIPAL SUPABASE)
 // Conectado exclusivamente al Clon de Pruebas: kkvzzheccniclfwqzivu
-// Identidad Visual Exacta: V&V Grafic Cobalt Enterprise (--vg-* Design Tokens)
+// Estilo Visual 100% Idéntico a la App en Uso (Estilos.html + Index.html + JS_*.html)
 // ============================================================================
 
 import {
@@ -14,11 +14,12 @@ import {
 
 const STATE = {
   tabActiva: "impresion",
-  periodoActivo: "todo", // todo, hoy, ayer, semana_actual, semana_anterior, mes_actual, custom
+  periodoActivo: "todo",
   fechaDesde: "",
   fechaHasta: "",
   busquedaGlobal: "",
   filtroPendientesLocal: "",
+  filtroHistorialImpLocal: "",
   filtroCalandraLocal: "",
   ordenCalandraAsc: true,
   rollosCalandraAbiertos: new Set(),
@@ -28,7 +29,6 @@ const STATE = {
   areaActual: localStorage.getItem("vg_area_actual") || "General",
   canalChatActivo: "Todos",
 
-  // Datos en vivo desde Supabase (kkvzzheccniclfwqzivu)
   rollosPapelSaldos: [],
   bloquesImpresion: [],
   impresiones: [],
@@ -42,9 +42,8 @@ const STATE = {
   dtfPedidos: [],
   dtfCuentasClientes: [],
   chatMensajes: [],
-  comprasFinanzas: [],
 
-  // Protección de Formulario Activo (Dirty-Form Protection — Pedido #7)
+  // Protección Dirty-Form (Pedido #7)
   impForm: {
     dirty: false,
     archivosSeleccionadosIds: new Set(),
@@ -60,10 +59,8 @@ const STATE = {
     autoDetectInfo: ""
   },
 
-  // Estado Kiosko activo (90dvh responsivo)
   kiosco: {
     abierto: false,
-    tipo: "",
     registroIds: [],
     inicioMs: 0,
     timerInterval: null
@@ -74,12 +71,9 @@ const STATE = {
 
 const sb = () => window.vgSupabase;
 
-// ============================================================================
-// UTILIDADES DE FORMATO Y DISENO VISUAL
-// ============================================================================
 function fmtNum(n, dec = 2) {
   const v = Number(n) || 0;
-  return v.toLocaleString("es-AR", { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  return v.toFixed(dec);
 }
 function fmtMoney(n) {
   const v = Number(n) || 0;
@@ -89,14 +83,17 @@ function fmtDateHora(isoStr) {
   if (!isoStr) return "-";
   const d = new Date(isoStr);
   if (isNaN(d.getTime())) return "-";
-  return d.toLocaleString("es-AR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false
-  });
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mi = String(d.getMinutes()).padStart(2, "0");
+  return `${dd}/${mm}<br>${hh}:${mi}`;
+}
+function fmtDateHoraLineal(isoStr) {
+  if (!isoStr) return "-";
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return "-";
+  return d.toLocaleString("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
 }
 function escHtml(str) {
   return String(str ?? "")
@@ -110,47 +107,42 @@ function toast(msg, tipo = "info") {
   const cont = document.getElementById("vgToastContainer");
   if (!cont) return;
   const el = document.createElement("div");
-  const borderVar = tipo === "error"
-    ? "var(--vg-status-alert)"
-    : tipo === "warn"
-      ? "var(--vg-status-processing)"
-      : "var(--vg-status-ready)";
-  el.style.cssText = `background:var(--vg-surface-modal);color:var(--vg-text-primary);border:2px solid ${borderVar};padding:10px 14px;border-radius:8px;font-weight:800;font-size:12.5px;box-shadow:0 8px 24px var(--vg-shadow-strong);margin-top:8px;`;
+  const borderVar = tipo === "error" ? "var(--danger)" : tipo === "warn" ? "var(--accent-orange)" : "var(--accent)";
+  el.style.cssText = `background:#111;color:#fff;border:2px solid ${borderVar};padding:10px 14px;border-radius:6px;font-weight:bold;font-size:12px;box-shadow:0 6px 20px rgba(0,0,0,0.6);margin-top:8px;`;
   el.textContent = msg;
   cont.appendChild(el);
-  setTimeout(() => el.remove(), 3800);
+  setTimeout(() => el.remove(), 3500);
 }
 
-// Genera miniatura visual de color/diseño (como en Captura 2)
-function renderMiniaturaDiseno(colorStr, disenoStr, nombreStr) {
+// Miniatura cuadrada de 60x60px idéntica a la columna "Diseño" de la Captura 2
+function renderMiniaturaDiseno60(colorStr, disenoStr, nombreStr) {
   const texto = `${colorStr || ""} ${disenoStr || ""} ${nombreStr || ""}`.toUpperCase();
-  let bgStyle = "background:var(--vg-grad-imp);";
+  let bg = "#2b0b3f";
   if (texto.includes("AMARILLO") && texto.includes("ROJO")) {
-    bgStyle = "background:repeating-linear-gradient(90deg, var(--vg-status-processing), var(--vg-status-processing) 6px, var(--vg-status-alert) 6px, var(--vg-status-alert) 9px);";
+    bg = "repeating-linear-gradient(90deg, #ffb300, #ffb300 3px, #e53935 3px, #e53935 6px)";
+  } else if (texto.includes("ROSA")) {
+    bg = "#fdf5e6";
   } else if (texto.includes("AMARILLO")) {
-    bgStyle = "background:var(--vg-status-processing);";
-  } else if (texto.includes("ROSA") || texto.includes("FUCSIA") || texto.includes("MAGENTA")) {
-    bgStyle = "background:var(--vg-status-alert);";
-  } else if (texto.includes("VERDE") || texto.includes("ESMERALDA")) {
-    bgStyle = "background:var(--vg-status-ready);";
-  } else if (texto.includes("AZUL") || texto.includes("FRANCIA") || texto.includes("MARINO") || texto.includes("CELESTE")) {
-    bgStyle = "background:var(--vg-brand-primary);";
+    bg = "#fdd835";
+  } else if (texto.includes("VERDE")) {
+    bg = "#43a047";
+  } else if (texto.includes("AZUL") || texto.includes("FRANCIA") || texto.includes("MARINO")) {
+    bg = "#1e88e5";
   } else if (texto.includes("NEGRO")) {
-    bgStyle = "background:var(--vg-bg-app);";
+    bg = "#212121";
   }
-  const label = escHtml((disenoStr || colorStr || "ARTE").slice(0, 6));
-  return `<div class="design-swatch" style="${bgStyle}" title="${escHtml(disenoStr || nombreStr || "")}">${label}</div>`;
+  return `<div style="width:56px; height:56px; margin:0 auto; border-radius:4px; background:${bg}; border:1px solid #444;" title="${escHtml(disenoStr || nombreStr || "")}"></div>`;
 }
 
 // ============================================================================
-// CÁLCULOS DE FECHAS Y PERÍODOS (Hoy, Día Anterior/Ayer, Esta Semana, Semana Anterior, Mes, Año)
+// CÁLCULOS DE FECHAS Y PERÍODOS
 // ============================================================================
 function obtenerVentanasTemporales() {
   const ahora = new Date();
   const hoyIni = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0, 0);
   const hoyFin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59, 999);
   const ayerIni = new Date(hoyIni.getTime() - 86400000);
-  const diaSem = ahora.getDay() || 7; // Lunes = 1 ... Domingo = 7
+  const diaSem = ahora.getDay() || 7;
   const semActualIni = new Date(hoyIni.getTime() - (diaSem - 1) * 86400000);
   const semAntIni = new Date(semActualIni.getTime() - 7 * 86400000);
   const mesActualIni = new Date(ahora.getFullYear(), ahora.getMonth(), 1, 0, 0, 0, 0);
@@ -172,7 +164,7 @@ function sumarMetrosEnVentana(arr, campoFecha, campoMetros, desde, hasta = null)
 
 function obtenerRangoFechasActivo() {
   const { hoyIni, hoyFin, ayerIni, semActualIni, semAntIni, mesActualIni } = obtenerVentanasTemporales();
-  if (STATE.periodoActivo === "todo") return { desde: null, hasta: null, etiqueta: "Histórico Completo" };
+  if (STATE.periodoActivo === "todo") return { desde: null, hasta: null, etiqueta: "Histórico" };
   if (STATE.periodoActivo === "hoy") return { desde: hoyIni, hasta: hoyFin, etiqueta: "Hoy" };
   if (STATE.periodoActivo === "ayer") return { desde: ayerIni, hasta: new Date(hoyIni.getTime() - 1), etiqueta: "Día Anterior (Ayer)" };
   if (STATE.periodoActivo === "semana_actual") return { desde: semActualIni, hasta: hoyFin, etiqueta: "Esta Semana" };
@@ -181,7 +173,7 @@ function obtenerRangoFechasActivo() {
   if (STATE.periodoActivo === "custom") {
     const d = STATE.fechaDesde ? new Date(STATE.fechaDesde + "T00:00:00") : null;
     const h = STATE.fechaHasta ? new Date(STATE.fechaHasta + "T23:59:59") : null;
-    return { desde: d, hasta: h, etiqueta: `Rango (${STATE.fechaDesde || "..."} a ${STATE.fechaHasta || "..."})` };
+    return { desde: d, hasta: h, etiqueta: `${STATE.fechaDesde || "..."} a ${STATE.fechaHasta || "..."}` };
   }
   return { desde: null, hasta: null, etiqueta: "Histórico" };
 }
@@ -197,9 +189,6 @@ function cumpleFiltroFecha(isoStr) {
   return true;
 }
 
-// ============================================================================
-// BUSCADOR UNIVERSAL OMNIPRESENTE (Pedido #5)
-// ============================================================================
 function cumpleBusquedaUniversal(obj) {
   const q = STATE.busquedaGlobal.trim().toLowerCase();
   if (!q) return true;
@@ -212,7 +201,7 @@ function cumpleBusquedaUniversal(obj) {
 }
 
 // ============================================================================
-// CARGA DE DATOS EN VIVO Y REALTIME DESDE EL CLON SUPABASE (kkvzzheccniclfwqzivu)
+// CARGA DE DATOS EN VIVO DESDE SUPABASE (kkvzzheccniclfwqzivu)
 // ============================================================================
 export async function cargarDatosTodo() {
   const client = sb();
@@ -274,7 +263,7 @@ function suscribirRealtime() {
       if (payload.table === "prod_chat_mensajes" && payload.eventType === "INSERT") {
         const msg = payload.new;
         if (msg && Array.isArray(msg.menciones) && msg.menciones.includes(STATE.usuarioActual)) {
-          toast(`🔔 @${STATE.usuarioActual}: ${msg.autor_nombre} te mencionó en el Chat (${msg.canal_area})`, "warn");
+          toast(`🔔 @${STATE.usuarioActual}: ${msg.autor_nombre} te mencionó en el Chat`, "warn");
         }
       }
       cargarDatosTodo();
@@ -283,7 +272,7 @@ function suscribirRealtime() {
 }
 
 // ============================================================================
-// CATÁLOGOS Y RANKING INTELIGENTE MRU (#1 SIEMPRE ES EL ÚLTIMO USADO — Pedido #3)
+// RANKING INTELIGENTE MRU (#1 SIEMPRE ES EL ÚLTIMO USADO — Pedido #3)
 // ============================================================================
 function obtenerItemsMRU(tipo) {
   const items = STATE.catalogos.filter(c => c.tipo === tipo);
@@ -311,7 +300,7 @@ async function registrarUsoMRU(tipo, nombre) {
 }
 
 // ============================================================================
-// RENDERIZADO GENERAL (Con Protección Dirty-Form para no borrar lo que escribe el operador)
+// RENDERIZADO GENERAL
 // ============================================================================
 function renderTodoRespetandoFormulario() {
   renderBadgesYTodosLosKPIs();
@@ -344,31 +333,21 @@ function setTxt(id, val) {
   if (el) el.textContent = val;
 }
 
-// Calcula y actualiza las 8 cajas KPI de Impresión, 6 de Calandrado y 6 de Láser
 function renderBadgesYTodosLosKPIs() {
   const { hoyIni, ayerIni, semActualIni, semAntIni, mesActualIni, anioActualIni } = obtenerVentanasTemporales();
 
   const pendSubRows = STATE.pendientesDrive.filter(p => p.modulo === "SUBLIMACION" && p.estado_impreso !== "SI");
   const pendCalRows = STATE.colaCalandrado.filter(c => !String(c.estado).toLowerCase().includes("terminado"));
   const pendLasRows = STATE.colaLaser.filter(l => !String(l.estado).toLowerCase().includes("terminado"));
-  const pendDtfRows = STATE.pendientesDrive.filter(p => p.modulo === "DTF" && p.estado_impreso !== "SI");
 
   const mPendImp = pendSubRows.reduce((a, b) => a + (Number(b.metros_totales) || 0), 0);
   const mPendCal = pendCalRows.reduce((a, b) => a + (Number(b.metros) || 0), 0);
   const mPendLas = pendLasRows.reduce((a, b) => a + (Number(b.metros) || 0), 0);
 
-  // Badges en pestañas
-  const laserBatchesPend = new Set(pendLasRows.map(l => l.batch_id || l.id)).size;
   const mencionesSinLeer = STATE.chatMensajes.filter(m => !m.resuelto && Array.isArray(m.menciones) && m.menciones.includes(STATE.usuarioActual)).length;
-
-  setTxt("badgeTabImp", pendSubRows.length);
-  setTxt("badgeTabCal", pendCalRows.length);
-  setTxt("badgeTabLaser", laserBatchesPend);
-  setTxt("badgeTabDtf", pendDtfRows.length);
   setTxt("badgeTabChat", mencionesSinLeer || STATE.chatMensajes.length);
-  setTxt("badgeFabChat", mencionesSinLeer > 0 ? `🔔 ${mencionesSinLeer}` : STATE.chatMensajes.length);
 
-  // --- KPIs IMPRESIÓN (Captura 1 + Ayer y Semana Anterior) ---
+  // KPIs Impresión
   const impNormales = STATE.impresiones.filter(i => i.accion === "Impresion Normal");
   const impHoy = sumarMetrosEnVentana(impNormales, "fecha_hora", "metros_impresos", hoyIni);
   const impAyer = sumarMetrosEnVentana(impNormales, "fecha_hora", "metros_impresos", ayerIni, hoyIni);
@@ -389,7 +368,7 @@ function renderBadgesYTodosLosKPIs() {
   setTxt("kpiImpAnual", `${fmtNum(impAnio)}m`);
   setTxt("kpiImpHistorico", `${fmtNum(impHist)}m`);
 
-  // --- KPIs CALANDRADO (Captura 3 + Ayer y Semana Anterior) ---
+  // KPIs Calandrado
   const calTerm = STATE.colaCalandrado.filter(c => String(c.estado).toLowerCase().includes("terminado"));
   const calHoy = sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", hoyIni);
   const calAyer = sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", ayerIni, hoyIni);
@@ -408,7 +387,7 @@ function renderBadgesYTodosLosKPIs() {
   setTxt("kpiCalAnual", `${fmtNum(calAnio)}m`);
   setTxt("kpiCalHistorico", `${fmtNum(calHist)}m`);
 
-  // --- KPIs LÁSER ---
+  // KPIs Láser
   const lasTerm = STATE.colaLaser.filter(l => String(l.estado).toLowerCase().includes("terminado"));
   const lasHoy = sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", hoyIni);
   const lasAyer = sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", ayerIni, hoyIni);
@@ -441,31 +420,24 @@ function renderResumenPeriodoBarra() {
     .filter(l => String(l.estado).toLowerCase().includes("terminado") && cumpleFiltroFecha(l.fecha_terminado || l.fecha_ingreso) && cumpleBusquedaUniversal(l))
     .reduce((acc, r) => acc + (Number(r.metros) || 0), 0);
 
-  const mDtf = STATE.dtfPedidos
-    .filter(d => cumpleFiltroFecha(d.fecha_hora) && cumpleBusquedaUniversal(d))
-    .reduce((acc, r) => acc + (Number(r.metros_archivo) || 0), 0);
-
   const el = document.getElementById("vgPeriodSummaryMetrics");
   if (el) {
-    el.innerHTML = `
-      <span class="badge mru-top">📅 Viendo: ${escHtml(etiqueta)}</span>
-      <span style="margin-left:8px;">🖨️ Impreso: <strong>${fmtNum(mImp)}m</strong></span> |
-      <span>🔥 Calandrado: <strong>${fmtNum(mCal)}m</strong></span> |
-      <span>⚡ Cortado Láser: <strong>${fmtNum(mLaser)}m</strong></span> |
-      <span>🎞️ DTF: <strong>${fmtNum(mDtf)}m</strong></span>
-    `;
+    if (STATE.periodoActivo === "todo" && !STATE.busquedaGlobal) {
+      el.textContent = "(Selecciona fechas para ver metros producidos)";
+    } else {
+      el.textContent = `Rendimiento (${etiqueta}): 🖨️ ${fmtNum(mImp)}m Impresos | ♨️ ${fmtNum(mCal)}m Calandrados | ⚡ ${fmtNum(mLaser)}m Cortados`;
+    }
   }
 }
 
 // ============================================================================
-// MÓDULO 1: IMPRESIÓN SUBLIMACIÓN (Capturas 1 y 2 + Mejoras Pedidas)
+// MÓDULO 1: IMPRESIÓN (Idéntico a JS_Impresion.html)
 // ============================================================================
 function obtenerRolloPapelActivo() {
   const activo = STATE.rollosPapelSaldos.find(r => r.estado === "Activo") || STATE.rollosPapelSaldos[0];
   if (!activo) {
     return { idBase: "29g-1910-1", bloqueActual: "29g-1910-1", restantes: 290, iniciales: 500, impresos: 210 };
   }
-  // Verificar si el rollo tiene sub-bloques (-C1, -C2) o usa el ID directo como en Captura 2 (29g-1910-1)
   const impDeRollo = STATE.impresiones.filter(i => i.id_rollo_base === activo.id_rollo || i.id_rollo_papel === activo.id_rollo);
   let bloqueActual = activo.id_rollo;
   let maxCut = 0;
@@ -498,28 +470,42 @@ function renderRolloActivoYSobrantes() {
 
   setTxt("lblRolloActivo", info.bloqueActual);
   setTxt("lblMetrosRestantes", `${fmtNum(info.restantes)}m`);
-  setTxt("lblSumaBloqueActual", `${fmtNum(sumaBloque)}m (${filasBloque.length} imp.)`);
+  setTxt("lblSumaBloqueActual", `${fmtNum(sumaBloque)}m`);
 
-  // Sobrantes / Puchitos en taller
   const sobrantes = STATE.rollosPapelSaldos.filter(r => r.id_rollo !== info.idBase && Number(r.metros_restantes_reales) > 2);
   setTxt("cantSobrantesBadge", `${sobrantes.length} Disponibles`);
   const contSob = document.getElementById("listaSobrantesContainer");
   if (contSob) {
     contSob.innerHTML = sobrantes.length === 0
-      ? "No hay puchitos en depósito."
-      : sobrantes.map(s => `
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:var(--vg-surface-input);border-radius:4px;margin-bottom:4px;">
-            <span>🧻 <strong>${escHtml(s.id_rollo)}</strong> (${escHtml(s.gramaje)}g) — Restante: <strong style="color:var(--vg-status-ready);">${fmtNum(s.metros_restantes_reales)}m</strong></span>
-            <button type="button" class="btn-table btn-activar-puchito" data-rollo="${escHtml(s.id_rollo)}">Montar Puchito</button>
-          </div>
-        `).join("");
+      ? "<div style='font-size:11px; color:#888; text-align:center; padding:10px;'>No hay retazos en depósito.</div>"
+      : sobrantes.map(s => {
+          const esPremium = Number(s.metros_restantes_reales) >= 15;
+          return `
+            <div class="sobrante-card ${esPremium ? "premium" : ""}">
+              <div>
+                <strong style="color:var(--accent);">${escHtml(s.id_rollo)}</strong> (${escHtml(s.gramaje)}g)
+                ${esPremium ? `<span class="badge activo" style="margin-left:5px;">⭐ >=15m Útil</span>` : ""}
+                <div style="font-size:11px; color:#aaa;">Disponible: <strong style="color:#fff; font-size:13px;">${fmtNum(s.metros_restantes_reales)}m</strong></div>
+              </div>
+              <button type="button" class="btn-activar-puchito" data-rollo="${escHtml(s.id_rollo)}" style="background:var(--accent); border:none; padding:6px 12px; border-radius:4px; font-weight:bold; cursor:pointer; color:#000;">🔄 Re-montar</button>
+            </div>
+          `;
+        }).join("");
   }
 }
 
 function renderChipsImpresion() {
-  const telas = obtenerItemsMRU("TELA").slice(0, 7);
-  const perfiles = obtenerItemsMRU("PERFIL").slice(0, 6);
+  const telas = obtenerItemsMRU("TELA").slice(0, 6);
+  const perfiles = obtenerItemsMRU("PERFIL").slice(0, 5);
   const colores = obtenerItemsMRU("COLOR").slice(0, 6);
+
+  // Poblar datalists igual que en JS_Global.html
+  const dlTelas = document.getElementById("listTelas");
+  if (dlTelas) dlTelas.innerHTML = telas.map(t => `<option value="${escHtml(t.nombre)}">`).join("");
+  const dlPerfiles = document.getElementById("listPerfiles");
+  if (dlPerfiles) dlPerfiles.innerHTML = perfiles.map(p => `<option value="${escHtml(p.nombre)}">`).join("");
+  const dlColores = document.getElementById("listColores");
+  if (dlColores) dlColores.innerHTML = colores.map(c => `<option value="${escHtml(c.nombre)}">`).join("");
 
   const renderGrupo = (containerId, items, campoForm) => {
     const el = document.getElementById(containerId);
@@ -528,24 +514,27 @@ function renderChipsImpresion() {
       const isSelected = STATE.impForm[campoForm] === item.nombre;
       const isFirst = idx === 0;
       return `
-        <button type="button"
-          class="chip-btn ${isFirst ? "mru-first" : ""} ${isSelected ? "selected" : ""}"
+        <span class="badge ${isFirst ? "activo" : ""}"
           data-chip-field="${campoForm}"
           data-chip-val="${escHtml(item.nombre)}"
-          title="${isFirst ? "⚡ Último usado (#1 MRU)" : `Usos recientes: ${item.contador_uso_reciente || 1}`}">
+          style="cursor:pointer; ${isSelected ? "outline:2px solid var(--accent-blue);" : ""}"
+          title="${isFirst ? "⚡ Último usado (#1)" : "Clic para elegir"}">
           ${isFirst ? "⚡ " : ""}${escHtml(item.nombre)}
-        </button>
+        </span>
       `;
     }).join("");
 
-    el.querySelectorAll("button[data-chip-field]").forEach(btn => {
+    el.querySelectorAll("[data-chip-field]").forEach(btn => {
       btn.addEventListener("click", () => {
         const field = btn.getAttribute("data-chip-field");
         const val = btn.getAttribute("data-chip-val");
         STATE.impForm.dirty = true;
         STATE.impForm[field] = val;
         const inputEl = document.getElementById(`impInput_${field}`);
-        if (inputEl) inputEl.value = val;
+        if (inputEl) {
+          inputEl.value = val;
+          inputEl.style.border = "2px solid var(--accent-blue)";
+        }
         actualizarClasesSeleccionChips();
       });
     });
@@ -559,9 +548,9 @@ function renderChipsImpresion() {
 
 function actualizarClasesSeleccionChips() {
   ["tela", "perfil", "color"].forEach(campo => {
-    document.querySelectorAll(`button[data-chip-field="${campo}"]`).forEach(btn => {
+    document.querySelectorAll(`[data-chip-field="${campo}"]`).forEach(btn => {
       const val = btn.getAttribute("data-chip-val");
-      btn.classList.toggle("selected", STATE.impForm[campo] === val);
+      btn.style.outline = STATE.impForm[campo] === val ? "2px solid var(--accent-blue)" : "none";
     });
   });
   actualizarBotonesRutaUI();
@@ -574,7 +563,7 @@ function actualizarBotonesRutaUI() {
   });
 }
 
-// Renderiza la Cola Pendiente AGRUPADA POR CARPETAS DE CLIENTES (Idéntico a Captura 1)
+// Renderiza Cola Pendiente con el HTML exacto de JS_Impresion.html (líneas 34-52)
 function renderPendientesDriveSublimacion() {
   const cont = document.getElementById("listaPendientesSublimacion");
   if (!cont) return;
@@ -587,7 +576,6 @@ function renderPendientesDriveSublimacion() {
     return true;
   });
 
-  // Calcular metros seleccionados en vivo + cómo quedará el bloque
   let sumaSeleccionados = 0;
   STATE.pendientesDrive.forEach(p => {
     if (STATE.impForm.archivosSeleccionadosIds.has(p.id)) {
@@ -600,20 +588,19 @@ function renderPendientesDriveSublimacion() {
     const actualBloque = STATE.impresiones
       .filter(x => x.id_rollo_papel === infoRollo.bloqueActual && x.accion === "Impresion Normal" && !x.anulado)
       .reduce((acc, x) => acc + (Number(x.metros_impresos) || 0), 0);
-    badgeSel.innerHTML = STATE.impForm.archivosSeleccionadosIds.size > 0
-      ? `Sel: ${fmtNum(sumaSeleccionados)}m → Bloque quedará en: ${fmtNum(actualBloque + sumaSeleccionados)}m`
-      : `Bloque actual: ${fmtNum(actualBloque)}m`;
+    badgeSel.textContent = STATE.impForm.archivosSeleccionadosIds.size > 0
+      ? `Seleccionados: ${fmtNum(sumaSeleccionados)}m | Bloque quedará en: ${fmtNum(actualBloque + sumaSeleccionados)}m`
+      : "";
   }
 
   if (lista.length === 0) {
-    cont.innerHTML = `<div style="text-align:center;padding:24px;color:var(--vg-text-secondary);font-size:12px;">No hay archivos pendientes. Podés usar "+ Archivo Manual" o "🔬 Lector Binario DPI".</div>`;
+    cont.innerHTML = "<div style='padding:15px; text-align:center; color:#888;'>No hay archivos pendientes. Usa el botón Sincronizar o + Archivo Manual.</div>";
     return;
   }
 
-  // Agrupar por Cliente (Carpeta)
   const carpetas = new Map();
   lista.forEach(p => {
-    const cli = p.cliente || "SIN CARPETA";
+    const cli = p.cliente || "SIN CLIENTE";
     if (!carpetas.has(cli)) carpetas.set(cli, []);
     carpetas.get(cli).push(p);
   });
@@ -622,43 +609,27 @@ function renderPendientesDriveSublimacion() {
   for (const [cliente, archivos] of carpetas.entries()) {
     const cerrada = STATE.carpetasPendientesCerradas.has(cliente);
     const totalMtsCarpeta = archivos.reduce((a, b) => a + (Number(b.metros_totales) || 0), 0);
+    const todosMarcados = archivos.every(a => STATE.impForm.archivosSeleccionadosIds.has(a.id));
 
     html += `
-      <div class="folder-header" data-folder-cli="${escHtml(cliente)}">
-        <span>📁 ${escHtml(cliente)} <span style="font-size:11px;color:var(--vg-text-secondary);font-weight:600;">(${fmtNum(totalMtsCarpeta)}m)</span></span>
-        <div style="display:flex;gap:6px;align-items:center;">
-          <button type="button" class="btn-table btn-sel-all-folder" data-folder-cli="${escHtml(cliente)}" title="Seleccionar o deseleccionar toda la carpeta">☑️ Todos</button>
-          <span class="badge">${archivos.length}</span>
-        </div>
+      <div class="folder-header" data-folder-cli="${escHtml(cliente)}" style="display:flex; justify-content:space-between; align-items:center;">
+        <span>
+          <input type="checkbox" class="chk-folder-all" data-folder-cli="${escHtml(cliente)}" ${todosMarcados ? "checked" : ""} style="margin-right:10px; width:16px; height:16px; cursor:pointer;" title="Seleccionar todo" />
+          📁 ${escHtml(cliente)}
+        </span>
+        <span style="cursor:pointer;">${fmtNum(totalMtsCarpeta)}m ▼</span>
       </div>
       <div class="folder-content" style="display:${cerrada ? "none" : "block"};">
         ${archivos.map(p => {
           const checked = STATE.impForm.archivosSeleccionadosIds.has(p.id);
-          const metaBadges = [
-            p.perfil_detectado ? `<span class="badge mru-top">🎨 ${escHtml(p.perfil_detectado)}</span>` : "",
-            p.tela_detectada ? `<span class="badge">👕 ${escHtml(p.tela_detectada)}</span>` : "",
-            p.rollo_detectado ? `<span class="badge">🧻 ${escHtml(p.rollo_detectado)}</span>` : "",
-            p.color_detectado ? `<span class="badge">🎨 ${escHtml(p.color_detectado)}</span>` : ""
-          ].filter(Boolean).join(" ");
-
           return `
-            <div class="check-item ${p.prioridad_maxima ? "alerta-item" : ""}" style="${checked ? "border-color:var(--vg-brand-secondary);background:var(--vg-cyan-soft);" : ""}">
+            <label class="file-item" style="${checked ? "border-color:var(--accent-blue);" : ""}">
               <input type="checkbox" class="chk-pend-sub" data-id="${p.id}" ${checked ? "checked" : ""} />
-              <div style="flex:1;font-size:12px;">
-                <div style="font-weight:700;color:var(--vg-text-primary);word-break:break-word;">
-                  ${p.prioridad_maxima ? `<span class="badge alerta">🚨 REPO URGENTE</span> ` : ""}
-                  ${escHtml(p.nombre_archivo)}
-                </div>
-                ${metaBadges ? `<div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap;">${metaBadges}</div>` : ""}
+              <div class="file-info">
+                <span class="fname">${p.prioridad_maxima ? "🚨 " : ""}${escHtml(p.nombre_archivo)}</span>
               </div>
-              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
-                <span class="badge mru-top font-mono">${fmtNum(p.metros_totales)}m</span>
-                <div style="display:flex;gap:3px;">
-                  <button type="button" class="btn-table btn-crud-edit" data-table="prod_pendientes_drive" data-id="${p.id}" style="padding:3px 6px;">✏️</button>
-                  <button type="button" class="btn-table btn-crud-del" data-table="prod_pendientes_drive" data-id="${p.id}" style="padding:3px 6px;">🗑️</button>
-                </div>
-              </div>
-            </div>
+              <div class="fmeters">${fmtNum(p.metros_totales)}m</div>
+            </label>
           `;
         }).join("")}
       </div>
@@ -667,7 +638,6 @@ function renderPendientesDriveSublimacion() {
 
   cont.innerHTML = html;
 
-  // Eventos de checkboxes individuales
   cont.querySelectorAll(".chk-pend-sub").forEach(chk => {
     chk.addEventListener("change", () => {
       const id = chk.getAttribute("data-id");
@@ -678,18 +648,16 @@ function renderPendientesDriveSublimacion() {
     });
   });
 
-  // Evento de colapsar/expandir carpeta y seleccionar toda la carpeta
   cont.querySelectorAll(".folder-header").forEach(hdr => {
     hdr.addEventListener("click", (e) => {
-      const btnAll = e.target.closest(".btn-sel-all-folder");
+      const chkAll = e.target.closest(".chk-folder-all");
       const cli = hdr.getAttribute("data-folder-cli");
-      if (btnAll) {
+      if (chkAll) {
         e.stopPropagation();
         const archs = carpetas.get(cli) || [];
-        const todosMarcados = archs.every(a => STATE.impForm.archivosSeleccionadosIds.has(a.id));
         archs.forEach(a => {
-          if (todosMarcados) STATE.impForm.archivosSeleccionadosIds.delete(a.id);
-          else STATE.impForm.archivosSeleccionadosIds.add(a.id);
+          if (chkAll.checked) STATE.impForm.archivosSeleccionadosIds.add(a.id);
+          else STATE.impForm.archivosSeleccionadosIds.delete(a.id);
         });
         aplicarAutodeteccionAlSeleccionarArchivos();
         renderPendientesDriveSublimacion();
@@ -702,8 +670,6 @@ function renderPendientesDriveSublimacion() {
   });
 }
 
-// Autodetección Inteligente desde el Nombre del Archivo (Pedido #1 de la última tanda):
-// Reconoce Perfil, Tela, Rollo, Color y Metros. Si NO tiene nada de eso en el nombre, lo deja EN BLANCO.
 function aplicarAutodeteccionAlSeleccionarArchivos() {
   const seleccionados = STATE.pendientesDrive.filter(p => STATE.impForm.archivosSeleccionadosIds.has(p.id));
   if (seleccionados.length === 0) {
@@ -736,7 +702,7 @@ function aplicarAutodeteccionAlSeleccionarArchivos() {
   STATE.impForm.color = auto.color || "";
   if (auto.ruta) STATE.impForm.ruta = auto.ruta;
   STATE.impForm.diseno = seleccionados.length === 1
-    ? seleccionados[0].nombre_archivo.slice(0, 35)
+    ? seleccionados[0].nombre_archivo
     : `LOTE ANIDADO (${seleccionados.length} ARCHIVOS)`;
 
   const detectadosList = [];
@@ -744,18 +710,17 @@ function aplicarAutodeteccionAlSeleccionarArchivos() {
   if (auto.tela) detectadosList.push(`Tela: ${auto.tela}`);
   if (auto.rollo) detectadosList.push(`Rollo: ${auto.rollo}`);
   if (auto.color) detectadosList.push(`Color: ${auto.color}`);
-  if (auto.ruta) detectadosList.push(`Ruta: ${auto.ruta}`);
 
   STATE.impForm.autoDetectInfo = detectadosList.length > 0
-    ? `✨ Autodetectado del nombre: ${detectadosList.join(" · ")}`
-    : `ℹ️ El archivo no especifica perfil/tela/color en su nombre — quedan en blanco para que los elijas abajo.`;
+    ? `✨ Detectado del nombre: ${detectadosList.join(" | ")}`
+    : "";
 
   sincronizarInputsImpresionConState();
 }
 
 function sincronizarInputsImpresionConState() {
   const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ""; };
-  setVal("impInput_metrosLote", fmtNum(STATE.impForm.metrosLote).replace(",", "."));
+  setVal("impInput_metrosLote", fmtNum(STATE.impForm.metrosLote));
   setVal("impInput_perfil", STATE.impForm.perfil);
   setVal("impInput_tela", STATE.impForm.tela);
   setVal("impInput_rolloTela", STATE.impForm.rolloTela);
@@ -766,8 +731,8 @@ function sincronizarInputsImpresionConState() {
   const thumb = document.getElementById("thumbPreviewBox");
   if (thumb) {
     thumb.innerHTML = STATE.impForm.diseno
-      ? renderMiniaturaDiseno(STATE.impForm.color, STATE.impForm.diseno, STATE.impForm.diseno)
-      : `<span style="color:var(--vg-text-secondary); font-size:10px;">IMG</span>`;
+      ? renderMiniaturaDiseno60(STATE.impForm.color, STATE.impForm.diseno, STATE.impForm.diseno)
+      : `<span style="color:#666; font-size:10px;">IMG</span>`;
   }
 
   const banner = document.getElementById("impAutoDetectBanner");
@@ -778,14 +743,27 @@ function sincronizarInputsImpresionConState() {
   actualizarClasesSeleccionChips();
 }
 
-// Renderiza Historial de Impresión con el Banner Violeta por Rollo/Bloque + Suma en Vivo + Botones cuadrados (Captura 2)
+function formatearAnidadosHTML(clienteArchivoTexto) {
+  if (!clienteArchivoTexto) return "";
+  const partes = String(clienteArchivoTexto).split(" | ");
+  if (partes.length === 1) return escHtml(partes[0]);
+  return `<div style="max-height:80px; overflow-y:auto; font-size:11px; padding:2px;">${partes.map((p, i) => (i === 0 ? escHtml(p) : `• ${escHtml(p)}`)).join("<br>")}</div>`;
+}
+
+// Renderiza Historial Impresión idéntico a JS_Impresion.html líneas 206-244 (Captura 2)
 function renderTablaImpresionesConBloques() {
   const tbody = document.getElementById("tbodyHistorialImpresion");
   if (!tbody) return;
 
-  const filtradas = STATE.impresiones.filter(i => cumpleFiltroFecha(i.fecha_hora) && cumpleBusquedaUniversal(i));
+  const qHist = STATE.filtroHistorialImpLocal.trim().toLowerCase();
+  const filtradas = STATE.impresiones.filter(i => {
+    if (!cumpleFiltroFecha(i.fecha_hora) || !cumpleBusquedaUniversal(i)) return false;
+    if (qHist && !`${i.id_rollo_papel} ${i.cliente_archivo} ${i.tela_destino} ${i.perfil}`.toLowerCase().includes(qHist)) return false;
+    return true;
+  });
+
   if (filtradas.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:20px;color:var(--vg-text-secondary);">No hay registros de impresión en este período o búsqueda.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:20px;color:#888;">No hay registros de impresión.</td></tr>`;
     return;
   }
 
@@ -793,67 +771,59 @@ function renderTablaImpresionesConBloques() {
   let ultimoBloque = null;
 
   filtradas.forEach(row => {
-    const bloqueId = row.id_rollo_papel || row.id_rollo_base || "Sin Rollo";
+    const bloqueId = row.id_rollo_papel || row.id_rollo_base || "Desconocido";
     if (bloqueId !== ultimoBloque) {
       ultimoBloque = bloqueId;
       const filasDelBloque = STATE.impresiones.filter(x => x.id_rollo_papel === bloqueId && !x.anulado);
       const sumaImpresosBloque = filasDelBloque
         .filter(x => x.accion === "Impresion Normal")
         .reduce((acc, x) => acc + (Number(x.metros_impresos) || 0), 0);
-      const sumaMermaBloque = filasDelBloque
-        .reduce((acc, x) => acc + (Number(x.metros_desperdicio) || 0), 0);
-      const cantTrabajos = filasDelBloque.filter(x => x.accion === "Impresion Normal").length;
 
       html += `
-        <tr class="row-corte">
-          <td colspan="11">
-            🔄 --- ROLLO / BLOQUE: ${escHtml(bloqueId)} (${cantTrabajos} impresiones) ---
-            | 📏 METROS SUMADOS DEL BLOQUE: ${fmtNum(sumaImpresosBloque)}m
-            ${sumaMermaBloque > 0 ? ` | ✂️ Cortes/Mermas: -${fmtNum(sumaMermaBloque)}m` : ""}
-          </td>
+        <tr class="row-corte" style="background:#5e35b1 !important; color:#fff !important;">
+          <td colspan="11">🔄 --- ROLLO NUEVO: ${escHtml(bloqueId)} | METROS SUMADOS DEL BLOQUE: ${fmtNum(sumaImpresosBloque)}m ---</td>
         </tr>
       `;
     }
 
-    const esAnidado = String(row.cliente_archivo || "").includes(" | ");
-    const cantAnidados = esAnidado ? String(row.cliente_archivo).split(" | ").length : 1;
-    const esNormal = row.accion === "Impresion Normal";
+    if (row.accion && row.accion.includes("Corte de Papel")) {
+      html += `<tr class="row-corte" style="background:var(--accent-magenta) !important; color:#fff !important;"><td colspan="11">✂️ --- CORTE DE PAPEL (-${fmtNum(row.metros_desperdicio)}m) ---</td></tr>`;
+      return;
+    }
+    if (row.accion && row.accion.includes("Avance")) {
+      html += `<tr class="row-corte" style="background:#e65100 !important;"><td colspan="11">📏 --- PURGA/AVANCE (${fmtNum(row.metros_desperdicio)}m) --- ${escHtml(row.observaciones || "")}</td></tr>`;
+      return;
+    }
+    if (row.accion && row.accion.includes("Calibración")) {
+      html += `<tr class="row-corte" style="background:#b71c1c !important;"><td colspan="11">⚙️ --- CALIBRACIÓN (${fmtNum(row.metros_desperdicio)}m) --- ${escHtml(row.observaciones || "")}</td></tr>`;
+      return;
+    }
 
-    const badgeRuta = row.ruta && row.ruta.includes("Láser")
-      ? `<span class="badge mru-top">🔥+⚡ ${escHtml(row.ruta)}</span>`
-      : row.ruta === "Solo Impresión"
-        ? `<span class="badge">🖨️ Solo Impresión</span>`
-        : `<span class="badge activo">🔥 ${escHtml(row.ruta || "Solo Calandrado")}</span>`;
+    const m = fmtNum(row.metros_impresos || row.metros_desperdicio || 0);
+    const actionBtn = `
+      <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; max-width:90px;">
+        <button type="button" class="btn-imp-falla" data-id="${row.id}" style="background:transparent; border:1px solid var(--danger); border-radius:4px; cursor:pointer; color:var(--danger); padding:3px;" title="Reportar Falla">⚠️</button>
+        <button type="button" class="btn-imp-deshacer" data-id="${row.id}" style="background:transparent; border:1px solid #aaa; color:#aaa; border-radius:4px; cursor:pointer; padding:3px;" title="Revertir">🔙</button>
+        <button type="button" class="btn-nota-rapida" data-table="prod_impresiones" data-id="${row.id}" data-batch="${escHtml(row.batch_id)}" style="background:transparent; border:1px solid var(--accent-orange); color:var(--accent-orange); border-radius:4px; cursor:pointer; padding:3px;" title="Añadir/Editar Nota">📝</button>
+        <button type="button" class="btn-imp-etiqueta" data-rollo="${escHtml(bloqueId)}" data-metros="${m}" style="background:var(--accent-blue); border:1px solid var(--accent-blue); border-radius:4px; cursor:pointer; color:#fff; padding:3px;" title="Etiqueta Lote">🖨️</button>
+        <button type="button" class="btn-crud-edit" data-table="prod_impresiones" data-id="${row.id}" style="background:transparent; border:1px solid var(--accent-blue); color:var(--accent-blue); border-radius:4px; cursor:pointer; padding:3px;" title="Editar">✏️</button>
+        <button type="button" class="btn-crud-del" data-table="prod_impresiones" data-id="${row.id}" style="background:transparent; border:1px solid var(--danger); color:var(--danger); border-radius:4px; cursor:pointer; padding:3px;" title="Eliminar">🗑️</button>
+      </div>
+    `;
 
     html += `
       <tr>
-        <td style="white-space:nowrap;">
-          <button type="button" class="btn-table btn-imp-falla" data-id="${row.id}" title="Reportar falla o reposición">⚠️</button>
-          <button type="button" class="btn-table btn-imp-deshacer" data-id="${row.id}" title="Deshacer y devolver a Cola Pendiente">🔙</button>
-          <button type="button" class="btn-table btn-nota-rapida" data-table="prod_impresiones" data-id="${row.id}" data-batch="${escHtml(row.batch_id)}" title="Agregar o editar nota / especificación">📝</button>
-          <button type="button" class="btn-table btn-chat-tag-job" data-id="${escHtml(row.batch_id)}" data-label="${escHtml(row.cliente_archivo.slice(0, 42))} (${fmtNum(row.metros_impresos)}m)" data-mod="Impresión" title="Hablar sobre este trabajo en el Chat">💬</button>
-          <button type="button" class="btn-table btn-crud-edit" data-table="prod_impresiones" data-id="${row.id}" title="Editar cualquier campo">✏️</button>
-          <button type="button" class="btn-table btn-crud-del" data-table="prod_impresiones" data-id="${row.id}" title="Eliminar registro">🗑️</button>
-        </td>
-        <td class="font-mono" style="font-size:11px;white-space:nowrap;color:var(--vg-text-secondary);">${fmtDateHora(row.fecha_hora)}</td>
-        <td style="max-width:340px;">
-          ${esAnidado ? `<span class="badge mru-top" style="margin-bottom:3px;">📦 ANIDADO (${cantAnidados} archivos)</span><br/>` : ""}
-          <strong style="color:var(--vg-text-primary);">${escHtml(row.cliente_archivo)}</strong>
-        </td>
-        <td>${renderMiniaturaDiseno(row.color_tela, row.diseno, row.cliente_archivo)}</td>
-        <td><strong>${escHtml(row.tela_destino || "-")}</strong></td>
-        <td>${escHtml(row.num_rollo_tela || "-")}</td>
-        <td>${escHtml(row.color_tela || "-")}</td>
-        <td class="font-mono" style="font-weight:900;font-size:13px;color:${esNormal ? "var(--vg-status-ready)" : "var(--vg-status-alert)"};">
-          ${esNormal ? `${fmtNum(row.metros_impresos)}m` : `-${fmtNum(row.metros_desperdicio)}m`}
-        </td>
-        <td style="font-size:11px;font-weight:700;">${escHtml(row.perfil || "-")}</td>
-        <td>${badgeRuta}</td>
-        <td>
-          ${row.observaciones
-            ? `<div style="background:var(--vg-amber-soft);border:1px solid var(--vg-status-processing);color:var(--vg-status-processing);padding:4px 8px;border-radius:4px;font-weight:700;font-size:11px;">📝 ${escHtml(row.observaciones)}</div>`
-            : `<button type="button" class="btn-table btn-nota-rapida" data-table="prod_impresiones" data-id="${row.id}" data-batch="${escHtml(row.batch_id)}" style="font-size:10px;opacity:0.75;">+ Nota</button>`}
-        </td>
+        <td>${actionBtn}</td>
+        <td>${fmtDateHora(row.fecha_hora)}</td>
+        <td>${formatearAnidadosHTML(row.cliente_archivo)}</td>
+        <td style="text-align:center;">${renderMiniaturaDiseno60(row.color_tela, row.diseno, row.cliente_archivo)}</td>
+        <td>${escHtml(row.tela_destino || "")}</td>
+        <td>${escHtml(row.num_rollo_tela || "")}</td>
+        <td>${escHtml(row.color_tela || "")}</td>
+        <td style="color:var(--accent); font-weight:bold;">${m}m</td>
+        <td>${escHtml(row.perfil || "")}</td>
+        <td><span class="badge">${escHtml(row.ruta || "Solo Calandrado")}</span></td>
+        <td>${row.observaciones ? `<span style="color:var(--accent-orange); font-weight:bold;">📝 ${escHtml(row.observaciones)}</span>` : "-"}</td>
       </tr>
     `;
   });
@@ -862,7 +832,7 @@ function renderTablaImpresionesConBloques() {
 }
 
 // ============================================================================
-// MÓDULO 2: CALANDRADO — TARJETAS DE ROLLO COLAPSABLES (Idéntico a Captura 3)
+// MÓDULO 2: CALANDRADO — Idéntico a JS_Calandrado.html (Captura 3)
 // ============================================================================
 function renderModuloCalandrado() {
   const contRollos = document.getElementById("contenedorRollosCalandrado");
@@ -877,14 +847,12 @@ function renderModuloCalandrado() {
     return true;
   });
 
-  // Ordenar según botón de orden
   const pendientes = [...pendientesRaw].sort((a, b) => {
     const da = new Date(a.fecha_hora).getTime() || 0;
     const db = new Date(b.fecha_hora).getTime() || 0;
     return STATE.ordenCalandraAsc ? da - db : db - da;
   });
 
-  // Agrupar pendientes por id_rollo_papel para mostrar las tarjetas .rollo-card como en Captura 3
   const rolloActivoImp = obtenerRolloPapelActivo().bloqueActual;
   const mapaRollos = new Map();
   pendientes.forEach(c => {
@@ -894,77 +862,84 @@ function renderModuloCalandrado() {
   });
 
   if (mapaRollos.size === 0) {
-    contRollos.innerHTML = `<div style="text-align:center;padding:24px;color:var(--vg-text-secondary);">No hay rollos pendientes en Cola de Calandrado.</div>`;
+    contRollos.innerHTML = "<div style='padding:15px; text-align:center; color:#888;'>No hay rollos pendientes.</div>";
   } else {
-    let cardsHtml = "";
-    for (const [rolloId, trabajos] of mapaRollos.entries()) {
-      const totalMtsRollo = trabajos.reduce((a, b) => a + (Number(b.metros) || 0), 0);
-      const estaEnImpresora = rolloId === rolloActivoImp;
-      const estaMontado = STATE.rolloMontadoCalandra === rolloId;
-      const estaAbierto = STATE.rollosCalandraAbiertos.has(rolloId);
+    let html = "";
+    for (const [lote, items] of mapaRollos.entries()) {
+      const totalMts = items.reduce((a, b) => a + (Number(b.metros) || 0), 0);
+      const isActivo = STATE.rolloMontadoCalandra === lote;
+      const isImprimiendo = lote === rolloActivoImp;
+      const isAbierto = STATE.rollosCalandraAbiertos.has(lote) || isActivo;
 
-      cardsHtml += `
-        <div class="rollo-card ${estaEnImpresora ? "en-impresora" : ""} ${estaMontado ? "montado" : ""}">
-          <div class="rollo-header" data-toggle-rollo="${escHtml(rolloId)}">
-            <div>
-              <span class="font-mono" style="font-size:15px;font-weight:900;color:var(--vg-brand-secondary);">🧻 ${escHtml(rolloId)}</span>
-              ${estaEnImpresora ? `<span class="badge en-impresora" style="margin-left:8px;">🖨️ EN IMPRESORA</span>` : ""}
-              ${estaMontado ? `<span class="badge activo" style="margin-left:8px;">🔥 MONTADO EN CALANDRA</span>` : ""}
-              <span class="badge" style="margin-left:8px;">${trabajos.length} Trabajo${trabajos.length > 1 ? "s" : ""}</span>
+      let badgeHTML = isActivo ? '<span class="badge activo" style="margin-left:5px;">🔥 MÁQUINA</span>' : '';
+      if (isImprimiendo && !isActivo) badgeHTML += '<span class="badge" style="background:#ff9800; color:#fff; margin-left:5px;">🖨️ EN IMPRESORA</span>';
+      const countBadge = `<span class="badge" style="background:#444; color:#fff; margin-left:5px;">${items.length} Trabajos</span>`;
+
+      const headerStyle = isActivo
+        ? 'class="rollo-header activo"'
+        : isImprimiendo
+          ? 'class="rollo-header" style="border:2px dashed #ff9800; background:rgba(255,152,0,0.1);"'
+          : 'class="rollo-header"';
+
+      let btnAccion = "";
+      if (isActivo) {
+        btnAccion = `<button type="button" class="btn-cal-montar-rollo" data-rollo="${escHtml(lote)}" style="background:var(--danger); border:none; padding:6px 12px; border-radius:4px; color:#fff; font-weight:bold; cursor:pointer;">⏸️ Desmontar</button>`;
+        btnAccion += `<button type="button" class="btn-cal-kiosco-rollo" data-rollo="${escHtml(lote)}" style="background:#2196F3; border:none; padding:6px 12px; border-radius:4px; color:#fff; font-weight:bold; cursor:pointer; margin-left:5px;">▶️ KIOSKO</button>`;
+      } else if (isImprimiendo) {
+        btnAccion = `<button type="button" disabled style="background:#444; border:none; padding:6px 12px; border-radius:4px; color:#888; font-weight:bold; cursor:not-allowed;">🖨️ Aún Imprimiendo</button>`;
+      } else {
+        btnAccion = `<button type="button" class="btn-cal-montar-rollo" data-rollo="${escHtml(lote)}" style="background:var(--accent); border:none; padding:6px 12px; border-radius:4px; color:#000; font-weight:bold; cursor:pointer;">⚙️ Montar</button>`;
+      }
+      const procesarBtn = `<button type="button" class="btn-cal-procesar-rollo" data-rollo="${escHtml(lote)}" style="background:var(--accent); border:none; padding:6px 12px; border-radius:4px; color:#000; font-weight:bold; cursor:pointer; margin-left:5px;">✅ Procesar</button>`;
+      const pdfBtn = `<button type="button" class="btn-cal-pdf-rollo" data-rollo="${escHtml(lote)}" style="background:var(--accent-blue); border:none; padding:6px 12px; border-radius:4px; color:#fff; font-weight:bold; cursor:pointer; margin-left:5px;">🖨️ PDF</button>`;
+
+      html += `
+        <div class="rollo-card">
+          <div ${headerStyle} data-toggle-rollo="${escHtml(lote)}">
+            <div style="flex:1;">
+              <div style="font-size:14px; font-weight:bold; color:var(--accent); margin-bottom:4px;">${escHtml(lote)}${badgeHTML}${countBadge}</div>
+              <div style="font-size:11px; color:#ccc;">Total a procesar: <strong style="color:#fff; font-size:13px;">${fmtNum(totalMts)}m</strong></div>
             </div>
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-              <span style="font-size:13px;color:var(--vg-text-secondary);">
-                Total a procesar: <strong class="font-mono" style="color:var(--vg-status-ready);font-size:14px;">${fmtNum(totalMtsRollo)}m</strong>
-              </span>
-              ${estaEnImpresora
-                ? `<span style="font-size:11px;color:var(--vg-status-processing);font-weight:700;">Imprimiendo... (Click para ver u operar igual)</span>`
-                : ""}
-              <div style="display:flex;gap:5px;" onclick="event.stopPropagation();">
-                <button type="button" class="btn-table btn-cal-montar-rollo" data-rollo="${escHtml(rolloId)}">⚙️ Montar</button>
-                <button type="button" class="btn-table btn-cal-kiosco-rollo" data-rollo="${escHtml(rolloId)}" style="background:var(--vg-brand-primary);border-color:var(--vg-brand-secondary);">▶️ KIOSKO</button>
-                <button type="button" class="btn-table btn-cal-procesar-rollo" data-rollo="${escHtml(rolloId)}" style="background:var(--vg-status-ready);color:var(--vg-bg-app);border-color:var(--vg-status-ready);">✅ Procesar</button>
-                <button type="button" class="btn-table btn-cal-pdf-rollo" data-rollo="${escHtml(rolloId)}">🖨️ PDF</button>
-              </div>
+            <div style="display:flex; flex-wrap:wrap; justify-content:flex-end; gap:5px;" onclick="event.stopPropagation();">
+              ${btnAccion}${procesarBtn}${pdfBtn}
             </div>
           </div>
-          <div class="rollo-body" style="display:${estaAbierto ? "block" : "none"};">
-            <table>
+          <div class="rollo-body ${isAbierto ? "open" : ""}">
+            <table class="tabla-normal" style="width:100%; min-width:500px;">
               <thead>
                 <tr>
                   <th>Acción</th>
-                  <th>Fecha Imp.</th>
-                  <th>Cliente / Archivo</th>
+                  <th>Fecha</th>
+                  <th>Cliente/Archivo</th>
+                  <th>Diseño</th>
                   <th>Tela</th>
                   <th>Nº Rollo</th>
                   <th>Color</th>
                   <th>Metros</th>
-                  <th>Ruta</th>
-                  <th>Notas / Fallas</th>
+                  <th>Perfil</th>
+                  <th>Notas</th>
                 </tr>
               </thead>
               <tbody>
-                ${trabajos.map(c => `
+                ${items.map(c => `
                   <tr>
                     <td style="white-space:nowrap;">
-                      <button type="button" class="btn-table btn-cal-terminar" data-id="${c.id}" style="background:var(--vg-status-ready);color:var(--vg-bg-app);" title="Marcar este trabajo como Calandrado (respeta Fecha Manual)">✅ Hecho</button>
-                      <button type="button" class="btn-table btn-cal-kiosco" data-id="${c.id}" title="Abrir Kiosko">▶️</button>
-                      <button type="button" class="btn-table btn-cal-falla" data-id="${c.id}" title="Reportar falla de calandra">⚠️</button>
-                      <button type="button" class="btn-table btn-nota-rapida" data-table="prod_cola_calandrado" data-id="${c.id}" data-batch="${escHtml(c.batch_id)}" title="Agregar/Editar Nota">📝</button>
-                      <button type="button" class="btn-table btn-crud-edit" data-table="prod_cola_calandrado" data-id="${c.id}">✏️</button>
-                      <button type="button" class="btn-table btn-crud-del" data-table="prod_cola_calandrado" data-id="${c.id}">🗑️</button>
+                      <button type="button" class="btn-secondary btn-cal-terminar" data-id="${c.id}" style="width:auto; padding:5px 8px; border-color:var(--accent); color:var(--accent);">✅ Hecho</button>
+                      <button type="button" class="btn-secondary btn-cal-kiosco" data-id="${c.id}" style="width:auto; padding:5px 8px;">▶️</button>
+                      <button type="button" class="btn-secondary btn-cal-falla" data-id="${c.id}" style="width:auto; padding:5px 8px; border-color:var(--danger); color:var(--danger);">⚠️</button>
+                      <button type="button" class="btn-secondary btn-nota-rapida" data-table="prod_cola_calandrado" data-id="${c.id}" data-batch="${escHtml(c.batch_id)}" style="width:auto; padding:5px 8px;">📝</button>
+                      <button type="button" class="btn-secondary btn-crud-edit" data-table="prod_cola_calandrado" data-id="${c.id}" style="width:auto; padding:5px 8px;">✏️</button>
+                      <button type="button" class="btn-secondary btn-crud-del" data-table="prod_cola_calandrado" data-id="${c.id}" style="width:auto; padding:5px 8px;">🗑️</button>
                     </td>
-                    <td class="font-mono" style="font-size:11px;">${fmtDateHora(c.fecha_hora)}</td>
-                    <td><strong>${escHtml(c.cliente_archivo)}</strong></td>
-                    <td><strong>${escHtml(c.tela_destino || "-")}</strong></td>
-                    <td>${escHtml(c.num_rollo_tela || "-")}</td>
-                    <td>${escHtml(c.color_tela || "-")}</td>
-                    <td class="font-mono" style="font-weight:900;color:var(--vg-status-ready);">${fmtNum(c.metros)}m</td>
-                    <td><span class="badge">${escHtml(c.ruta || "Solo Calandrado")}</span></td>
-                    <td>
-                      ${c.observaciones
-                        ? `<div style="background:var(--vg-amber-soft);border:1px solid var(--vg-status-processing);color:var(--vg-status-processing);padding:3px 7px;border-radius:4px;font-size:11px;font-weight:700;">📝 ${escHtml(c.observaciones)}</div>`
-                        : `<button type="button" class="btn-table btn-nota-rapida" data-table="prod_cola_calandrado" data-id="${c.id}" data-batch="${escHtml(c.batch_id)}" style="font-size:10px;">+ Nota</button>`}
-                    </td>
+                    <td>${fmtDateHora(c.fecha_hora)}</td>
+                    <td>${formatearAnidadosHTML(c.cliente_archivo)}</td>
+                    <td style="text-align:center;">${renderMiniaturaDiseno60(c.color_tela, c.diseno, c.cliente_archivo)}</td>
+                    <td>${escHtml(c.tela_destino || "")}</td>
+                    <td>${escHtml(c.num_rollo_tela || "")}</td>
+                    <td>${escHtml(c.color_tela || "")}</td>
+                    <td style="color:var(--danger); font-weight:bold;">${fmtNum(c.metros)}m</td>
+                    <td>${escHtml(c.perfil || "")}</td>
+                    <td>${c.observaciones ? `<span style="color:var(--accent-orange); font-weight:bold;">📝 ${escHtml(c.observaciones)}</span>` : "-"}</td>
                   </tr>
                 `).join("")}
               </tbody>
@@ -973,7 +948,7 @@ function renderModuloCalandrado() {
         </div>
       `;
     }
-    contRollos.innerHTML = cardsHtml;
+    contRollos.innerHTML = html;
 
     contRollos.querySelectorAll(".rollo-header[data-toggle-rollo]").forEach(hdr => {
       hdr.addEventListener("click", () => {
@@ -990,17 +965,21 @@ function renderModuloCalandrado() {
   if (panelPrev) {
     const mapaTelas = {};
     pendientes.forEach(p => {
-      const k = `${p.tela_destino || "SIN ESPECIFICAR"} — Color: ${p.color_tela || "BLANCO"} ${p.num_rollo_tela ? `(${p.num_rollo_tela})` : ""}`;
+      const k = `${p.tela_destino || "SIN ESPECIFICAR"} (${p.color_tela || "BLANCO"})`;
       mapaTelas[k] = (mapaTelas[k] || 0) + (Number(p.metros) || 0);
     });
     const entries = Object.entries(mapaTelas);
     panelPrev.innerHTML = entries.length === 0
-      ? `<div style="color:var(--vg-text-secondary);">No hay telas pendientes de calandrar.</div>`
-      : `<div style="font-weight:800;color:var(--vg-status-ready);margin-bottom:8px;">🛒 Previsión de Telas para los Rollos en Cola:</div>` +
-        entries.map(([k, m]) => `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--vg-border-subtle);"><span>👕 ${escHtml(k)}</span><strong class="font-mono" style="color:var(--vg-status-ready);">${fmtNum(m)}m</strong></div>`).join("");
+      ? `<div style="color:#888;">Sin telas requeridas.</div>`
+      : entries.map(([k, m]) => `
+          <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #222; color:#ccc;">
+            <span>👕 <strong>${escHtml(k)}</strong></span>
+            <strong style="color:#4CAF50;">${fmtNum(m)}m</strong>
+          </div>
+        `).join("");
   }
 
-  // Historial Reciente de Calandrado agrupado por ROLLO CERRADO (Captura 3)
+  // Historial Reciente de Calandrado idéntico a JS_Calandrado.html líneas 60-76
   const terminados = STATE.colaCalandrado.filter(c =>
     String(c.estado).toLowerCase().includes("terminado") &&
     cumpleFiltroFecha(c.fecha_terminado || c.fecha_hora) &&
@@ -1008,7 +987,7 @@ function renderModuloCalandrado() {
   );
 
   if (terminados.length === 0) {
-    tbodyHist.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:18px;color:var(--vg-text-secondary);">No hay trabajos calandrados en el período seleccionado.</td></tr>`;
+    tbodyHist.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:18px;color:#888;">No hay trabajos calandrados en el período seleccionado.</td></tr>`;
   } else {
     let htmlHist = "";
     let ultimoRolloHist = null;
@@ -1020,34 +999,32 @@ function renderModuloCalandrado() {
           .filter(x => x.id_rollo_papel === rId)
           .reduce((a, b) => a + (Number(b.metros) || 0), 0);
         htmlHist += `
-          <tr class="row-corte">
-            <td colspan="11">--- ROLLO CERRADO: ${escHtml(rId)} | TOTAL DEL ROLLO: ${fmtNum(totRollo)}m ---</td>
+          <tr style="cursor:pointer; background:#111;">
+            <td colspan="11" style="border-top:1px solid #00E676; border-bottom:1px solid #00E676; color:#00E676; text-align:center; font-weight:bold; padding:8px;">
+              ROLLO CERRADO: ${escHtml(rId)} | TOTAL DEL ROLLO: ${fmtNum(totRollo)}m
+            </td>
           </tr>
         `;
       }
       htmlHist += `
         <tr>
           <td style="white-space:nowrap;">
-            <button type="button" class="btn-table btn-cal-falla" data-id="${c.id}" title="Reportar falla">⚠️</button>
-            <button type="button" class="btn-table btn-cal-reabrir" data-id="${c.id}" title="Devolver a Cola Calandrado">🔙</button>
-            <button type="button" class="btn-table btn-nota-rapida" data-table="prod_cola_calandrado" data-id="${c.id}" data-batch="${escHtml(c.batch_id)}" title="Editar Nota">📝</button>
-            <button type="button" class="btn-table btn-crud-edit" data-table="prod_cola_calandrado" data-id="${c.id}">✏️</button>
-            <button type="button" class="btn-table btn-crud-del" data-table="prod_cola_calandrado" data-id="${c.id}">🗑️</button>
+            <button type="button" class="btn-cal-reabrir" data-id="${c.id}" style="background:transparent; border:1px solid #aaa; color:#aaa; border-radius:4px; cursor:pointer; padding:3px;" title="Deshacer">🔙</button>
+            <button type="button" class="btn-nota-rapida" data-table="prod_cola_calandrado" data-id="${c.id}" data-batch="${escHtml(c.batch_id)}" style="background:transparent; border:1px solid var(--accent-orange); color:var(--accent-orange); border-radius:4px; cursor:pointer; padding:3px;" title="Nota">📝</button>
+            <button type="button" class="btn-imp-etiqueta" data-rollo="${escHtml(rId)}" data-metros="${fmtNum(c.metros)}" style="background:var(--accent-blue); border:1px solid var(--accent-blue); color:#fff; border-radius:4px; cursor:pointer; padding:3px;" title="Etiqueta">🖨️</button>
+            <button type="button" class="btn-crud-edit" data-table="prod_cola_calandrado" data-id="${c.id}" style="background:transparent; border:1px solid var(--accent-blue); color:var(--accent-blue); border-radius:4px; cursor:pointer; padding:3px;">✏️</button>
+            <button type="button" class="btn-crud-del" data-table="prod_cola_calandrado" data-id="${c.id}" style="background:transparent; border:1px solid var(--danger); color:var(--danger); border-radius:4px; cursor:pointer; padding:3px;">🗑️</button>
           </td>
-          <td class="font-mono" style="font-size:11px;white-space:nowrap;">${fmtDateHora(c.fecha_terminado || c.fecha_hora)}</td>
-          <td><strong>${escHtml(c.id_rollo_papel)}</strong></td>
-          <td><strong>${escHtml(c.cliente_archivo)}</strong></td>
-          <td>${escHtml(c.tela_destino || "-")}</td>
-          <td>${escHtml(c.num_rollo_tela || "-")}</td>
-          <td>${escHtml(c.color_tela || "-")}</td>
-          <td class="font-mono" style="font-weight:900;color:var(--vg-status-ready);">${fmtNum(c.metros)}m</td>
-          <td style="font-size:11px;">${escHtml(c.perfil || "-")}</td>
+          <td>${fmtDateHora(c.fecha_terminado || c.fecha_hora)}</td>
+          <td>${formatearAnidadosHTML(c.cliente_archivo)}</td>
+          <td style="text-align:center;">${renderMiniaturaDiseno60(c.color_tela, c.diseno, c.cliente_archivo)}</td>
+          <td>${escHtml(c.tela_destino || "")}</td>
+          <td>${escHtml(c.num_rollo_tela || "")}</td>
+          <td>${escHtml(c.color_tela || "")}</td>
+          <td style="color:var(--accent); font-weight:bold;">${fmtNum(c.metros)}m</td>
+          <td>${escHtml(c.perfil || "")}</td>
           <td>${escHtml(c.ruta || "Solo Calandrado")}</td>
-          <td>
-            ${c.observaciones
-              ? `<div style="background:var(--vg-amber-soft);border:1px solid var(--vg-status-processing);color:var(--vg-status-processing);padding:3px 7px;border-radius:4px;font-size:11px;font-weight:700;">📝 ${escHtml(c.observaciones)}</div>`
-              : "-"}
-          </td>
+          <td>${c.observaciones ? `<span style="color:var(--accent-orange); font-weight:bold;">📝 ${escHtml(c.observaciones)}</span>` : "-"}</td>
         </tr>
       `;
     });
@@ -1056,7 +1033,7 @@ function renderModuloCalandrado() {
 }
 
 // ============================================================================
-// MÓDULO 3: CORTE LÁSER (Trabajos Anidados Agrupados por batch_id — Pedido #2)
+// MÓDULO 3: CORTE LÁSER (Con trabajos anidados agrupados — Pedido #2)
 // ============================================================================
 function agruparLaserPorBatch(filas) {
   const mapa = new Map();
@@ -1103,56 +1080,47 @@ function renderModuloLaser() {
   const lotesTerminados = agruparLaserPorBatch(termRaw);
 
   tbodyCola.innerHTML = lotesPendientes.length === 0
-    ? `<tr><td colspan="8" style="text-align:center;padding:18px;color:var(--vg-text-secondary);">No hay lotes pendientes en Corte Láser.</td></tr>`
+    ? `<tr><td colspan="8" style="text-align:center;padding:18px;color:#888;">Cola vacía</td></tr>`
     : lotesPendientes.map(g => {
       const esAnidado = g.archivos.length > 1;
       return `
         <tr>
           <td style="white-space:nowrap;">
-            <button type="button" class="btn-table btn-laser-cortar-lote" data-batch="${escHtml(g.batch_id)}" data-ids="${g.ids.join(",")}" style="background:var(--vg-status-ready);color:var(--vg-bg-app);border-color:var(--vg-status-ready);">
-              ⚡ Cortar ${esAnidado ? `Lote (${g.archivos.length})` : ""}
+            <button type="button" class="btn-main btn-laser-cortar-lote" data-batch="${escHtml(g.batch_id)}" data-ids="${g.ids.join(",")}" style="width:auto; padding:5px 10px; font-size:11px; margin:0;">
+              Cortar ${esAnidado ? `Lote (${g.archivos.length})` : ""}
             </button>
-            <button type="button" class="btn-table btn-nota-rapida" data-table="prod_cola_laser" data-id="${g.ids[0]}" data-batch="${escHtml(g.batch_id)}">📝</button>
-            <button type="button" class="btn-table btn-crud-edit" data-table="prod_cola_laser" data-id="${g.ids[0]}">✏️</button>
-            <button type="button" class="btn-table btn-crud-del" data-table="prod_cola_laser" data-id="${g.ids[0]}">🗑️</button>
+            <button type="button" class="btn-nota-rapida" data-table="prod_cola_laser" data-id="${g.ids[0]}" data-batch="${escHtml(g.batch_id)}" style="background:transparent; border:1px solid var(--accent-orange); color:var(--accent-orange); border-radius:4px; cursor:pointer; padding:4px;">📝</button>
+            <button type="button" class="btn-crud-edit" data-table="prod_cola_laser" data-id="${g.ids[0]}" style="background:transparent; border:1px solid var(--accent-blue); color:var(--accent-blue); border-radius:4px; cursor:pointer; padding:4px;">✏️</button>
+            <button type="button" class="btn-crud-del" data-table="prod_cola_laser" data-id="${g.ids[0]}" style="background:transparent; border:1px solid var(--danger); color:var(--danger); border-radius:4px; cursor:pointer; padding:4px;">🗑️</button>
           </td>
-          <td class="font-mono" style="font-size:11px;">${fmtDateHora(g.fecha_ingreso)}</td>
+          <td>${fmtDateHora(g.fecha_ingreso)}</td>
           <td><strong>${escHtml(g.id_rollo_papel)}</strong></td>
           <td>
-            ${esAnidado
-              ? `<span class="badge mru-top" style="margin-bottom:4px;">📦 TRABAJO ANIDADO AGRUPADO (${g.archivos.length} archivos — Se marcan juntos con 1 clic)</span>`
-              : `<span class="badge activo" style="margin-bottom:4px;">Archivo Individual</span>`}
-            <div style="font-weight:700;margin-top:3px;">${g.archivos.map(a => `• ${escHtml(a)}`).join("<br/>")}</div>
+            ${esAnidado ? `<span class="badge activo" style="margin-bottom:4px;">📦 ANIDADO (${g.archivos.length} archivos)</span><br>` : ""}
+            ${g.archivos.map(a => `• ${escHtml(a)}`).join("<br>")}
           </td>
-          <td><strong>${escHtml(g.tela_rollo_color || "-")}</strong></td>
-          <td class="font-mono" style="font-weight:900;color:var(--vg-status-ready);">${fmtNum(g.metros_totales)}m</td>
-          <td>Vel: ${escHtml(g.velocidad)} | Poder: <strong>${escHtml(g.poder)}%</strong></td>
-          <td>
-            ${g.observaciones
-              ? `<div style="background:var(--vg-amber-soft);border:1px solid var(--vg-status-processing);color:var(--vg-status-processing);padding:4px 8px;border-radius:4px;font-weight:700;font-size:11px;">📝 ${escHtml(g.observaciones)}</div>`
-              : "-"}
-          </td>
+          <td>${escHtml(g.tela_rollo_color || "-")}</td>
+          <td><strong style="color:var(--accent-blue);">${fmtNum(g.metros_totales)}m</strong></td>
+          <td>Vel: ${escHtml(g.velocidad)} | ${escHtml(g.poder)}%</td>
+          <td>${g.observaciones ? `<span style="color:var(--accent-orange); font-weight:bold;">📝 ${escHtml(g.observaciones)}</span>` : "-"}</td>
         </tr>
       `;
     }).join("");
 
   tbodyHist.innerHTML = lotesTerminados.length === 0
-    ? `<tr><td colspan="7" style="text-align:center;padding:18px;color:var(--vg-text-secondary);">No hay cortes láser finalizados en este período.</td></tr>`
+    ? `<tr><td colspan="7" style="text-align:center;padding:18px;color:#888;">No hay cortes láser finalizados en este período.</td></tr>`
     : lotesTerminados.map(g => `
       <tr>
         <td style="white-space:nowrap;">
-          <button type="button" class="btn-table btn-crud-edit" data-table="prod_cola_laser" data-id="${g.ids[0]}">✏️</button>
-          <button type="button" class="btn-table btn-crud-del" data-table="prod_cola_laser" data-id="${g.ids[0]}">🗑️</button>
+          <button type="button" class="btn-crud-edit" data-table="prod_cola_laser" data-id="${g.ids[0]}" style="background:transparent; border:1px solid var(--accent-blue); color:var(--accent-blue); border-radius:4px; cursor:pointer; padding:4px;">✏️</button>
+          <button type="button" class="btn-crud-del" data-table="prod_cola_laser" data-id="${g.ids[0]}" style="background:transparent; border:1px solid var(--danger); color:var(--danger); border-radius:4px; cursor:pointer; padding:4px;">🗑️</button>
         </td>
-        <td class="font-mono" style="font-size:11px;">${fmtDateHora(g.fecha_terminado || g.fecha_ingreso)}</td>
+        <td>${fmtDateHora(g.fecha_terminado || g.fecha_ingreso)}</td>
         <td><strong>${escHtml(g.id_rollo_papel)}</strong></td>
-        <td>
-          ${g.archivos.length > 1 ? `<span class="badge mru-top">📦 Anidado (${g.archivos.length})</span><br/>` : ""}
-          <strong>${g.archivos.map(a => escHtml(a)).join(" | ")}</strong>
-        </td>
+        <td>${g.archivos.map(a => escHtml(a)).join(" | ")}</td>
         <td>${escHtml(g.tela_rollo_color || "-")}</td>
-        <td class="font-mono" style="font-weight:800;color:var(--vg-status-ready);">${fmtNum(g.metros_totales)}m</td>
-        <td>${g.observaciones ? `<div style="background:var(--vg-amber-soft);padding:3px 6px;border-radius:4px;font-size:11px;">📝 ${escHtml(g.observaciones)}</div>` : "-"}</td>
+        <td style="color:var(--accent); font-weight:bold;">${fmtNum(g.metros_totales)}m</td>
+        <td>${g.observaciones ? `<span style="color:var(--accent-orange);">${escHtml(g.observaciones)}</span>` : "-"}</td>
       </tr>
     `).join("");
 }
@@ -1175,34 +1143,28 @@ function renderModuloDTF() {
   }
 
   kpiWrap.innerHTML = STATE.dtfRollosSaldos.map(r => `
-    <div class="stat-box" style="border-bottom: 3px solid ${r.estado === "Activo" ? "var(--vg-status-ready)" : "var(--vg-brand-secondary)"};">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <span class="stat-title">🎞️ ${escHtml(r.id_rollo_dtf)}</span>
-        <button type="button" class="btn-table btn-crud-edit" data-table="prod_dtf_rollos" data-id="${escHtml(r.id_rollo_dtf)}" style="padding:2px 6px;">✏️</button>
-      </div>
+    <div class="stat-box" style="border-bottom: 3px solid var(--accent);">
+      <div class="stat-title">${escHtml(r.id_rollo_dtf)} (${escHtml(r.marca_fabricante)})</div>
       <div class="stat-value">${fmtNum(r.metros_restantes_reales)}m</div>
-      <div class="stat-sub">${escHtml(r.marca_fabricante)} | ${escHtml(r.perfil_impresion)}</div>
+      <div style="font-size:10px; color:#888; margin-top:3px;">${escHtml(r.perfil_impresion)}</div>
     </div>
   `).join("");
 
   const pendDtf = STATE.pendientesDrive.filter(p => p.modulo === "DTF" && p.estado_impreso !== "SI" && cumpleBusquedaUniversal(p));
   if (tbodyPend) {
     tbodyPend.innerHTML = pendDtf.length === 0
-      ? `<tr><td colspan="6" style="text-align:center;padding:14px;color:var(--vg-text-secondary);">Sin archivos DTF pendientes en Drive.</td></tr>`
+      ? `<tr><td colspan="6" style="text-align:center;color:#888;">Sin archivos DTF pendientes.</td></tr>`
       : pendDtf.map(p => {
         const cargo = p.es_repo_muestra || "VENTA";
         const precioUnit = calcularPrecioMetroDTF(p.metros_totales, cargo);
         return `
           <tr>
             <td><strong>${escHtml(p.cliente)}</strong></td>
-            <td><strong>${escHtml(p.nombre_archivo)}</strong></td>
-            <td class="font-mono" style="font-weight:800;">${fmtNum(p.metros_totales)}m</td>
-            <td><span class="badge ${cargo === "VENTA" ? "activo" : "alerta"}">${escHtml(cargo)}</span></td>
-            <td class="font-mono" style="font-weight:900;">${fmtMoney(precioUnit * (Number(p.metros_totales) || 0))}</td>
-            <td>
-              <button type="button" class="btn-table btn-dtf-cargar-pend" data-id="${p.id}">➕ Cargar</button>
-              <button type="button" class="btn-table btn-crud-edit" data-table="prod_pendientes_drive" data-id="${p.id}">✏️</button>
-            </td>
+            <td>${escHtml(p.nombre_archivo)}</td>
+            <td>${fmtNum(p.metros_totales)}m</td>
+            <td><span class="badge ${cargo === "VENTA" ? "activo" : "danger"}">${escHtml(cargo)}</span></td>
+            <td>${fmtMoney(precioUnit * (Number(p.metros_totales) || 0))}</td>
+            <td><button type="button" class="btn-secondary btn-dtf-cargar-pend" data-id="${p.id}" style="width:auto;padding:4px 8px;">Cargar</button></td>
           </tr>
         `;
       }).join("");
@@ -1210,56 +1172,45 @@ function renderModuloDTF() {
 
   const pedidosFilt = STATE.dtfPedidos.filter(d => cumpleFiltroFecha(d.fecha_hora) && cumpleBusquedaUniversal(d));
   if (tbodyPedidos) {
-    tbodyPedidos.innerHTML = pedidosFilt.length === 0
-      ? `<tr><td colspan="9" style="text-align:center;padding:16px;color:var(--vg-text-secondary);">No hay pedidos DTF en el período seleccionado.</td></tr>`
-      : pedidosFilt.map(d => {
-        const saldo = (Number(d.subtotal_cobrar) || 0) - (Number(d.monto_pagado) || 0);
-        return `
-          <tr>
-            <td style="white-space:nowrap;">
-              ${saldo > 0 ? `<button type="button" class="btn-table btn-dtf-saldar" data-id="${d.id}" data-total="${d.subtotal_cobrar}" style="background:var(--vg-status-ready);color:var(--vg-bg-app);">💵 Saldar</button>` : ""}
-              <button type="button" class="btn-table btn-crud-edit" data-table="prod_dtf_pedidos" data-id="${d.id}">✏️</button>
-              <button type="button" class="btn-table btn-crud-del" data-table="prod_dtf_pedidos" data-id="${d.id}">🗑️</button>
-            </td>
-            <td class="font-mono" style="font-size:11px;">${fmtDateHora(d.fecha_hora)}</td>
-            <td><strong>${escHtml(d.cliente)}</strong></td>
-            <td>
-              <strong>${escHtml(d.nombre_archivo)}</strong>
-              ${d.observaciones ? `<div style="font-size:11px;color:var(--vg-status-processing);">📝 ${escHtml(d.observaciones)}</div>` : ""}
-            </td>
-            <td><span class="badge ${d.tipo_cargo === "VENTA" ? "activo" : "alerta"}">${escHtml(d.tipo_cargo)}</span></td>
-            <td class="font-mono" style="font-weight:800;">${fmtNum(d.metros_archivo)}m</td>
-            <td class="font-mono">${fmtMoney(d.precio_metro)}/m</td>
-            <td class="font-mono" style="font-weight:900;">${fmtMoney(d.subtotal_cobrar)}</td>
-            <td>
-              <span class="badge ${saldo <= 0 ? "activo" : "alerta"}">
-                ${saldo <= 0 ? "✅ Pagado" : `Debe ${fmtMoney(saldo)}`}
-              </span>
-            </td>
-          </tr>
-        `;
-      }).join("");
+    tbodyPedidos.innerHTML = pedidosFilt.map(d => {
+      const saldo = (Number(d.subtotal_cobrar) || 0) - (Number(d.monto_pagado) || 0);
+      return `
+        <tr>
+          <td style="white-space:nowrap;">
+            ${saldo > 0 ? `<button type="button" class="btn-secondary btn-dtf-saldar" data-id="${d.id}" data-total="${d.subtotal_cobrar}" style="width:auto;padding:3px 6px;border-color:var(--accent);color:var(--accent);">💵</button>` : ""}
+            <button type="button" class="btn-crud-edit" data-table="prod_dtf_pedidos" data-id="${d.id}" style="background:transparent;border:1px solid var(--accent-blue);color:var(--accent-blue);border-radius:4px;padding:3px;">✏️</button>
+            <button type="button" class="btn-crud-del" data-table="prod_dtf_pedidos" data-id="${d.id}" style="background:transparent;border:1px solid var(--danger);color:var(--danger);border-radius:4px;padding:3px;">🗑️</button>
+          </td>
+          <td>${fmtDateHora(d.fecha_hora)}</td>
+          <td><strong>${escHtml(d.cliente)}</strong></td>
+          <td>${escHtml(d.nombre_archivo)}</td>
+          <td><span class="badge ${d.tipo_cargo === "VENTA" ? "activo" : "danger"}">${escHtml(d.tipo_cargo)}</span></td>
+          <td style="color:var(--accent);font-weight:bold;">${fmtNum(d.metros_archivo)}m</td>
+          <td>${fmtMoney(d.precio_metro)}</td>
+          <td><strong>${fmtMoney(d.subtotal_cobrar)}</strong></td>
+          <td><span class="badge ${saldo <= 0 ? "activo" : "danger"}">${saldo <= 0 ? "Pagado" : `Debe ${fmtMoney(saldo)}`}</span></td>
+        </tr>
+      `;
+    }).join("");
   }
 
   if (tbodyCuentas) {
     tbodyCuentas.innerHTML = STATE.dtfCuentasClientes.map(c => `
       <tr>
         <td><strong>${escHtml(c.cliente_nombre)}</strong></td>
-        <td class="font-mono">${fmtNum(c.metros_comprados)}m</td>
-        <td class="font-mono">${fmtNum(c.metros_reposicion)}m</td>
-        <td class="font-mono">${fmtNum(c.metros_muestras)}m</td>
-        <td class="font-mono" style="font-weight:800;">${fmtMoney(c.total_facturado)}</td>
-        <td class="font-mono" style="color:var(--vg-status-ready);font-weight:800;">${fmtMoney(c.total_abonado)}</td>
-        <td class="font-mono" style="color:${Number(c.saldo_pendiente) > 0 ? "var(--vg-status-alert)" : "var(--vg-status-ready)"};font-weight:900;">
-          ${fmtMoney(c.saldo_pendiente)}
-        </td>
+        <td>${fmtNum(c.metros_comprados)}m</td>
+        <td>${fmtNum(c.metros_reposicion)}m</td>
+        <td>${fmtNum(c.metros_muestras)}m</td>
+        <td>${fmtMoney(c.total_facturado)}</td>
+        <td style="color:#4CAF50;">${fmtMoney(c.total_abonado)}</td>
+        <td style="color:${Number(c.saldo_pendiente) > 0 ? "var(--danger)" : "#4CAF50"};font-weight:bold;">${fmtMoney(c.saldo_pendiente)}</td>
       </tr>
     `).join("");
   }
 }
 
 // ============================================================================
-// MÓDULOS 5 Y 6: FINANZAS Y BITÁCORA DE FALLAS
+// MÓDULOS 5 Y 6: FINANZAS Y BITÁCORA
 // ============================================================================
 function renderModuloFinanzasYMantenimiento() {
   const totalImp = STATE.impresiones
@@ -1273,22 +1224,22 @@ function renderModuloFinanzasYMantenimiento() {
   const tbodyFallas = document.getElementById("tbodyBitacoraFallas");
   if (tbodyFallas) {
     tbodyFallas.innerHTML = STATE.fallasReposiciones.length === 0
-      ? `<tr><td colspan="6" style="text-align:center;padding:18px;color:var(--vg-text-secondary);">Sin fallas ni mermas registradas.</td></tr>`
+      ? `<tr><td colspan="6" style="text-align:center;color:#888;">Sin registros técnicos.</td></tr>`
       : STATE.fallasReposiciones.map(f => `
           <tr>
-            <td class="font-mono" style="font-size:11px;">${fmtDateHora(f.fecha_hora)}</td>
-            <td><span class="badge alerta">${escHtml(f.estacion || f.tipo_registro)}</span></td>
-            <td><strong>${escHtml(f.id_rollo || "-")}</strong></td>
-            <td><strong>${escHtml(f.archivo_afectado || "-")}</strong></td>
-            <td class="font-mono" style="color:var(--vg-status-alert);font-weight:800;">-${fmtNum(f.metros_merma)}m</td>
-            <td>${escHtml(f.motivo || f.detalle_reposicion || "-")}</td>
+            <td>${fmtDateHoraLineal(f.fecha_hora)}</td>
+            <td>${escHtml(f.estacion || f.tipo_registro)}</td>
+            <td>${escHtml(f.id_rollo || "-")}</td>
+            <td>${escHtml(f.archivo_afectado || "-")}</td>
+            <td style="color:var(--danger); font-weight:bold;">${fmtNum(f.metros_merma)}m</td>
+            <td style="color:var(--accent-orange);">${escHtml(f.motivo || f.detalle_reposicion || "-")}</td>
           </tr>
         `).join("");
   }
 }
 
 // ============================================================================
-// MÓDULO 7: MÉTRICAS (BI) — Idéntica a Captura 4 + Día Anterior y Semana Anterior
+// MÓDULO 7: MÉTRICAS (BI) — Idéntico a JS_Dashboards.html (Captura 4)
 // ============================================================================
 function renderModuloMetricasBI() {
   const { hoyIni, ayerIni, semActualIni, semAntIni, mesActualIni } = obtenerVentanasTemporales();
@@ -1301,16 +1252,15 @@ function renderModuloMetricasBI() {
   const qCal = pendCal.reduce((a, b) => a + (Number(b.metros) || 0), 0);
   const qLas = pendLas.reduce((a, b) => a + (Number(b.metros) || 0), 0);
 
-  // SLA (650m/día Imp, 650m/día Cal, 300m/día Láser)
-  const dImp = qImp / 650;
-  const dCal = qCal / 650;
-  const dLas = qLas / 300;
-  const dTotal = Math.max(1, Math.ceil(dImp + dCal + dLas));
+  const dImp = Math.ceil(qImp / 650);
+  const dCal = Math.ceil(qCal / 650);
+  const dLas = Math.ceil(qLas / 300);
+  const dTotal = Math.max(1, dImp + dCal + dLas);
 
-  setTxt("slaDiasImp", `${fmtNum(dImp, 1)} Días`);
-  setTxt("slaDiasCal", `${fmtNum(dCal, 1)} Días`);
-  setTxt("slaDiasLas", `${fmtNum(dLas, 1)} Días`);
-  setTxt("slaDiasTotal", `Aprox ~ ${dTotal} Día${dTotal > 1 ? "s" : ""}`);
+  setTxt("slaDiasImp", `${dImp} ${dImp === 1 ? "Día" : "Días"}`);
+  setTxt("slaDiasCal", `${dCal} ${dCal === 1 ? "Día" : "Días"}`);
+  setTxt("slaDiasLas", `${dLas} ${dLas === 1 ? "Día" : "Días"}`);
+  setTxt("slaDiasTotal", `Aprox ~ ${dTotal} ${dTotal === 1 ? "Día" : "Días"}`);
 
   setTxt("radarQImp", `${fmtNum(qImp, 0)}m`);
   setTxt("radarQCal", `${fmtNum(qCal, 0)}m`);
@@ -1320,41 +1270,74 @@ function renderModuloMetricasBI() {
   const calTerm = STATE.colaCalandrado.filter(c => String(c.estado).toLowerCase().includes("terminado"));
   const lasTerm = STATE.colaLaser.filter(l => String(l.estado).toLowerCase().includes("terminado"));
 
-  // Tarjeta Violeta: IMPRESIÓN
-  setTxt("biImpHoy", `${fmtNum(sumarMetrosEnVentana(impNormal, "fecha_hora", "metros_impresos", hoyIni))}m`);
-  setTxt("biImpAyer", `${fmtNum(sumarMetrosEnVentana(impNormal, "fecha_hora", "metros_impresos", ayerIni, hoyIni))}m`);
-  setTxt("biImpSem", `${fmtNum(sumarMetrosEnVentana(impNormal, "fecha_hora", "metros_impresos", semActualIni))}m`);
-  setTxt("biImpSemAnt", `${fmtNum(sumarMetrosEnVentana(impNormal, "fecha_hora", "metros_impresos", semAntIni, semActualIni))}m`);
-  setTxt("biImpMes", `${fmtNum(sumarMetrosEnVentana(impNormal, "fecha_hora", "metros_impresos", mesActualIni))}m`);
-  setTxt("biImpHis", `${fmtNum(impNormal.reduce((a, b) => a + (Number(b.metros_impresos) || 0), 0))}m`);
+  setTxt("biImpHoy", fmtNum(sumarMetrosEnVentana(impNormal, "fecha_hora", "metros_impresos", hoyIni)));
+  setTxt("biImpAyer", fmtNum(sumarMetrosEnVentana(impNormal, "fecha_hora", "metros_impresos", ayerIni, hoyIni)));
+  setTxt("biImpSem", fmtNum(sumarMetrosEnVentana(impNormal, "fecha_hora", "metros_impresos", semActualIni)));
+  setTxt("biImpSemAnt", fmtNum(sumarMetrosEnVentana(impNormal, "fecha_hora", "metros_impresos", semAntIni, semActualIni)));
+  setTxt("biImpMes", fmtNum(sumarMetrosEnVentana(impNormal, "fecha_hora", "metros_impresos", mesActualIni)));
+  setTxt("biImpHis", fmtNum(impNormal.reduce((a, b) => a + (Number(b.metros_impresos) || 0), 0)));
 
-  // Tarjeta Naranja: CALANDRADO
-  setTxt("biCalHoy", `${fmtNum(sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", hoyIni))}m`);
-  setTxt("biCalAyer", `${fmtNum(sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", ayerIni, hoyIni))}m`);
-  setTxt("biCalSem", `${fmtNum(sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", semActualIni))}m`);
-  setTxt("biCalSemAnt", `${fmtNum(sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", semAntIni, semActualIni))}m`);
-  setTxt("biCalMes", `${fmtNum(sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", mesActualIni))}m`);
-  setTxt("biCalHis", `${fmtNum(calTerm.reduce((a, b) => a + (Number(b.metros) || 0), 0))}m`);
+  setTxt("biCalHoy", fmtNum(sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", hoyIni)));
+  setTxt("biCalAyer", fmtNum(sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", ayerIni, hoyIni)));
+  setTxt("biCalSem", fmtNum(sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", semActualIni)));
+  setTxt("biCalSemAnt", fmtNum(sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", semAntIni, semActualIni)));
+  setTxt("biCalMes", fmtNum(sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", mesActualIni)));
+  setTxt("biCalHis", fmtNum(calTerm.reduce((a, b) => a + (Number(b.metros) || 0), 0)));
 
-  // Tarjeta Azul: CORTE LÁSER
-  setTxt("biLasHoy", `${fmtNum(sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", hoyIni))}m`);
-  setTxt("biLasAyer", `${fmtNum(sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", ayerIni, hoyIni))}m`);
-  setTxt("biLasSem", `${fmtNum(sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", semActualIni))}m`);
-  setTxt("biLasSemAnt", `${fmtNum(sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", semAntIni, semActualIni))}m`);
-  setTxt("biLasMes", `${fmtNum(sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", mesActualIni))}m`);
-  setTxt("biLasHis", `${fmtNum(lasTerm.reduce((a, b) => a + (Number(b.metros) || 0), 0))}m`);
+  setTxt("biLasHoy", fmtNum(sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", hoyIni)));
+  setTxt("biLasAyer", fmtNum(sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", ayerIni, hoyIni)));
+  setTxt("biLasSem", fmtNum(sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", semActualIni)));
+  setTxt("biLasSemAnt", fmtNum(sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", semAntIni, semActualIni)));
+  setTxt("biLasMes", fmtNum(sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", mesActualIni)));
+  setTxt("biLasHis", fmtNum(lasTerm.reduce((a, b) => a + (Number(b.metros) || 0), 0)));
 
-  // Tarjeta Esmeralda: DTF
-  setTxt("biDtfHoy", `${fmtNum(sumarMetrosEnVentana(STATE.dtfPedidos, "fecha_hora", "metros_archivo", hoyIni))}m`);
-  setTxt("biDtfAyer", `${fmtNum(sumarMetrosEnVentana(STATE.dtfPedidos, "fecha_hora", "metros_archivo", ayerIni, hoyIni))}m`);
-  setTxt("biDtfSem", `${fmtNum(sumarMetrosEnVentana(STATE.dtfPedidos, "fecha_hora", "metros_archivo", semActualIni))}m`);
-  setTxt("biDtfSemAnt", `${fmtNum(sumarMetrosEnVentana(STATE.dtfPedidos, "fecha_hora", "metros_archivo", semAntIni, semActualIni))}m`);
-  setTxt("biDtfMes", `${fmtNum(sumarMetrosEnVentana(STATE.dtfPedidos, "fecha_hora", "metros_archivo", mesActualIni))}m`);
-  setTxt("biDtfHis", `${fmtNum(STATE.dtfPedidos.reduce((a, b) => a + (Number(b.metros_archivo) || 0), 0))}m`);
+  // Top Telas Histórico (Idéntico a JS_Dashboards.html líneas 54-80)
+  const conteoTelas = {};
+  impNormal.forEach(r => {
+    const t = String(r.tela_destino || "").trim();
+    if (t) conteoTelas[t] = (conteoTelas[t] || 0) + (Number(r.metros_impresos) || 0);
+  });
+  const arrTelas = Object.entries(conteoTelas).map(([tela, mts]) => ({ tela, mts })).sort((a, b) => b.mts - a.mts);
+  const maxT = arrTelas[0]?.mts || 1;
+  const elTopTelas = document.getElementById("dashTopTelas");
+  if (elTopTelas) {
+    elTopTelas.innerHTML = arrTelas.slice(0, 5).map((t, i) => `
+      <div style="margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:2px; color:#aaa;">
+          <span>${i + 1}. ${escHtml(t.tela)}</span><span>${fmtNum(t.mts, 0)}m</span>
+        </div>
+        <div style="width:100%; background:#222; border-radius:4px; height:10px; overflow:hidden;">
+          <div style="width:${(t.mts / maxT) * 100}%; background:var(--accent-blue); height:100%;"></div>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  // Top Clientes Histórico (Idéntico a JS_Dashboards.html líneas 120-149)
+  const conteoCli = {};
+  impNormal.forEach(r => {
+    const cli = String(r.cliente_archivo || "").split(" - ")[0]?.trim() || "Cliente";
+    conteoCli[cli] = (conteoCli[cli] || 0) + (Number(r.metros_impresos) || 0);
+  });
+  const arrCli = Object.entries(conteoCli).map(([cli, mts]) => ({ cli, mts })).sort((a, b) => b.mts - a.mts);
+  const maxC = arrCli[0]?.mts || 1;
+  const elTopCli = document.getElementById("dashTopClientes");
+  if (elTopCli) {
+    elTopCli.innerHTML = arrCli.slice(0, 5).map((c, i) => `
+      <div style="margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:2px; color:#aaa;">
+          <span>${i + 1}. ${escHtml(c.cli)}</span><span>${fmtNum(c.mts, 0)}m</span>
+        </div>
+        <div style="width:100%; background:#222; border-radius:4px; height:10px; overflow:hidden;">
+          <div style="width:${(c.mts / maxC) * 100}%; background:#ff9800; height:100%;"></div>
+        </div>
+      </div>
+    `).join("");
+  }
 }
 
 // ============================================================================
-// MÓDULO 8: CHAT INTERNO DE TALLER EN TIEMPO REAL (@Menciones, #Trabajos, Fotos Cámara WebP)
+// MÓDULO 8: CHAT INTERNO DE TALLER
 // ============================================================================
 function renderModuloChat() {
   const feedEl = document.getElementById("chatFeedContainer");
@@ -1364,10 +1347,7 @@ function renderModuloChat() {
   if (selTrabajo && selTrabajo.options.length <= 1) {
     const opciones = [`<option value=""># Vincular a un Trabajo (Opcional)...</option>`];
     STATE.impresiones.slice(0, 20).forEach(i => {
-      opciones.push(`<option value="IMP|${escHtml(i.batch_id)}|${escHtml(i.cliente_archivo.slice(0, 42))} (${fmtNum(i.metros_impresos)}m)">🖨️ [Imp] ${escHtml(i.cliente_archivo.slice(0, 48))} (${fmtNum(i.metros_impresos)}m)</option>`);
-    });
-    STATE.dtfPedidos.slice(0, 10).forEach(d => {
-      opciones.push(`<option value="DTF|${escHtml(d.id)}|${escHtml(d.cliente)} - ${escHtml(d.nombre_archivo.slice(0, 30))}">🎞️ [DTF] ${escHtml(d.cliente)} — ${escHtml(d.nombre_archivo.slice(0, 35))}</option>`);
+      opciones.push(`<option value="IMP|${escHtml(i.batch_id)}|${escHtml(i.cliente_archivo.slice(0, 42))} (${fmtNum(i.metros_impresos)}m)">🖨️ ${escHtml(i.cliente_archivo.slice(0, 48))} (${fmtNum(i.metros_impresos)}m)</option>`);
     });
     selTrabajo.innerHTML = opciones.join("");
   }
@@ -1375,9 +1355,7 @@ function renderModuloChat() {
   if (chipsMencion) {
     const miembros = STATE.catalogos.filter(c => c.tipo === "EQUIPO");
     chipsMencion.innerHTML = miembros.map(m => `
-      <button type="button" class="chip-btn btn-chat-mention" data-mention="${escHtml(m.nombre)}">
-        @${escHtml(m.nombre)}
-      </button>
+      <span class="badge btn-chat-mention" data-mention="${escHtml(m.nombre)}" style="cursor:pointer;">@${escHtml(m.nombre)}</span>
     `).join("");
     chipsMencion.querySelectorAll(".btn-chat-mention").forEach(btn => {
       btn.addEventListener("click", () => {
@@ -1402,48 +1380,26 @@ function renderModuloChat() {
   });
 
   feedEl.innerHTML = msgs.length === 0
-    ? `<div style="text-align:center;padding:24px;color:var(--vg-text-secondary);">No hay mensajes en este canal. ¡Escribí el primero o adjuntá una foto!</div>`
+    ? `<div style="text-align:center;padding:20px;color:#888;">No hay mensajes en este canal.</div>`
     : msgs.map(m => {
       const meMenciona = Array.isArray(m.menciones) && m.menciones.includes(STATE.usuarioActual);
       return `
-        <div class="chat-msg-card ${meMenciona ? "mention-me" : ""}">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div style="background:#141414; border:1px solid ${meMenciona ? "var(--danger)" : "#333"}; border-radius:6px; padding:10px; margin-bottom:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
             <div>
-              <strong style="color:var(--vg-brand-secondary);">👤 ${escHtml(m.autor_nombre)}</strong>
-              <span class="badge" style="margin-left:4px;">📍 ${escHtml(m.canal_area)}</span>
-              ${meMenciona ? `<span class="badge alerta">🔔 Te mencionó</span>` : ""}
+              <strong style="color:var(--accent-blue);">👤 ${escHtml(m.autor_nombre)}</strong>
+              <span class="badge" style="margin-left:5px;">${escHtml(m.canal_area)}</span>
             </div>
-            <div class="font-mono" style="font-size:11px;color:var(--vg-text-secondary);">
-              ${fmtDateHora(m.created_at)}
-              <button type="button" class="btn-table btn-crud-del" data-table="prod_chat_mensajes" data-id="${m.id}" style="margin-left:6px;padding:2px 6px;">🗑️</button>
-            </div>
+            <span style="font-size:11px; color:#888;">${fmtDateHoraLineal(m.created_at)}</span>
           </div>
-          <div style="margin-top:6px;font-size:13px;font-weight:600;white-space:pre-wrap;">${escHtml(m.mensaje)}</div>
-          ${m.trabajo_etiqueta ? `
-            <div style="margin-top:6px;">
-              <button type="button" class="badge mru-top" style="cursor:pointer;" onclick="window.vgBuscarTrabajoDesdeChat('${escHtml(m.trabajo_etiqueta.split("(")[0].trim())}')">
-                🔗 #${escHtml(m.trabajo_modulo || "Trabajo")}: ${escHtml(m.trabajo_etiqueta)} (Localizar)
-              </button>
-            </div>
-          ` : ""}
-          ${m.foto_base64 ? `
-            <div style="margin-top:8px;">
-              <img src="${m.foto_base64}" alt="Foto adjunta del taller" style="max-width:260px;max-height:220px;border-radius:6px;border:1px solid var(--vg-border-subtle);cursor:pointer;" onclick="window.open(this.src)"/>
-            </div>
-          ` : ""}
+          <div style="margin-top:6px; color:#ddd; font-size:13px;">${escHtml(m.mensaje)}</div>
+          ${m.trabajo_etiqueta ? `<div style="margin-top:5px;"><span class="badge activo">🔗 #${escHtml(m.trabajo_etiqueta)}</span></div>` : ""}
+          ${m.foto_base64 ? `<div style="margin-top:6px;"><img src="${m.foto_base64}" style="max-width:220px; border-radius:4px;" /></div>` : ""}
         </div>
       `;
     }).join("");
 }
 
-window.vgBuscarTrabajoDesdeChat = (termino) => {
-  STATE.busquedaGlobal = termino;
-  const inp = document.getElementById("vgOmniSearchInput");
-  if (inp) inp.value = termino;
-  renderTodoRespetandoFormulario();
-};
-
-// Panel de Resultados Instantáneos de OmniSearch (Pedido #5)
 function renderResultadosOmnisearch() {
   const panel = document.getElementById("vgOmnisearchPanel");
   if (!panel) return;
@@ -1452,36 +1408,31 @@ function renderResultadosOmnisearch() {
   const impMatch = STATE.impresiones.filter(cumpleBusquedaUniversal).slice(0, 6);
   const calMatch = STATE.colaCalandrado.filter(cumpleBusquedaUniversal).slice(0, 6);
   const lasMatch = STATE.colaLaser.filter(cumpleBusquedaUniversal).slice(0, 6);
-  const dtfMatch = STATE.dtfPedidos.filter(cumpleBusquedaUniversal).slice(0, 6);
 
   panel.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <strong style="color:var(--vg-brand-secondary);">🔍 Resultados Globales para "${escHtml(STATE.busquedaGlobal)}" en todo el Taller:</strong>
-      <button type="button" class="btn-table" onclick="document.getElementById('vgOmniSearchClear').click()">✖ Cerrar Buscador</button>
+      <strong style="color:var(--accent-blue);">🔍 Resultados para "${escHtml(STATE.busquedaGlobal)}":</strong>
+      <button type="button" class="btn-secondary" style="width:auto;padding:4px 10px;" onclick="document.getElementById('vgOmniSearchClear').click()">✖ Cerrar</button>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;font-size:12px;">
-      <div style="background:var(--vg-surface-input);padding:10px;border-radius:6px;border:1px solid var(--vg-border-subtle);">
-        <strong style="color:var(--vg-brand-secondary);">🖨️ Impresión (${impMatch.length})</strong>
-        ${impMatch.map(i => `<div style="margin-top:4px;">• <strong>${escHtml(i.cliente_archivo.slice(0, 42))}</strong> — <span class="font-mono" style="color:var(--vg-status-ready);">${fmtNum(i.metros_impresos)}m</span> (${escHtml(i.id_rollo_papel)})</div>`).join("") || `<div style="color:var(--vg-text-secondary);">Sin coincidencias</div>`}
+      <div style="background:#1a1a1a;padding:10px;border-radius:6px;border:1px solid #333;">
+        <strong style="color:var(--accent);">🖨️ Impresión (${impMatch.length})</strong>
+        ${impMatch.map(i => `<div style="margin-top:4px;">• ${escHtml(i.cliente_archivo.slice(0, 42))} — <strong>${fmtNum(i.metros_impresos)}m</strong></div>`).join("") || `<div style="color:#888;">Sin coincidencias</div>`}
       </div>
-      <div style="background:var(--vg-surface-input);padding:10px;border-radius:6px;border:1px solid var(--vg-border-subtle);">
-        <strong style="color:var(--vg-status-alert);">🔥 Calandrado (${calMatch.length})</strong>
-        ${calMatch.map(c => `<div style="margin-top:4px;">• <strong>${escHtml(c.cliente_archivo.slice(0, 42))}</strong> — <span class="font-mono" style="color:var(--vg-status-ready);">${fmtNum(c.metros)}m</span> [${escHtml(c.estado)}]</div>`).join("") || `<div style="color:var(--vg-text-secondary);">Sin coincidencias</div>`}
+      <div style="background:#1a1a1a;padding:10px;border-radius:6px;border:1px solid #333;">
+        <strong style="color:var(--accent-magenta);">🔥 Calandrado (${calMatch.length})</strong>
+        ${calMatch.map(c => `<div style="margin-top:4px;">• ${escHtml(c.cliente_archivo.slice(0, 42))} — <strong>${fmtNum(c.metros)}m</strong> [${escHtml(c.estado)}]</div>`).join("") || `<div style="color:#888;">Sin coincidencias</div>`}
       </div>
-      <div style="background:var(--vg-surface-input);padding:10px;border-radius:6px;border:1px solid var(--vg-border-subtle);">
-        <strong style="color:var(--vg-status-processing);">⚡ Corte Láser (${lasMatch.length})</strong>
-        ${lasMatch.map(l => `<div style="margin-top:4px;">• <strong>${escHtml(l.cliente_archivo.slice(0, 42))}</strong> — <span class="font-mono" style="color:var(--vg-status-ready);">${fmtNum(l.metros)}m</span> [${escHtml(l.estado)}]</div>`).join("") || `<div style="color:var(--vg-text-secondary);">Sin coincidencias</div>`}
-      </div>
-      <div style="background:var(--vg-surface-input);padding:10px;border-radius:6px;border:1px solid var(--vg-border-subtle);">
-        <strong style="color:var(--vg-status-ready);">🎞️ DTF (${dtfMatch.length})</strong>
-        ${dtfMatch.map(d => `<div style="margin-top:4px;">• <strong>${escHtml(d.cliente)}</strong> (${escHtml(d.nombre_archivo.slice(0, 28))}) — <span class="font-mono">${fmtNum(d.metros_archivo)}m</span></div>`).join("") || `<div style="color:var(--vg-text-secondary);">Sin coincidencias</div>`}
+      <div style="background:#1a1a1a;padding:10px;border-radius:6px;border:1px solid #333;">
+        <strong style="color:var(--accent-orange);">⚡ Corte Láser (${lasMatch.length})</strong>
+        ${lasMatch.map(l => `<div style="margin-top:4px;">• ${escHtml(l.cliente_archivo.slice(0, 42))} — <strong>${fmtNum(l.metros)}m</strong> [${escHtml(l.estado)}]</div>`).join("") || `<div style="color:#888;">Sin coincidencias</div>`}
       </div>
     </div>
   `;
 }
 
 // ============================================================================
-// ACCIONES OPERATIVAS (Impresión, Corte -4m, Avance, Calibración, Calandrado, Láser)
+// ACCIONES OPERATIVAS Y CRUD UNIVERSAL
 // ============================================================================
 async function procesarImpresionLote() {
   const seleccionados = STATE.pendientesDrive.filter(p => STATE.impForm.archivosSeleccionadosIds.has(p.id));
@@ -1489,7 +1440,7 @@ async function procesarImpresionLote() {
   const disenoInput = document.getElementById("impInput_diseno")?.value.trim() || STATE.impForm.diseno;
 
   if (seleccionados.length === 0 && metrosManualInput <= 0) {
-    toast("Seleccioná al menos 1 archivo de la Cola Pendiente o ingresá los Metros a Descontar.", "warn");
+    toast("Seleccione al menos un archivo o ingrese los Metros a Descontar.", "warn");
     return;
   }
 
@@ -1499,8 +1450,8 @@ async function procesarImpresionLote() {
   const fechaIso = fechaManVal ? new Date(fechaManVal).toISOString() : new Date().toISOString();
 
   const nombresUnidos = seleccionados.length > 0
-    ? seleccionados.map(s => s.nombre_archivo.includes(s.cliente) ? s.nombre_archivo : `${s.cliente} - ${s.nombre_archivo}`).join(" | ")
-    : (disenoInput || "TRABAJO MANUAL DE IMPRESIÓN");
+    ? seleccionados.map(s => s.nombre_archivo).join(" | ")
+    : (disenoInput || "TRABAJO MANUAL");
 
   const metrosTotales = metrosManualInput > 0
     ? metrosManualInput
@@ -1537,7 +1488,7 @@ async function procesarImpresionLote() {
   });
 
   if (errImp) {
-    toast("Error al registrar impresión: " + errImp.message, "error");
+    toast("Error: " + errImp.message, "error");
     return;
   }
 
@@ -1565,7 +1516,6 @@ async function procesarImpresionLote() {
     await sb().from("prod_pendientes_drive").update({ estado_impreso: "SI" }).eq("id", s.id);
   }
 
-  // Actualizar Ranking MRU (#1 pasa a ser inmediatamente el último usado — Pedido #3)
   await Promise.all([
     registrarUsoMRU("TELA", tela),
     registrarUsoMRU("PERFIL", perfil),
@@ -1580,7 +1530,7 @@ async function procesarImpresionLote() {
   STATE.impForm.autoDetectInfo = "";
   sincronizarInputsImpresionConState();
 
-  toast(`✅ Confirmado: ${fmtNum(metrosTotales)}m en ${infoRollo.bloqueActual}. Sugerencias MRU actualizadas.`);
+  toast(`✅ Impresión confirmada (${fmtNum(metrosTotales)}m).`);
   await cargarDatosTodo();
 }
 
@@ -1592,24 +1542,24 @@ async function cortarBloquePapel4m() {
     fecha_hora: new Date().toISOString(),
     id_rollo_papel: info.bloqueActual,
     id_rollo_base: info.idBase,
-    cliente_archivo: `--- CORTE DE PAPEL (-4M) CIERRE DE ${info.bloqueActual} ---`,
+    cliente_archivo: `--- CORTE DE PAPEL (-4M) ---`,
     accion: "Corte de Papel (-4m)",
     metros_impresos: 0,
     metros_desperdicio: 4.0,
     metros_restantes_snapshot: Math.max(0, info.restantes - 4.0),
     ruta: "Interno",
-    observaciones: "Corte de papel (-4m) y apertura de nuevo bloque"
+    observaciones: "Corte de papel (-4m)"
   });
-  toast(`✂️ Corte (-4m) aplicado en ${info.bloqueActual}. Nuevo bloque abierto.`);
+  toast(`✂️ Corte de Papel (-4m) aplicado.`);
   await cargarDatosTodo();
 }
 
 async function registrarAvanceOCalibracion(tipoAccion) {
   const info = obtenerRolloPapelActivo();
-  const defMts = tipoAccion === "Calibración" ? "1.0" : "2.0";
-  const m = parseFloat(prompt(`📏 ¿Cuántos metros de papel se consumieron por ${tipoAccion} en el rollo ${info.bloqueActual}?`, defMts));
+  const defMts = tipoAccion === "Calibración" ? "1.0" : "0.50";
+  const m = parseFloat(prompt(`Cantidad de metros a descontar por ${tipoAccion}:`, defMts));
   if (!m || m <= 0) return;
-  const obs = prompt("Motivo / Detalle opcional:", tipoAccion) || tipoAccion;
+  const obs = prompt("Motivo / Obs:", tipoAccion) || tipoAccion;
 
   await sb().from("prod_impresiones").insert({
     empresa_id: "vvgrafic-principal",
@@ -1617,7 +1567,7 @@ async function registrarAvanceOCalibracion(tipoAccion) {
     fecha_hora: new Date().toISOString(),
     id_rollo_papel: info.bloqueActual,
     id_rollo_base: info.idBase,
-    cliente_archivo: `--- ${tipoAccion.toUpperCase()} (-${fmtNum(m)}m) ---`,
+    cliente_archivo: `--- ${tipoAccion.toUpperCase()} ---`,
     accion: tipoAccion,
     metros_impresos: 0,
     metros_desperdicio: m,
@@ -1625,11 +1575,10 @@ async function registrarAvanceOCalibracion(tipoAccion) {
     ruta: "Interno",
     observaciones: obs
   });
-  toast(`✅ ${tipoAccion} (-${fmtNum(m)}m) descontado del rollo ${info.bloqueActual}.`);
+  toast(`✅ ${tipoAccion} (-${fmtNum(m)}m) registrado.`);
   await cargarDatosTodo();
 }
 
-// Finalizar trabajo o rollo entero en Calandrado respetando Fecha Manual (Pedido #3) y pasando el lote anidado a Láser (Pedido #2)
 async function finalizarTrabajoCalandrado(idCal, minutosExtra = 0) {
   const reg = STATE.colaCalandrado.find(c => c.id === idCal);
   if (!reg) return;
@@ -1661,7 +1610,7 @@ async function finalizarTrabajoCalandrado(idCal, minutosExtra = 0) {
     });
   }
 
-  toast(`🔥 Calandrado finalizado con fecha ${fmtDateHora(fechaFinIso)}.`);
+  toast(`✅ Calandrado procesado (${fmtDateHoraLineal(fechaFinIso)}).`);
   await cargarDatosTodo();
 }
 
@@ -1671,11 +1620,10 @@ async function procesarRolloCompletoCalandrado(rolloId) {
 
   const inputFechaManual = document.getElementById("calInputFechaManual")?.value;
   const msgFecha = inputFechaManual
-    ? `con la Fecha Manual seleccionada (${fmtDateHora(new Date(inputFechaManual).toISOString())})`
-    : `con fecha y hora actual`;
+    ? `con la fecha seleccionada (${fmtDateHoraLineal(new Date(inputFechaManual).toISOString())})`
+    : `con fecha actual`;
 
-  if (!confirm(`¿Marcar los ${trabajos.length} trabajo(s) del rollo ${rolloId} como Calandrados ${msgFecha}?`)) return;
-
+  if (!confirm(`¿Procesar los ${trabajos.length} trabajos del rollo ${rolloId} ${msgFecha}?`)) return;
   for (const t of trabajos) {
     await finalizarTrabajoCalandrado(t.id);
   }
@@ -1693,55 +1641,68 @@ async function cortarLoteLaser(idsCsv) {
       fecha_terminado: fechaFinIso
     }).eq("id", id);
   }
-  toast(`⚡ Lote cortado en Láser (${ids.length} registro/s marcados juntos).`);
+  toast(`⚡ Lote cortado en Láser.`);
   await cargarDatosTodo();
 }
 
+function imprimirEtiquetaRollo(loteId, metrosTotales) {
+  const win = window.open("", "_blank", "width=400,height=300");
+  if (!win) return alert("Habilita las ventanas emergentes.");
+  win.document.write(`
+    <html><head><title>Etiqueta ${escHtml(loteId)}</title>
+    <style>@page { size: 100mm 70mm; margin: 0; } body { font-family: sans-serif; margin: 0; padding: 4mm; width: 100mm; height: 70mm; box-sizing: border-box; }</style>
+    </head><body>
+      <h2 style="margin:0 0 6px 0; border-bottom:2px solid #000;">V&V GRAFIC — ${escHtml(loteId)}</h2>
+      <div style="font-size:28pt; font-weight:bold; text-align:center; border:3px solid #000; border-radius:4mm; margin:6px 0;">${escHtml(metrosTotales)} m</div>
+    </body></html>
+  `);
+  setTimeout(() => win.print(), 400);
+}
+
 // ============================================================================
-// MODAL UNIVERSAL CRUD (EDITAR O AGREGAR CUALQUIER REGISTRO EN CUALQUIER MOMENTO)
+// MODAL UNIVERSAL CRUD
 // ============================================================================
 const ESQUEMA_CAMPOS_CRUD = {
   prod_impresiones: [
-    { key: "fecha_hora", label: "Fecha y Hora (ISO o YYYY-MM-DDTHH:mm)", type: "text" },
-    { key: "id_rollo_papel", label: "Bloque / ID Rollo Papel (ej: 29g-1910-1)", type: "text" },
-    { key: "id_rollo_base", label: "ID Rollo Base (ej: 29g-1910-1)", type: "text" },
-    { key: "cliente_archivo", label: "Cliente / Archivo(s)", type: "text" },
+    { key: "fecha_hora", label: "Fecha y Hora", type: "text" },
+    { key: "id_rollo_papel", label: "ID Rollo Papel", type: "text" },
+    { key: "id_rollo_base", label: "ID Rollo Base", type: "text" },
+    { key: "cliente_archivo", label: "Cliente / Archivo", type: "text" },
     { key: "diseno", label: "Diseño", type: "text" },
     { key: "tela_destino", label: "Tela Destino", type: "text" },
-    { key: "num_rollo_tela", label: "Nº Rollo de Tela", type: "text" },
-    { key: "color_tela", label: "Color de Tela", type: "text" },
-    { key: "perfil", label: "Perfil de Impresión", type: "text" },
+    { key: "num_rollo_tela", label: "Nº Rollo", type: "text" },
+    { key: "color_tela", label: "Color", type: "text" },
+    { key: "perfil", label: "Perfil", type: "text" },
     { key: "ruta", label: "Ruta de Producción", type: "text" },
     { key: "metros_impresos", label: "Metros Impresos", type: "number" },
-    { key: "metros_desperdicio", label: "Metros Merma / Desperdicio", type: "number" },
-    { key: "observaciones", label: "Notas / Fallas / Especificaciones", type: "textarea" }
+    { key: "observaciones", label: "Notas / Fallas", type: "textarea" }
   ],
   prod_cola_calandrado: [
     { key: "fecha_hora", label: "Fecha Ingreso", type: "text" },
-    { key: "fecha_terminado", label: "Fecha Terminado (Vacío si está Pendiente)", type: "text" },
-    { key: "id_rollo_papel", label: "Bloque / ID Rollo Papel", type: "text" },
-    { key: "cliente_archivo", label: "Cliente / Archivo(s)", type: "text" },
-    { key: "tela_destino", label: "Tela Destino", type: "text" },
-    { key: "num_rollo_tela", label: "Nº Rollo Tela", type: "text" },
-    { key: "color_tela", label: "Color Tela", type: "text" },
+    { key: "fecha_terminado", label: "Fecha Terminado", type: "text" },
+    { key: "id_rollo_papel", label: "ID Rollo Papel", type: "text" },
+    { key: "cliente_archivo", label: "Cliente / Archivo", type: "text" },
+    { key: "tela_destino", label: "Tela", type: "text" },
+    { key: "num_rollo_tela", label: "Nº Rollo", type: "text" },
+    { key: "color_tela", label: "Color", type: "text" },
     { key: "metros", label: "Metros", type: "number" },
     { key: "perfil", label: "Perfil", type: "text" },
-    { key: "ruta", label: "Ruta de Producción", type: "text" },
+    { key: "ruta", label: "Ruta", type: "text" },
     { key: "estado", label: "Estado (Pendiente / Terminado)", type: "text" },
-    { key: "observaciones", label: "Notas / Especificaciones", type: "textarea" }
+    { key: "observaciones", label: "Notas", type: "textarea" }
   ],
   prod_cola_laser: [
     { key: "fecha_ingreso", label: "Fecha Ingreso", type: "text" },
     { key: "fecha_terminado", label: "Fecha Terminado", type: "text" },
-    { key: "batch_id", label: "ID de Lote Anidado (batch_id)", type: "text" },
-    { key: "id_rollo_papel", label: "ID Rollo / Bloque", type: "text" },
-    { key: "cliente_archivo", label: "Cliente / Archivo(s) (separar anidados con ' | ')", type: "textarea" },
+    { key: "batch_id", label: "ID Lote Anidado (batch_id)", type: "text" },
+    { key: "id_rollo_papel", label: "ID Rollo", type: "text" },
+    { key: "cliente_archivo", label: "Archivos (separar anidados con ' | ')", type: "textarea" },
     { key: "tela_rollo_color", label: "Tela / Rollo / Color", type: "text" },
     { key: "metros", label: "Metros", type: "number" },
-    { key: "velocidad", label: "Velocidad Láser", type: "number" },
-    { key: "poder", label: "Poder Láser (%)", type: "number" },
+    { key: "velocidad", label: "Velocidad", type: "number" },
+    { key: "poder", label: "Poder (%)", type: "number" },
     { key: "estado", label: "Estado (Pendiente / Terminado)", type: "text" },
-    { key: "observaciones", label: "Notas / Especificaciones", type: "textarea" }
+    { key: "observaciones", label: "Notas", type: "textarea" }
   ],
   prod_pendientes_drive: [
     { key: "modulo", label: "Módulo (SUBLIMACION o DTF)", type: "text" },
@@ -1752,29 +1713,25 @@ const ESQUEMA_CAMPOS_CRUD = {
     { key: "tela_detectada", label: "Tela", type: "text" },
     { key: "rollo_detectado", label: "Nº Rollo", type: "text" },
     { key: "color_detectado", label: "Color", type: "text" },
-    { key: "ruta_detectada", label: "Ruta", type: "text" },
     { key: "estado_impreso", label: "Estado Impreso (NO / SI)", type: "text" }
   ],
   prod_dtf_pedidos: [
     { key: "fecha_hora", label: "Fecha y Hora", type: "text" },
     { key: "cliente", label: "Cliente", type: "text" },
-    { key: "nombre_archivo", label: "Nombre de Archivo", type: "text" },
+    { key: "nombre_archivo", label: "Archivo", type: "text" },
     { key: "tipo_cargo", label: "Tipo Cargo (VENTA / REPOSICION / MUESTRA)", type: "text" },
-    { key: "metros_archivo", label: "Metros del Archivo", type: "number" },
-    { key: "precio_metro", label: "Precio por Metro ($)", type: "number" },
-    { key: "subtotal_cobrar", label: "Subtotal a Cobrar ($)", type: "number" },
-    { key: "monto_pagado", label: "Monto Abonado ($)", type: "number" },
-    { key: "modalidad_pago", label: "Modalidad de Pago", type: "text" },
-    { key: "estado_entrega", label: "Estado (Impreso / Entregado)", type: "text" },
-    { key: "observaciones", label: "Notas / Observaciones", type: "textarea" }
+    { key: "metros_archivo", label: "Metros", type: "number" },
+    { key: "precio_metro", label: "Precio / m ($)", type: "number" },
+    { key: "subtotal_cobrar", label: "Total ($)", type: "number" },
+    { key: "monto_pagado", label: "Abonado ($)", type: "number" },
+    { key: "observaciones", label: "Notas", type: "textarea" }
   ],
   prod_dtf_rollos: [
-    { key: "id_rollo_dtf", label: "Código Rollo DTF (ej: DTF-60-003)", type: "text" },
-    { key: "marca_fabricante", label: "Marca / Fabricante", type: "text" },
-    { key: "perfil_impresion", label: "Perfil de Impresión DTF", type: "text" },
-    { key: "metros_iniciales", label: "Metros Iniciales (ej: 100)", type: "number" },
-    { key: "estado", label: "Estado (Activo / En Stock / Terminado)", type: "text" },
-    { key: "observaciones", label: "Observaciones", type: "textarea" }
+    { key: "id_rollo_dtf", label: "Código Rollo DTF", type: "text" },
+    { key: "marca_fabricante", label: "Marca", type: "text" },
+    { key: "perfil_impresion", label: "Perfil", type: "text" },
+    { key: "metros_iniciales", label: "Metros Iniciales", type: "number" },
+    { key: "estado", label: "Estado", type: "text" }
   ]
 };
 
@@ -1799,24 +1756,14 @@ function abrirModalCrudUniversal(tabla, id = null, valoresIniciales = {}) {
 
   const campos = ESQUEMA_CAMPOS_CRUD[tabla] || [];
   const reg = id ? obtenerRegistroMemoria(tabla, id) : valoresIniciales;
-  title.textContent = id ? `✏️ Editar Registro (${tabla})` : `➕ Agregar Registro Manual (${tabla})`;
+  title.textContent = id ? `✏️ Editar Registro (${tabla})` : `➕ Agregar Registro (${tabla})`;
 
   body.innerHTML = campos.map(c => {
     const val = reg && reg[c.key] !== undefined && reg[c.key] !== null ? reg[c.key] : "";
     if (c.type === "textarea") {
-      return `
-        <div>
-          <label>${escHtml(c.label)}</label>
-          <textarea data-crud-key="${c.key}" rows="2">${escHtml(val)}</textarea>
-        </div>
-      `;
+      return `<div><label>${escHtml(c.label)}</label><textarea data-crud-key="${c.key}" rows="2">${escHtml(val)}</textarea></div>`;
     }
-    return `
-      <div>
-        <label>${escHtml(c.label)}</label>
-        <input type="${c.type === "number" ? "number" : "text"}" step="any" data-crud-key="${c.key}" value="${escHtml(val)}"/>
-      </div>
-    `;
+    return `<div><label>${escHtml(c.label)}</label><input type="${c.type === "number" ? "number" : "text"}" step="any" data-crud-key="${c.key}" value="${escHtml(val)}"/></div>`;
   }).join("");
 
   modal.setAttribute("data-crud-table", tabla);
@@ -1845,16 +1792,16 @@ async function guardarModalCrudUniversal() {
 
   if (id) {
     const { error } = await sb().from(tabla).update(payload).eq(pkCol, id);
-    if (error) { toast("Error al actualizar: " + error.message, "error"); return; }
-    toast("✅ Registro actualizado y saldos recalculados.");
+    if (error) { toast("Error: " + error.message, "error"); return; }
+    toast("✅ Registro actualizado.");
   } else {
     payload.empresa_id = "vvgrafic-principal";
     if (tabla === "prod_impresiones" || tabla === "prod_cola_calandrado" || tabla === "prod_cola_laser") {
       if (!payload.batch_id) payload.batch_id = `MANUAL-${Date.now()}`;
     }
     const { error } = await sb().from(tabla).insert(payload);
-    if (error) { toast("Error al crear: " + error.message, "error"); return; }
-    toast("✅ Registro agregado manualmente.");
+    if (error) { toast("Error: " + error.message, "error"); return; }
+    toast("✅ Registro agregado.");
   }
 
   modal.classList.remove("open");
@@ -1862,21 +1809,18 @@ async function guardarModalCrudUniversal() {
 }
 
 async function eliminarRegistroCrudUniversal(tabla, id) {
-  if (!confirm("¿Confirmás eliminar este registro? Los metros y saldos se recalcularán automáticamente.")) return;
+  if (!confirm("¿Confirmás eliminar este registro?")) return;
   const pkCol = tabla === "prod_dtf_rollos" ? "id_rollo_dtf" : tabla === "prod_rollos_papel" ? "id_rollo" : "id";
   const { error } = await sb().from(tabla).delete().eq(pkCol, id);
-  if (error) {
-    toast("Error al eliminar: " + error.message, "error");
-    return;
-  }
-  toast("🗑️ Registro eliminado y saldos actualizados.");
+  if (error) { toast("Error: " + error.message, "error"); return; }
+  toast("🗑️ Registro eliminado.");
   await cargarDatosTodo();
 }
 
 async function editarNotaRapida(tabla, id, batchId) {
   const reg = obtenerRegistroMemoria(tabla, id);
   const actual = reg?.observaciones || "";
-  const nueva = prompt("📝 Escribí o editá la Nota / Especificación / Falla para este trabajo (se verá en todas las áreas):", actual);
+  const nueva = prompt("Escribe la nota u observación (se verá en todas las áreas):", actual);
   if (nueva === null) return;
 
   await sb().from(tabla).update({ observaciones: nueva }).eq("id", id);
@@ -1887,13 +1831,10 @@ async function editarNotaRapida(tabla, id, batchId) {
       sb().from("prod_cola_laser").update({ observaciones: nueva }).eq("batch_id", batchId)
     ]);
   }
-  toast("📝 Nota guardada y sincronizada en toda la ruta del trabajo.");
+  toast("📝 Nota guardada.");
   await cargarDatosTodo();
 }
 
-// ============================================================================
-// KIOSKO OPERATIVO 90dvh Y REPORTE DE FALLAS
-// ============================================================================
 function abrirKioscoCalandra(idCal, rolloId = null) {
   const modal = document.getElementById("modalKioscoOperativo");
   if (!modal) return;
@@ -1912,16 +1853,14 @@ function abrirKioscoCalandra(idCal, rolloId = null) {
   STATE.kiosco.registroIds = trabajos.map(t => t.id);
   STATE.kiosco.inicioMs = Date.now();
 
-  document.getElementById("kioscoTitulo").textContent = `▶️ MODO KIOSKO — ROLLO ${trabajos[0].id_rollo_papel}`;
+  document.getElementById("kioscoTitulo").textContent = `▶️ MODO KIOSKO - ROLLO: ${trabajos[0].id_rollo_papel}`;
   document.getElementById("kioscoSubtitulo").innerHTML = `
-    <div style="font-size:15px;font-weight:800;margin-bottom:8px;color:var(--vg-brand-secondary);">
-      ${trabajos.length} Trabajo(s) | Total: ${fmtNum(totalM)}m
-    </div>
+    <div style="font-size:26px; color:#4CAF50; font-weight:bold; margin-bottom:6px;">${fmtNum(totalM)} m</div>
     ${trabajos.map(t => `
-      <div style="padding:8px;background:var(--vg-surface-input);border:1px solid var(--vg-border-subtle);border-radius:6px;margin-bottom:6px;font-size:12px;">
-        <strong>${escHtml(t.cliente_archivo)}</strong> — <span class="font-mono" style="color:var(--vg-status-ready);">${fmtNum(t.metros)}m</span>
-        | Tela: <strong>${escHtml(t.tela_destino || "-")}</strong> (${escHtml(t.num_rollo_tela || "-")})
-        ${t.observaciones ? `<div style="margin-top:4px;color:var(--vg-status-processing);font-weight:700;">📝 ${escHtml(t.observaciones)}</div>` : ""}
+      <div style="background:#1a1c23; padding:10px; border-radius:6px; border:1px solid #333; margin-bottom:6px; font-size:13px;">
+        <div><strong>Archivo:</strong> ${escHtml(t.cliente_archivo)}</div>
+        <div><strong>Tela:</strong> <span style="color:#2196F3; font-weight:bold;">${escHtml(t.tela_destino || "-")}</span> | <strong>Rollo:</strong> ${escHtml(t.num_rollo_tela || "-")}</div>
+        ${t.observaciones ? `<div style="color:#ff9800; font-weight:bold; margin-top:4px;">Obs: ${escHtml(t.observaciones)}</div>` : ""}
       </div>
     `).join("")}
   `;
@@ -1949,9 +1888,9 @@ function abrirKioscoCalandra(idCal, rolloId = null) {
 async function reportarFallaConReposicion(reg, estacion) {
   if (!reg) return;
   const mDefault = reg.metros || reg.metros_impresos || 10;
-  const metrosFalla = parseFloat(prompt(`⚠️ ¿Cuántos metros salieron con falla en "${reg.cliente_archivo}"?`, mDefault)) || 0;
+  const metrosFalla = parseFloat(prompt(`¿Cuántos metros salieron con falla en "${reg.cliente_archivo}"?`, mDefault)) || 0;
   if (metrosFalla <= 0) return;
-  const motivo = prompt("Describí el motivo de la falla (ej: Mancha, arruga, corte):", `Falla en ${estacion}`) || `Falla en ${estacion}`;
+  const motivo = prompt("Motivo de la falla:", `Falla en ${estacion}`) || `Falla en ${estacion}`;
 
   await sb().from("prod_fallas_reposiciones").insert({
     empresa_id: "vvgrafic-principal",
@@ -1962,7 +1901,7 @@ async function reportarFallaConReposicion(reg, estacion) {
     archivo_afectado: reg.cliente_archivo,
     tela: reg.tela_destino,
     metros_merma: metrosFalla,
-    detalle_reposicion: `Reimprimir ${metrosFalla}m por falla en ${estacion}`,
+    detalle_reposicion: `Reimprimir ${metrosFalla}m`,
     motivo,
     estado: "Pendiente"
   });
@@ -1970,7 +1909,7 @@ async function reportarFallaConReposicion(reg, estacion) {
   await sb().from("prod_pendientes_drive").insert({
     empresa_id: "vvgrafic-principal",
     modulo: "SUBLIMACION",
-    cliente: `🚨 REPOSICIÓN ${estacion.toUpperCase()}`,
+    cliente: `REPOSICIÓN ${estacion.toUpperCase()}`,
     nombre_archivo: `[REPO URGENTE] ${reg.cliente_archivo}`,
     medida_unitaria: metrosFalla,
     repeticiones: 1,
@@ -1985,15 +1924,14 @@ async function reportarFallaConReposicion(reg, estacion) {
     file_id: `REPO-${Date.now()}`
   });
 
-  toast(`🚨 Falla registrada y orden de reposición (${fmtNum(metrosFalla)}m) enviada a Cola Pendiente.`, "warn");
+  toast(`⚠️ Falla registrada y reposición enviada a Cola Pendiente.`, "warn");
   await cargarDatosTodo();
 }
 
 // ============================================================================
-// INICIALIZACIÓN DE EVENTOS DE INTERFAZ
+// INICIALIZACIÓN DE EVENTOS
 // ============================================================================
 export function inicializarEventosUI() {
-  // Cargar Logo Oficial V&V Grafic
   const imgLogo = document.getElementById("imgLogoVV");
   if (imgLogo && window.VG_LOGO_B64) {
     imgLogo.src = window.VG_LOGO_B64.startsWith("data:")
@@ -2001,7 +1939,6 @@ export function inicializarEventosUI() {
       : `data:image/png;base64,${window.VG_LOGO_B64}`;
   }
 
-  // 1. Navegación de Pestañas (.tab-btn y .tab-content)
   document.querySelectorAll(".tab-btn[data-tab]").forEach(btn => {
     btn.addEventListener("click", () => {
       const tab = btn.getAttribute("data-tab");
@@ -2013,11 +1950,10 @@ export function inicializarEventosUI() {
     });
   });
 
-  // 2. Filtros de Período Temporal (Histórico, Hoy, Día Anterior/Ayer, Esta Semana, Semana Anterior, Este Mes, Rango)
   document.querySelectorAll(".vg-period-pill[data-period]").forEach(btn => {
     btn.addEventListener("click", () => {
       STATE.periodoActivo = btn.getAttribute("data-period");
-      document.querySelectorAll(".vg-period-pill[data-period]").forEach(b => b.classList.toggle("mru-top", b === btn));
+      document.querySelectorAll(".vg-period-pill[data-period]").forEach(b => b.classList.toggle("activo", b === btn));
       renderTodoRespetandoFormulario();
     });
   });
@@ -2028,13 +1964,11 @@ export function inicializarEventosUI() {
     STATE.fechaDesde = inpDesde?.value || "";
     STATE.fechaHasta = inpHasta?.value || "";
     STATE.periodoActivo = "custom";
-    document.querySelectorAll(".vg-period-pill[data-period]").forEach(b => b.classList.remove("mru-top"));
+    document.querySelectorAll(".vg-period-pill[data-period]").forEach(b => b.classList.remove("activo"));
     renderTodoRespetandoFormulario();
   };
   document.getElementById("btnCalcularRango")?.addEventListener("click", aplicarRangoCustom);
-  [inpDesde, inpHasta].forEach(inp => inp?.addEventListener("change", aplicarRangoCustom));
 
-  // 3. Buscador Universal Instantáneo (OmniSearch) y Buscadores Locales
   const omniInput = document.getElementById("vgOmniSearchInput");
   const omniClear = document.getElementById("vgOmniSearchClear");
   omniInput?.addEventListener("input", () => {
@@ -2051,12 +1985,15 @@ export function inicializarEventosUI() {
     STATE.filtroPendientesLocal = e.target.value;
     renderPendientesDriveSublimacion();
   });
+  document.getElementById("searchHistorialImpLocal")?.addEventListener("input", (e) => {
+    STATE.filtroHistorialImpLocal = e.target.value;
+    renderTablaImpresionesConBloques();
+  });
   document.getElementById("searchCalandraLocal")?.addEventListener("input", (e) => {
     STATE.filtroCalandraLocal = e.target.value;
     renderModuloCalandrado();
   });
 
-  // 4. Protección Dirty-Form en inputs de Impresión (Pedido #7)
   ["metrosLote", "perfil", "tela", "rolloTela", "color", "diseno", "observaciones"].forEach(campo => {
     const el = document.getElementById(`impInput_${campo}`);
     if (el) {
@@ -2068,7 +2005,6 @@ export function inicializarEventosUI() {
     }
   });
 
-  // 5. Botones Táctiles de Ruta de Producción (Pedido #4)
   document.querySelectorAll(".vg-route-btn[data-ruta-val]").forEach(btn => {
     btn.addEventListener("click", () => {
       STATE.impForm.dirty = true;
@@ -2077,7 +2013,6 @@ export function inicializarEventosUI() {
     });
   });
 
-  // 6. Acciones de Impresión y Botones de Rollo (+ Rollo Nuevo, Corte -4m, Avance, Calibración, Sobrantes)
   document.getElementById("btnConfirmarImpresion")?.addEventListener("click", procesarImpresionLote);
   document.getElementById("btnCortarPapel4m")?.addEventListener("click", cortarBloquePapel4m);
   document.getElementById("btnAvanceManual")?.addEventListener("click", () => registrarAvanceOCalibracion("Avance Manual"));
@@ -2109,11 +2044,10 @@ export function inicializarEventosUI() {
       observaciones: obs
     });
     document.getElementById("modalMontarRollo")?.classList.remove("open");
-    toast(`🧻 Nuevo rollo ${nuevoId} (${metros}m) montado y activo.`);
+    toast(`🧻 Rollo ${nuevoId} montado.`);
     await cargarDatosTodo();
   });
 
-  // 7. Calandrado: Orden y Previsión de Telas
   document.getElementById("btnOrdenCalandra")?.addEventListener("click", (e) => {
     STATE.ordenCalandraAsc = !STATE.ordenCalandraAsc;
     e.currentTarget.textContent = STATE.ordenCalandraAsc
@@ -2127,7 +2061,16 @@ export function inicializarEventosUI() {
     if (p) p.style.display = p.style.display === "none" ? "block" : "none";
   });
 
-  // 8. Lector Binario Real de DPI y Geometría de Archivos
+  document.getElementById("btnSyncDriveSandbox")?.addEventListener("click", async () => {
+    const url = window.VG_CONEXION?.sandboxBridgeUrl;
+    toast("Sincronizando...");
+    if (url) {
+      try { await fetch(`${url}?action=sync_drive`, { mode: "no-cors" }); } catch (_) {}
+    }
+    await cargarDatosTodo();
+    toast("✅ Sincronizado.");
+  });
+
   const inpFileDpi = document.getElementById("inpInspectorArchivosLocales");
   inpFileDpi?.addEventListener("change", async (e) => {
     const files = Array.from(e.target.files || []);
@@ -2141,7 +2084,6 @@ export function inicializarEventosUI() {
       const parsed = parsearNombreArchivoInteligente(f.name, "CARGA LOCAL", catObj);
       const geo = await leerGeometriaRealArchivo(f);
       const metrosFinal = parsed.metrosTotales > 0 ? parsed.metrosTotales : geo.metrosDpiReal || 1.0;
-      const discrepancia = parsed.metrosTotales > 0 && geo.metrosDpiReal > 0 && Math.abs(parsed.metrosTotales - geo.metrosDpiReal) > 0.15;
 
       await sb().from("prod_pendientes_drive").upsert({
         empresa_id: "vvgrafic-principal",
@@ -2153,92 +2095,26 @@ export function inicializarEventosUI() {
         metros_totales: metrosFinal,
         metros_dpi_real: geo.metrosDpiReal || metrosFinal,
         dpi_detectado: geo.dpiDetectado,
-        discrepancia_medida: discrepancia,
         perfil_detectado: parsed.perfil,
         tela_detectada: parsed.tela,
         rollo_detectado: parsed.rollo,
         color_detectado: parsed.color,
         ruta_detectada: parsed.ruta,
-        es_repo_muestra: parsed.tipoCargo === "VENTA" ? "" : parsed.tipoCargo,
         estado_impreso: "NO",
         file_id: `LOCAL-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
       }, { onConflict: "file_id" });
     }
-    toast(`🔬 ${files.length} archivo(s) analizados por nombre y cabecera binaria DPI.`);
+    toast(`🔬 ${files.length} archivo(s) cargados.`);
     await cargarDatosTodo();
-  });
-
-  // 9. Sincronizar con Google Drive real (Solo Lectura vía Puente Sandbox)
-  document.getElementById("btnSyncDriveSandbox")?.addEventListener("click", async () => {
-    const url = window.VG_CONEXION?.sandboxBridgeUrl;
-    toast("🔄 Sincronizando cola de impresión...");
-    if (url) {
-      try {
-        await fetch(`${url}?action=sync_drive`, { mode: "no-cors" });
-      } catch (_) {}
-    }
-    await cargarDatosTodo();
-    toast("✅ Cola sincronizada.");
-  });
-
-  // 10. Módulo DTF: Calculadora en vivo y Registro de Pedido / Tirada
-  const dtfMetrosInp = document.getElementById("dtfInputMetrosArchivo");
-  const dtfCargoSel = document.getElementById("dtfInputTipoCargo");
-  const dtfArchivoInp = document.getElementById("dtfInputArchivo");
-  const dtfClienteInp = document.getElementById("dtfInputCliente");
-
-  const recalcularPreviewDTF = () => {
-    const m = parseFloat(dtfMetrosInp?.value) || 0;
-    const cargo = dtfCargoSel?.value || "VENTA";
-    const nom = dtfArchivoInp?.value || "";
-    const cli = dtfClienteInp?.value || "";
-
-    let cargoEfectivo = cargo;
-    if (/\(\s*repo(?:sicion|sición)?\s*\)|\brepo\b/i.test(nom)) {
-      cargoEfectivo = "REPOSICION";
-      if (dtfCargoSel) dtfCargoSel.value = "REPOSICION";
-    } else if (/\(\s*muestra\s*\)|\bmuestra\b/i.test(nom)) {
-      cargoEfectivo = "MUESTRA";
-      if (dtfCargoSel) dtfCargoSel.value = "MUESTRA";
-    }
-
-    const precioMetro = calcularPrecioMetroDTF(m, cargoEfectivo);
-    const subtotal = cargoEfectivo === "VENTA" ? m * precioMetro : 0;
-    const previewEl = document.getElementById("dtfPrecioPreviewBox");
-    if (previewEl) {
-      previewEl.innerHTML = `
-        Tarifa aplicada: <strong>${fmtMoney(precioMetro)}/m</strong> (${cargoEfectivo})
-        → Total a cobrar: <strong style="font-size:15px;color:var(--vg-status-ready);">${fmtMoney(subtotal)}</strong>
-      `;
-    }
-
-    const dupAlert = document.getElementById("dtfDuplicateAlert");
-    if (dupAlert && nom.trim().length > 3) {
-      const yaExiste = STATE.dtfPedidos.find(p =>
-        p.nombre_archivo.toLowerCase() === nom.trim().toLowerCase() &&
-        (!cli || p.cliente.toLowerCase() === cli.trim().toLowerCase())
-      );
-      if (yaExiste && cargoEfectivo === "VENTA") {
-        dupAlert.style.display = "block";
-        dupAlert.innerHTML = `⚠️ <strong>ALERTA DE DUPLICADO:</strong> "${escHtml(nom)}" ya fue impreso el ${fmtDateHora(yaExiste.fecha_hora)}. Si es reposición, agregale <code>(repo)</code>.`;
-      } else {
-        dupAlert.style.display = "none";
-      }
-    }
-  };
-
-  [dtfMetrosInp, dtfCargoSel, dtfArchivoInp, dtfClienteInp].forEach(el => {
-    el?.addEventListener("input", recalcularPreviewDTF);
-    el?.addEventListener("change", recalcularPreviewDTF);
   });
 
   document.getElementById("btnRegistrarPedidoDTF")?.addEventListener("click", async () => {
-    const cliente = dtfClienteInp?.value.trim() || "CLIENTE DTF";
-    const archivo = dtfArchivoInp?.value.trim() || "Archivo DTF.png";
-    const metrosArch = parseFloat(dtfMetrosInp?.value) || 1;
+    const cliente = document.getElementById("dtfInputCliente")?.value.trim() || "CLIENTE DTF";
+    const archivo = document.getElementById("dtfInputArchivo")?.value.trim() || "Archivo DTF.png";
+    const metrosArch = parseFloat(document.getElementById("dtfInputMetrosArchivo")?.value) || 1;
     const metrosRollo = parseFloat(document.getElementById("dtfInputMetrosRolloFisico")?.value) || metrosArch;
     const idRollo = document.getElementById("dtfInputRollo")?.value || "DTF-60-001";
-    const cargo = dtfCargoSel?.value || "VENTA";
+    const cargo = document.getElementById("dtfInputTipoCargo")?.value || "VENTA";
     const pagado = parseFloat(document.getElementById("dtfInputMontoPagado")?.value) || 0;
     const modalidad = document.getElementById("dtfInputModalidadPago")?.value || "Paga al retirar";
     const obs = document.getElementById("dtfInputObs")?.value.trim() || "";
@@ -2271,31 +2147,17 @@ export function inicializarEventosUI() {
       observaciones: obs
     });
 
-    toast(`🎞️ Trabajo DTF registrado (${fmtNum(metrosArch)}m).`);
-    if (dtfArchivoInp) dtfArchivoInp.value = "";
+    toast(`✅ Trabajo DTF registrado.`);
     await cargarDatosTodo();
   });
 
-  // 11. Finanzas: Guardar Compra de Insumo
-  document.getElementById("btnGuardarCompraFinanzas")?.addEventListener("click", () => {
-    const tipo = document.getElementById("finCompraTipo")?.value || "Insumo";
-    const det = document.getElementById("finCompraDetalle")?.value || "";
-    const cant = document.getElementById("finCompraCant")?.value || 1;
-    const costo = document.getElementById("finCompraCosto")?.value || 0;
-    toast(`🛒 Compra registrada: ${cant}x ${tipo} (${det}) — ${fmtMoney(costo)}`);
-  });
-
-  // 12. Chat Interno de Taller
   const inpFotoChat = document.getElementById("chatInputFotoCamara");
   inpFotoChat?.addEventListener("change", async (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
     STATE.chatFotoBase64 = await comprimirFotoCamaraWebP(f);
     const prev = document.getElementById("chatFotoPreviewBadge");
-    if (prev) {
-      prev.style.display = "inline-flex";
-      prev.textContent = "📷 Foto WebP lista";
-    }
+    if (prev) { prev.style.display = "inline-block"; prev.textContent = "📷 Foto lista"; }
   });
 
   document.getElementById("btnEnviarMensajeChat")?.addEventListener("click", async () => {
@@ -2312,7 +2174,6 @@ export function inicializarEventosUI() {
       trabId = parts[1] || "";
       trabEtiq = parts[2] || "";
     }
-
     const miembros = STATE.catalogos.filter(c => c.tipo === "EQUIPO").map(c => c.nombre);
     const menciones = miembros.filter(m => texto.toLowerCase().includes(`@${m.toLowerCase()}`));
 
@@ -2325,41 +2186,25 @@ export function inicializarEventosUI() {
       trabajo_id: trabId,
       trabajo_etiqueta: trabEtiq,
       trabajo_modulo: trabMod,
-      mensaje: texto || "📷 Foto adjunta de taller",
+      mensaje: texto || "📷 Foto adjunta",
       foto_base64: STATE.chatFotoBase64 || ""
     });
-
-    if (trabId && trabMod === "IMP") {
-      const impRow = STATE.impresiones.find(i => i.batch_id === trabId);
-      const obsPrev = impRow?.observaciones ? impRow.observaciones + " | " : "";
-      const nuevaObs = `${obsPrev}💬 [${STATE.usuarioActual}]: ${texto}`;
-      await Promise.all([
-        sb().from("prod_impresiones").update({ observaciones: nuevaObs }).eq("batch_id", trabId),
-        sb().from("prod_cola_calandrado").update({ observaciones: nuevaObs }).eq("batch_id", trabId),
-        sb().from("prod_cola_laser").update({ observaciones: nuevaObs }).eq("batch_id", trabId)
-      ]);
-    }
 
     if (inp) inp.value = "";
     STATE.chatFotoBase64 = "";
     const prev = document.getElementById("chatFotoPreviewBadge");
     if (prev) prev.style.display = "none";
-    toast("💬 Mensaje enviado al taller.");
+    toast("💬 Mensaje enviado.");
     await cargarDatosTodo();
   });
 
-  // 13. Delegación global de clics en tablas y tarjetas
   document.body.addEventListener("click", async (e) => {
     const btnEdit = e.target.closest(".btn-crud-edit");
-    if (btnEdit) {
-      abrirModalCrudUniversal(btnEdit.getAttribute("data-table"), btnEdit.getAttribute("data-id"));
-      return;
-    }
+    if (btnEdit) { abrirModalCrudUniversal(btnEdit.getAttribute("data-table"), btnEdit.getAttribute("data-id")); return; }
+
     const btnDel = e.target.closest(".btn-crud-del");
-    if (btnDel) {
-      eliminarRegistroCrudUniversal(btnDel.getAttribute("data-table"), btnDel.getAttribute("data-id"));
-      return;
-    }
+    if (btnDel) { eliminarRegistroCrudUniversal(btnDel.getAttribute("data-table"), btnDel.getAttribute("data-id")); return; }
+
     const btnAddManual = e.target.closest(".btn-crud-add");
     if (btnAddManual) {
       abrirModalCrudUniversal(btnAddManual.getAttribute("data-table"), null, {
@@ -2373,59 +2218,57 @@ export function inicializarEventosUI() {
       });
       return;
     }
+
     const btnNota = e.target.closest(".btn-nota-rapida");
-    if (btnNota) {
-      editarNotaRapida(btnNota.getAttribute("data-table"), btnNota.getAttribute("data-id"), btnNota.getAttribute("data-batch"));
-      return;
-    }
+    if (btnNota) { editarNotaRapida(btnNota.getAttribute("data-table"), btnNota.getAttribute("data-id"), btnNota.getAttribute("data-batch")); return; }
+
+    const btnEtiqueta = e.target.closest(".btn-imp-etiqueta");
+    if (btnEtiqueta) { imprimirEtiquetaRollo(btnEtiqueta.getAttribute("data-rollo"), btnEtiqueta.getAttribute("data-metros")); return; }
+
     const btnPuchito = e.target.closest(".btn-activar-puchito");
     if (btnPuchito) {
       const rId = btnPuchito.getAttribute("data-rollo");
       await sb().from("prod_rollos_papel").update({ estado: "Sobrante" }).eq("estado", "Activo");
       await sb().from("prod_rollos_papel").update({ estado: "Activo" }).eq("id_rollo", rId);
-      toast(`🧻 Sobrante ${rId} montado como Rollo Activo.`);
+      toast(`🧻 Sobrante ${rId} re-montado.`);
       await cargarDatosTodo();
       return;
     }
+
     const btnImpFalla = e.target.closest(".btn-imp-falla");
     if (btnImpFalla) {
       const reg = STATE.impresiones.find(i => i.id === btnImpFalla.getAttribute("data-id"));
       reportarFallaConReposicion(reg, "Impresión");
       return;
     }
+
     const btnImpDeshacer = e.target.closest(".btn-imp-deshacer");
     if (btnImpDeshacer) {
       const reg = STATE.impresiones.find(i => i.id === btnImpDeshacer.getAttribute("data-id"));
-      if (reg && confirm(`¿Deshacer la impresión "${reg.cliente_archivo}" y descontarla del rollo?`)) {
+      if (reg && confirm("¿Deshacer impresión?")) {
         await sb().from("prod_impresiones").delete().eq("id", reg.id);
-        if (reg.batch_id) {
-          await sb().from("prod_cola_calandrado").delete().eq("batch_id", reg.batch_id);
-        }
-        toast("🔙 Impresión deshecha y saldos recalculados.");
+        if (reg.batch_id) await sb().from("prod_cola_calandrado").delete().eq("batch_id", reg.batch_id);
         await cargarDatosTodo();
       }
       return;
     }
+
     const btnCalMontarRollo = e.target.closest(".btn-cal-montar-rollo");
     if (btnCalMontarRollo) {
       const rId = btnCalMontarRollo.getAttribute("data-rollo");
       STATE.rolloMontadoCalandra = STATE.rolloMontadoCalandra === rId ? "" : rId;
       localStorage.setItem("vg_rollo_calandra_montado", STATE.rolloMontadoCalandra);
       STATE.rollosCalandraAbiertos.add(rId);
-      toast(`🔥 Rollo ${rId} marcado como montado en Calandra.`);
       renderModuloCalandrado();
       return;
     }
+
     const btnCalKioscoRollo = e.target.closest(".btn-cal-kiosco-rollo");
-    if (btnCalKioscoRollo) {
-      abrirKioscoCalandra(null, btnCalKioscoRollo.getAttribute("data-rollo"));
-      return;
-    }
+    if (btnCalKioscoRollo) { abrirKioscoCalandra(null, btnCalKioscoRollo.getAttribute("data-rollo")); return; }
+
     const btnCalProcRollo = e.target.closest(".btn-cal-procesar-rollo");
-    if (btnCalProcRollo) {
-      procesarRolloCompletoCalandrado(btnCalProcRollo.getAttribute("data-rollo"));
-      return;
-    }
+    if (btnCalProcRollo) { procesarRolloCompletoCalandrado(btnCalProcRollo.getAttribute("data-rollo")); return; }
+
     const btnCalPdfRollo = e.target.closest(".btn-cal-pdf-rollo");
     if (btnCalPdfRollo) {
       const rId = btnCalPdfRollo.getAttribute("data-rollo");
@@ -2434,71 +2277,47 @@ export function inicializarEventosUI() {
       window.print();
       return;
     }
+
     const btnCalTerm = e.target.closest(".btn-cal-terminar");
-    if (btnCalTerm) {
-      finalizarTrabajoCalandrado(btnCalTerm.getAttribute("data-id"));
-      return;
-    }
+    if (btnCalTerm) { finalizarTrabajoCalandrado(btnCalTerm.getAttribute("data-id")); return; }
+
     const btnCalReabrir = e.target.closest(".btn-cal-reabrir");
     if (btnCalReabrir) {
       await sb().from("prod_cola_calandrado").update({ estado: "Pendiente", fecha_terminado: null }).eq("id", btnCalReabrir.getAttribute("data-id"));
-      toast("🔙 Trabajo devuelto a la Cola de Calandrado.");
       await cargarDatosTodo();
       return;
     }
+
     const btnCalKiosco = e.target.closest(".btn-cal-kiosco");
-    if (btnCalKiosco) {
-      abrirKioscoCalandra(btnCalKiosco.getAttribute("data-id"));
-      return;
-    }
+    if (btnCalKiosco) { abrirKioscoCalandra(btnCalKiosco.getAttribute("data-id")); return; }
+
     const btnCalFalla = e.target.closest(".btn-cal-falla");
     if (btnCalFalla) {
       const reg = STATE.colaCalandrado.find(c => c.id === btnCalFalla.getAttribute("data-id"));
       reportarFallaConReposicion(reg, "Calandrado");
       return;
     }
+
     const btnLasCorte = e.target.closest(".btn-laser-cortar-lote");
-    if (btnLasCorte) {
-      cortarLoteLaser(btnLasCorte.getAttribute("data-ids"));
-      return;
-    }
+    if (btnLasCorte) { cortarLoteLaser(btnLasCorte.getAttribute("data-ids")); return; }
+
     const btnDtfSaldar = e.target.closest(".btn-dtf-saldar");
     if (btnDtfSaldar) {
       const id = btnDtfSaldar.getAttribute("data-id");
       const tot = parseFloat(btnDtfSaldar.getAttribute("data-total")) || 0;
       await sb().from("prod_dtf_pedidos").update({ monto_pagado: tot, estado_entrega: "Entregado" }).eq("id", id);
-      toast("💵 Pago registrado y saldo actualizado.");
       await cargarDatosTodo();
       return;
     }
+
     const btnDtfPend = e.target.closest(".btn-dtf-cargar-pend");
     if (btnDtfPend) {
       const p = STATE.pendientesDrive.find(x => x.id === btnDtfPend.getAttribute("data-id"));
       if (p) {
-        if (dtfClienteInp) dtfClienteInp.value = p.cliente;
-        if (dtfArchivoInp) dtfArchivoInp.value = p.nombre_archivo;
-        if (dtfMetrosInp) dtfMetrosInp.value = p.metros_totales;
-        if (dtfCargoSel) dtfCargoSel.value = p.es_repo_muestra || "VENTA";
-        recalcularPreviewDTF();
-        toast("📋 Archivo cargado en el formulario DTF.");
+        document.getElementById("dtfInputCliente").value = p.cliente;
+        document.getElementById("dtfInputArchivo").value = p.nombre_archivo;
+        document.getElementById("dtfInputMetrosArchivo").value = p.metros_totales;
       }
-      return;
-    }
-    const btnChatTag = e.target.closest(".btn-chat-tag-job");
-    if (btnChatTag) {
-      const id = btnChatTag.getAttribute("data-id");
-      const label = btnChatTag.getAttribute("data-label");
-      document.querySelector('.tab-btn[data-tab="chat"]')?.click();
-      const sel = document.getElementById("chatSelectTrabajo");
-      if (sel) {
-        const optVal = `IMP|${id}|${label}`;
-        const opt = document.createElement("option");
-        opt.value = optVal;
-        opt.textContent = `🔗 #${label}`;
-        sel.appendChild(opt);
-        sel.value = optVal;
-      }
-      document.getElementById("chatInputMensaje")?.focus();
       return;
     }
   });
@@ -2524,7 +2343,7 @@ export function inicializarEventosUI() {
   document.querySelectorAll(".btn-canal-chat").forEach(btn => {
     btn.addEventListener("click", () => {
       STATE.canalChatActivo = btn.getAttribute("data-canal");
-      document.querySelectorAll(".btn-canal-chat").forEach(b => b.classList.toggle("mru-top", b === btn));
+      document.querySelectorAll(".btn-canal-chat").forEach(b => b.classList.toggle("activo", b === btn));
       renderModuloChat();
     });
   });
