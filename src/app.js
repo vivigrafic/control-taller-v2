@@ -895,16 +895,16 @@ function renderModuloCalandrado() {
 
       html += `
         <div class="rollo-card">
-          <div ${headerStyle} data-toggle-rollo="${escHtml(lote)}">
+          <div ${headerStyle} data-toggle-rollo="${escHtml(lote)}" style="cursor:pointer;">
             <div style="flex:1;">
               <div style="font-size:14px; font-weight:bold; color:var(--accent); margin-bottom:4px;">${escHtml(lote)}${badgeHTML}${countBadge}</div>
               <div style="font-size:11px; color:#ccc;">Total a procesar: <strong style="color:#fff; font-size:13px;">${fmtNum(totalMts)}m</strong></div>
             </div>
-            <div style="display:flex; flex-wrap:wrap; justify-content:flex-end; gap:5px;" onclick="event.stopPropagation();">
+            <div style="display:flex; flex-wrap:wrap; justify-content:flex-end; gap:5px;">
               ${btnAccion}${procesarBtn}${pdfBtn}
             </div>
           </div>
-          <div class="rollo-body ${isAbierto ? "open" : ""}">
+          <div id="body_rollo_${escHtml(lote)}" class="rollo-body ${isAbierto ? "open" : ""}">
             <table class="tabla-normal" style="width:100%; min-width:500px;">
               <thead>
                 <tr>
@@ -924,12 +924,12 @@ function renderModuloCalandrado() {
                 ${items.map(c => `
                   <tr>
                     <td style="white-space:nowrap;">
-                      <button type="button" class="btn-secondary btn-cal-terminar" data-id="${c.id}" style="width:auto; padding:5px 8px; border-color:var(--accent); color:var(--accent);">✅ Hecho</button>
-                      <button type="button" class="btn-secondary btn-cal-kiosco" data-id="${c.id}" style="width:auto; padding:5px 8px;">▶️</button>
-                      <button type="button" class="btn-secondary btn-cal-falla" data-id="${c.id}" style="width:auto; padding:5px 8px; border-color:var(--danger); color:var(--danger);">⚠️</button>
-                      <button type="button" class="btn-secondary btn-nota-rapida" data-table="prod_cola_calandrado" data-id="${c.id}" data-batch="${escHtml(c.batch_id)}" style="width:auto; padding:5px 8px;">📝</button>
-                      <button type="button" class="btn-secondary btn-crud-edit" data-table="prod_cola_calandrado" data-id="${c.id}" style="width:auto; padding:5px 8px;">✏️</button>
-                      <button type="button" class="btn-secondary btn-crud-del" data-table="prod_cola_calandrado" data-id="${c.id}" style="width:auto; padding:5px 8px;">🗑️</button>
+                      <button type="button" class="btn-secondary btn-cal-terminar" data-id="${c.id}" style="width:auto; padding:5px 8px; border-color:var(--accent); color:var(--accent); cursor:pointer;">✅ Hecho</button>
+                      <button type="button" class="btn-secondary btn-cal-kiosco" data-id="${c.id}" style="width:auto; padding:5px 8px; cursor:pointer;">▶️</button>
+                      <button type="button" class="btn-secondary btn-cal-falla" data-id="${c.id}" style="width:auto; padding:5px 8px; border-color:var(--danger); color:var(--danger); cursor:pointer;">⚠️</button>
+                      <button type="button" class="btn-secondary btn-nota-rapida" data-table="prod_cola_calandrado" data-id="${c.id}" data-batch="${escHtml(c.batch_id)}" style="width:auto; padding:5px 8px; cursor:pointer;">📝</button>
+                      <button type="button" class="btn-secondary btn-crud-edit" data-table="prod_cola_calandrado" data-id="${c.id}" style="width:auto; padding:5px 8px; cursor:pointer;">✏️</button>
+                      <button type="button" class="btn-secondary btn-crud-del" data-table="prod_cola_calandrado" data-id="${c.id}" style="width:auto; padding:5px 8px; cursor:pointer;">🗑️</button>
                     </td>
                     <td>${fmtDateHora(c.fecha_hora)}</td>
                     <td>${formatearAnidadosHTML(c.cliente_archivo)}</td>
@@ -950,12 +950,76 @@ function renderModuloCalandrado() {
     }
     contRollos.innerHTML = html;
 
-    contRollos.querySelectorAll(".rollo-header[data-toggle-rollo]").forEach(hdr => {
-      hdr.addEventListener("click", () => {
-        const rId = hdr.getAttribute("data-toggle-rollo");
-        if (STATE.rollosCalandraAbiertos.has(rId)) STATE.rollosCalandraAbiertos.delete(rId);
-        else STATE.rollosCalandraAbiertos.add(rId);
+    // Listeners directos inmediatos e inmunes a bubbling
+    contRollos.querySelectorAll(".btn-cal-montar-rollo").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const rId = btn.getAttribute("data-rollo");
+        STATE.rolloMontadoCalandra = STATE.rolloMontadoCalandra === rId ? "" : rId;
+        localStorage.setItem("vg_rollo_calandra_montado", STATE.rolloMontadoCalandra);
+        STATE.rollosCalandraAbiertos.add(rId);
         renderModuloCalandrado();
+      });
+    });
+
+    contRollos.querySelectorAll(".btn-cal-procesar-rollo").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const rId = btn.getAttribute("data-rollo");
+        procesarRolloCompletoCalandrado(rId);
+      });
+    });
+
+    contRollos.querySelectorAll(".btn-cal-pdf-rollo").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const rId = btn.getAttribute("data-rollo");
+        STATE.rollosCalandraAbiertos.add(rId);
+        renderModuloCalandrado();
+        setTimeout(() => window.print(), 200);
+      });
+    });
+
+    contRollos.querySelectorAll(".btn-cal-kiosco-rollo").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const rId = btn.getAttribute("data-rollo");
+        abrirKioscoCalandra(null, rId);
+      });
+    });
+
+    contRollos.querySelectorAll(".btn-cal-terminar").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        finalizarTrabajoCalandrado(btn.getAttribute("data-id"));
+      });
+    });
+
+    contRollos.querySelectorAll(".btn-cal-kiosco").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        abrirKioscoCalandra(btn.getAttribute("data-id"));
+      });
+    });
+
+    contRollos.querySelectorAll(".btn-cal-falla").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const reg = STATE.colaCalandrado.find(c => c.id === btn.getAttribute("data-id"));
+        reportarFallaConReposicion(reg, "Calandrado");
+      });
+    });
+
+    contRollos.querySelectorAll(".rollo-header[data-toggle-rollo]").forEach(hdr => {
+      hdr.addEventListener("click", (e) => {
+        if (e.target.closest("button")) return;
+        const rId = hdr.getAttribute("data-toggle-rollo");
+        const bodyEl = document.getElementById(`body_rollo_${rId}`);
+        if (bodyEl) {
+          bodyEl.classList.toggle("open");
+          if (bodyEl.classList.contains("open")) STATE.rollosCalandraAbiertos.add(rId);
+          else STATE.rollosCalandraAbiertos.delete(rId);
+        }
       });
     });
   }
@@ -1579,7 +1643,7 @@ async function registrarAvanceOCalibracion(tipoAccion) {
   await cargarDatosTodo();
 }
 
-async function finalizarTrabajoCalandrado(idCal, minutosExtra = 0) {
+async function finalizarTrabajoCalandrado(idCal, minutosExtra = 0, skipReload = false) {
   const reg = STATE.colaCalandrado.find(c => c.id === idCal);
   if (!reg) return;
 
@@ -1592,10 +1656,11 @@ async function finalizarTrabajoCalandrado(idCal, minutosExtra = 0) {
     minutos_trabajados: minutosExtra || reg.minutos_trabajados || Math.max(5, Math.round((Number(reg.metros) || 10) * 1.2))
   }).eq("id", idCal);
 
-  if (String(reg.ruta || "").includes("Láser")) {
+  const rLower = String(reg.ruta || "").toLowerCase();
+  if (rLower.includes("laser") || rLower.includes("láser") || rLower.includes("corte")) {
     await sb().from("prod_cola_laser").insert({
       empresa_id: "vvgrafic-principal",
-      batch_id: reg.batch_id,
+      batch_id: reg.batch_id || `BATCH-${Date.now()}`,
       fecha_ingreso: fechaFinIso,
       id_rollo_papel: reg.id_rollo_papel,
       cliente_archivo: reg.cliente_archivo,
@@ -1610,13 +1675,18 @@ async function finalizarTrabajoCalandrado(idCal, minutosExtra = 0) {
     });
   }
 
-  toast(`✅ Calandrado procesado (${fmtDateHoraLineal(fechaFinIso)}).`);
-  await cargarDatosTodo();
+  if (!skipReload) {
+    toast(`✅ Calandrado procesado (${fmtDateHoraLineal(fechaFinIso)}).`);
+    await cargarDatosTodo();
+  }
 }
 
 async function procesarRolloCompletoCalandrado(rolloId) {
   const trabajos = STATE.colaCalandrado.filter(c => c.id_rollo_papel === rolloId && !String(c.estado).toLowerCase().includes("terminado"));
-  if (trabajos.length === 0) return;
+  if (trabajos.length === 0) {
+    toast(`No hay trabajos pendientes en el rollo ${rolloId}.`, "error");
+    return;
+  }
 
   const inputFechaManual = document.getElementById("calInputFechaManual")?.value;
   const msgFecha = inputFechaManual
@@ -1624,9 +1694,13 @@ async function procesarRolloCompletoCalandrado(rolloId) {
     : `con fecha actual`;
 
   if (!confirm(`¿Procesar los ${trabajos.length} trabajos del rollo ${rolloId} ${msgFecha}?`)) return;
+
+  toast(`Procesando ${trabajos.length} trabajos...`);
   for (const t of trabajos) {
-    await finalizarTrabajoCalandrado(t.id);
+    await finalizarTrabajoCalandrado(t.id, 0, true);
   }
+  toast(`✅ Rollo ${rolloId} procesado completo.`);
+  await cargarDatosTodo();
 }
 
 async function cortarLoteLaser(idsCsv) {
@@ -1880,8 +1954,10 @@ function abrirKioscoCalandra(idCal, rolloId = null) {
     const min = Math.max(1, Math.round((Date.now() - STATE.kiosco.inicioMs) / 60000));
     modal.classList.remove("open");
     for (const id of STATE.kiosco.registroIds) {
-      await finalizarTrabajoCalandrado(id, min);
+      await finalizarTrabajoCalandrado(id, min, true);
     }
+    toast(`✅ Kiosko finalizado (${STATE.kiosco.registroIds.length} trabajos).`);
+    await cargarDatosTodo();
   };
 }
 
@@ -2058,7 +2134,10 @@ export function inicializarEventosUI() {
 
   document.getElementById("btnAbrirPrevisionTelas")?.addEventListener("click", () => {
     const p = document.getElementById("panelPrevisionTelasInline");
-    if (p) p.style.display = p.style.display === "none" ? "block" : "none";
+    if (p) {
+      const isHidden = window.getComputedStyle(p).display === "none";
+      p.style.display = isHidden ? "block" : "none";
+    }
   });
 
   document.getElementById("btnSyncDriveSandbox")?.addEventListener("click", async () => {
@@ -2324,9 +2403,41 @@ export function inicializarEventosUI() {
 
   document.getElementById("btnGuardarModalCrud")?.addEventListener("click", guardarModalCrudUniversal);
 
+  document.getElementById("btnGuardarCompraFinanzas")?.addEventListener("click", async () => {
+    const tipo = document.getElementById("finCompraTipo")?.value || "Insumo";
+    const det = document.getElementById("finCompraDetalle")?.value || "";
+    const cant = parseFloat(document.getElementById("finCompraCant")?.value) || 1;
+    const costo = parseFloat(document.getElementById("finCompraCosto")?.value) || 0;
+    if (!det) { alert("Ingresa el detalle de la compra."); return; }
+
+    await sb().from("prod_catalogos").insert({
+      empresa_id: "vvgrafic-principal",
+      tipo: "COMPRA_INSUMO",
+      nombre: `${tipo}: ${det}`,
+      valor_1: String(cant),
+      valor_2: String(costo)
+    });
+    toast("✅ Compra registrada.");
+    const inpDet = document.getElementById("finCompraDetalle");
+    const inpCos = document.getElementById("finCompraCosto");
+    if (inpDet) inpDet.value = "";
+    if (inpCos) inpCos.value = "";
+    await cargarDatosTodo();
+  });
+
   document.querySelectorAll(".vg-modal-close").forEach(btn => {
     btn.addEventListener("click", () => {
       btn.closest(".modal-overlay")?.classList.remove("open");
+      if (STATE.kiosco.timerInterval) clearInterval(STATE.kiosco.timerInterval);
+    });
+  });
+
+  document.querySelectorAll(".modal-overlay").forEach(overlay => {
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) {
+        overlay.classList.remove("open");
+        if (STATE.kiosco.timerInterval) clearInterval(STATE.kiosco.timerInterval);
+      }
     });
   });
 
