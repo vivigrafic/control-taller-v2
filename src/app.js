@@ -23,6 +23,7 @@ const STATE = {
   filtroCalandraLocal: "",
   ordenCalandraAsc: true,
   rollosCalandraAbiertos: new Set(),
+  rollosHistCalCerrados: new Set(),
   carpetasPendientesAbiertas: new Set(),
   rolloMontadoCalandra: localStorage.getItem("vg_rollo_calandra_montado") || "",
   usuarioActual: localStorage.getItem("vg_operador_actual") || "Roberto",
@@ -61,6 +62,15 @@ const STATE = {
 
   kiosco: {
     abierto: false,
+    corriendoEnFondo: false,
+    pausado: false,
+    acumuladoMs: 0,
+    ultimoInicioMs: 0,
+    rolloId: "",
+    trabajos: [],
+    indiceActual: 0,
+    completadosIds: new Set(),
+    descartadosIds: new Set(),
     registroIds: [],
     inicioMs: 0,
     timerInterval: null
@@ -898,8 +908,10 @@ function renderModuloCalandrado() {
         btnAccion += `<button type="button" class="btn-cal-kiosco-rollo" data-rollo="${escHtml(lote)}" style="background:#2196F3; border:none; padding:6px 12px; border-radius:4px; color:#fff; font-weight:bold; cursor:pointer; margin-left:5px;">▶️ KIOSKO</button>`;
       } else if (isImprimiendo) {
         btnAccion = `<button type="button" disabled style="background:#444; border:none; padding:6px 12px; border-radius:4px; color:#888; font-weight:bold; cursor:not-allowed;">🖨️ Aún Imprimiendo</button>`;
+        btnAccion += `<button type="button" class="btn-cal-kiosco-rollo" data-rollo="${escHtml(lote)}" style="background:#2196F3; border:none; padding:6px 12px; border-radius:4px; color:#fff; font-weight:bold; cursor:pointer; margin-left:5px;">▶️ KIOSKO</button>`;
       } else {
         btnAccion = `<button type="button" class="btn-cal-montar-rollo" data-rollo="${escHtml(lote)}" style="background:var(--accent); border:none; padding:6px 12px; border-radius:4px; color:#000; font-weight:bold; cursor:pointer;">⚙️ Montar</button>`;
+        btnAccion += `<button type="button" class="btn-cal-kiosco-rollo" data-rollo="${escHtml(lote)}" style="background:#2196F3; border:none; padding:6px 12px; border-radius:4px; color:#fff; font-weight:bold; cursor:pointer; margin-left:5px;">▶️ KIOSKO</button>`;
       }
       const procesarBtn = `<button type="button" class="btn-cal-procesar-rollo" data-rollo="${escHtml(lote)}" style="background:var(--accent); border:none; padding:6px 12px; border-radius:4px; color:#000; font-weight:bold; cursor:pointer; margin-left:5px;">✅ Procesar</button>`;
       const pdfBtn = `<button type="button" class="btn-cal-pdf-rollo" data-rollo="${escHtml(lote)}" style="background:var(--accent-blue); border:none; padding:6px 12px; border-radius:4px; color:#fff; font-weight:bold; cursor:pointer; margin-left:5px;">🖨️ PDF</button>`;
@@ -916,10 +928,10 @@ function renderModuloCalandrado() {
             </div>
           </div>
           <div id="body_rollo_${escHtml(lote)}" class="rollo-body ${isAbierto ? "open" : ""}">
-            <table class="tabla-normal" style="width:100%; min-width:500px;">
+            <table class="tabla-tarjetas" style="width:100%; min-width:500px;">
               <thead>
                 <tr>
-                  <th>Acción</th>
+                  <th style="width:1%; white-space:nowrap;">Acción</th>
                   <th>Fecha</th>
                   <th>Cliente/Archivo</th>
                   <th>Diseño</th>
@@ -934,23 +946,25 @@ function renderModuloCalandrado() {
               <tbody>
                 ${items.map(c => `
                   <tr>
-                    <td style="white-space:nowrap;">
-                      <button type="button" class="btn-secondary btn-cal-terminar" data-id="${c.id}" style="width:auto; padding:5px 8px; border-color:var(--accent); color:var(--accent); cursor:pointer;">✅ Hecho</button>
-                      <button type="button" class="btn-secondary btn-cal-kiosco" data-id="${c.id}" style="width:auto; padding:5px 8px; cursor:pointer;">▶️</button>
-                      <button type="button" class="btn-secondary btn-cal-falla" data-id="${c.id}" style="width:auto; padding:5px 8px; border-color:var(--danger); color:var(--danger); cursor:pointer;">⚠️</button>
-                      <button type="button" class="btn-secondary btn-nota-rapida" data-table="prod_cola_calandrado" data-id="${c.id}" data-batch="${escHtml(c.batch_id)}" style="width:auto; padding:5px 8px; cursor:pointer;">📝</button>
-                      <button type="button" class="btn-secondary btn-crud-edit" data-table="prod_cola_calandrado" data-id="${c.id}" style="width:auto; padding:5px 8px; cursor:pointer;">✏️</button>
-                      <button type="button" class="btn-secondary btn-crud-del" data-table="prod_cola_calandrado" data-id="${c.id}" style="width:auto; padding:5px 8px; cursor:pointer;">🗑️</button>
+                    <td data-label="Acción" style="width:1%; white-space:nowrap;">
+                      <div class="cal-actions-grid">
+                        <button type="button" class="btn-secondary btn-cal-terminar" data-id="${c.id}" style="width:auto; padding:5px 8px; border-color:var(--accent); color:var(--accent); cursor:pointer;">✅ Hecho</button>
+                        <button type="button" class="btn-secondary btn-cal-kiosco" data-id="${c.id}" style="width:auto; padding:5px 8px; cursor:pointer;" title="Modo Kiosko">▶️</button>
+                        <button type="button" class="btn-secondary btn-cal-falla" data-id="${c.id}" style="width:auto; padding:5px 8px; border-color:var(--danger); color:var(--danger); cursor:pointer;" title="Reportar Falla">⚠️</button>
+                        <button type="button" class="btn-secondary btn-nota-rapida" data-table="prod_cola_calandrado" data-id="${c.id}" data-batch="${escHtml(c.batch_id)}" style="width:auto; padding:5px 8px; cursor:pointer;" title="Nota">📝</button>
+                        <button type="button" class="btn-secondary btn-crud-edit" data-table="prod_cola_calandrado" data-id="${c.id}" style="width:auto; padding:5px 8px; cursor:pointer;" title="Editar">✏️</button>
+                        <button type="button" class="btn-secondary btn-crud-del" data-table="prod_cola_calandrado" data-id="${c.id}" style="width:auto; padding:5px 8px; cursor:pointer;" title="Eliminar">🗑️</button>
+                      </div>
                     </td>
-                    <td>${fmtDateHora(c.fecha_hora)}</td>
-                    <td>${formatearAnidadosHTML(c.cliente_archivo)}</td>
-                    <td style="text-align:center;">${renderMiniaturaDiseno60(c.color_tela, c.diseno, c.cliente_archivo)}</td>
-                    <td>${escHtml(c.tela_destino || "")}</td>
-                    <td>${escHtml(c.num_rollo_tela || "")}</td>
-                    <td>${escHtml(c.color_tela || "")}</td>
-                    <td style="color:var(--danger); font-weight:bold;">${fmtNum(c.metros)}m</td>
-                    <td>${escHtml(c.perfil || "")}</td>
-                    <td>${c.observaciones ? `<span style="color:var(--accent-orange); font-weight:bold;">📝 ${escHtml(c.observaciones)}</span>` : "-"}</td>
+                    <td data-label="Fecha">${fmtDateHora(c.fecha_hora)}</td>
+                    <td data-label="Cliente/Archivo">${formatearAnidadosHTML(c.cliente_archivo)}</td>
+                    <td data-label="Diseño" style="text-align:center;">${renderMiniaturaDiseno60(c.color_tela, c.diseno, c.cliente_archivo)}</td>
+                    <td data-label="Tela">${escHtml(c.tela_destino || "")}</td>
+                    <td data-label="Nº Rollo">${escHtml(c.num_rollo_tela || "")}</td>
+                    <td data-label="Color">${escHtml(c.color_tela || "")}</td>
+                    <td data-label="Metros" style="color:var(--danger); font-weight:bold;">${fmtNum(c.metros)}m</td>
+                    <td data-label="Perfil">${escHtml(c.perfil || "")}</td>
+                    <td data-label="Notas">${c.observaciones ? `<span style="color:var(--accent-orange); font-weight:bold;">📝 ${escHtml(c.observaciones)}</span>` : "-"}</td>
                   </tr>
                 `).join("")}
               </tbody>
@@ -1052,7 +1066,7 @@ function renderModuloCalandrado() {
         `).join("");
   }
 
-  // Historial Reciente de Calandrado idéntico a JS_Calandrado.html líneas 60-76
+  // Historial Reciente de Calandrado agrupado por rollo (y colapsable al hacer clic)
   const terminados = STATE.colaCalandrado.filter(c =>
     String(c.estado).toLowerCase().includes("terminado") &&
     cumpleFiltroFecha(c.fecha_terminado || c.fecha_hora) &&
@@ -1062,46 +1076,66 @@ function renderModuloCalandrado() {
   if (terminados.length === 0) {
     tbodyHist.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:18px;color:#888;">No hay trabajos calandrados en el período seleccionado.</td></tr>`;
   } else {
-    let htmlHist = "";
-    let ultimoRolloHist = null;
+    // Agrupar por id_rollo_papel manteniendo el orden de aparición
+    const gruposHist = new Map();
     terminados.forEach(c => {
       const rId = c.id_rollo_papel || "Sin Rollo";
-      if (rId !== ultimoRolloHist) {
-        ultimoRolloHist = rId;
-        const totRollo = terminados
-          .filter(x => x.id_rollo_papel === rId)
-          .reduce((a, b) => a + (Number(b.metros) || 0), 0);
-        htmlHist += `
-          <tr style="cursor:pointer; background:#111;">
-            <td colspan="11" style="border-top:1px solid #00E676; border-bottom:1px solid #00E676; color:#00E676; text-align:center; font-weight:bold; padding:8px;">
-              ROLLO CERRADO: ${escHtml(rId)} | TOTAL DEL ROLLO: ${fmtNum(totRollo)}m
-            </td>
-          </tr>
-        `;
-      }
+      if (!gruposHist.has(rId)) gruposHist.set(rId, []);
+      gruposHist.get(rId).push(c);
+    });
+
+    let htmlHist = "";
+    for (const [rId, listaRollo] of gruposHist.entries()) {
+      const totRollo = listaRollo.reduce((a, b) => a + (Number(b.metros) || 0), 0);
+      const estaCerrado = STATE.rollosHistCalCerrados.has(rId);
+      const icono = estaCerrado ? "▶" : "▼";
+
       htmlHist += `
-        <tr>
-          <td style="white-space:nowrap;">
-            <button type="button" class="btn-cal-reabrir" data-id="${c.id}" style="background:transparent; border:1px solid #aaa; color:#aaa; border-radius:4px; cursor:pointer; padding:3px;" title="Deshacer">🔙</button>
-            <button type="button" class="btn-nota-rapida" data-table="prod_cola_calandrado" data-id="${c.id}" data-batch="${escHtml(c.batch_id)}" style="background:transparent; border:1px solid var(--accent-orange); color:var(--accent-orange); border-radius:4px; cursor:pointer; padding:3px;" title="Nota">📝</button>
-            <button type="button" class="btn-imp-etiqueta" data-rollo="${escHtml(rId)}" data-metros="${fmtNum(c.metros)}" style="background:var(--accent-blue); border:1px solid var(--accent-blue); color:#fff; border-radius:4px; cursor:pointer; padding:3px;" title="Etiqueta">🖨️</button>
-            <button type="button" class="btn-crud-edit" data-table="prod_cola_calandrado" data-id="${c.id}" style="background:transparent; border:1px solid var(--accent-blue); color:var(--accent-blue); border-radius:4px; cursor:pointer; padding:3px;">✏️</button>
-            <button type="button" class="btn-crud-del" data-table="prod_cola_calandrado" data-id="${c.id}" style="background:transparent; border:1px solid var(--danger); color:var(--danger); border-radius:4px; cursor:pointer; padding:3px;">🗑️</button>
+        <tr class="tr-toggle-hist-cal" data-rollo-hist="${escHtml(rId)}" style="cursor:pointer; background:#111;">
+          <td colspan="11" style="border-top:1px solid #00E676; border-bottom:1px solid #00E676; color:#00E676; text-align:center; font-weight:bold; padding:8px;">
+            ${icono} ROLLO CERRADO: ${escHtml(rId)} (${listaRollo.length} trab.) | TOTAL DEL ROLLO: ${fmtNum(totRollo)}m <span style="font-size:10px; color:#888; margin-left:6px;">(clic para mostrar/ocultar)</span>
           </td>
-          <td>${fmtDateHora(c.fecha_terminado || c.fecha_hora)}</td>
-          <td>${formatearAnidadosHTML(c.cliente_archivo)}</td>
-          <td style="text-align:center;">${renderMiniaturaDiseno60(c.color_tela, c.diseno, c.cliente_archivo)}</td>
-          <td>${escHtml(c.tela_destino || "")}</td>
-          <td>${escHtml(c.num_rollo_tela || "")}</td>
-          <td>${escHtml(c.color_tela || "")}</td>
-          <td style="color:var(--accent); font-weight:bold;">${fmtNum(c.metros)}m</td>
-          <td>${escHtml(c.perfil || "")}</td>
-          <td>${escHtml(c.ruta || "Solo Calandrado")}</td>
-          <td>${c.observaciones ? `<span style="color:var(--accent-orange); font-weight:bold;">📝 ${escHtml(c.observaciones)}</span>` : "-"}</td>
         </tr>
       `;
-    });
+
+      if (!estaCerrado) {
+        listaRollo.forEach(c => {
+          htmlHist += `
+            <tr>
+              <td data-label="Acción" style="width:1%; white-space:nowrap;">
+                <div class="cal-actions-grid">
+                  <button type="button" class="btn-cal-reabrir" data-id="${c.id}" style="background:transparent; border:1px solid #aaa; color:#aaa; border-radius:4px; cursor:pointer; padding:4px 6px;" title="Deshacer">🔙</button>
+                  <button type="button" class="btn-nota-rapida" data-table="prod_cola_calandrado" data-id="${c.id}" data-batch="${escHtml(c.batch_id)}" style="background:transparent; border:1px solid var(--accent-orange); color:var(--accent-orange); border-radius:4px; cursor:pointer; padding:4px 6px;" title="Nota">📝</button>
+                  <button type="button" class="btn-imp-etiqueta" data-rollo="${escHtml(rId)}" data-metros="${fmtNum(c.metros)}" style="background:var(--accent-blue); border:1px solid var(--accent-blue); color:#fff; border-radius:4px; cursor:pointer; padding:4px 6px;" title="Etiqueta">🖨️</button>
+                  <button type="button" class="btn-crud-edit" data-table="prod_cola_calandrado" data-id="${c.id}" style="background:transparent; border:1px solid var(--accent-blue); color:var(--accent-blue); border-radius:4px; cursor:pointer; padding:4px 6px;" title="Editar">✏️</button>
+                  <button type="button" class="btn-crud-del" data-table="prod_cola_calandrado" data-id="${c.id}" style="background:transparent; border:1px solid var(--danger); color:var(--danger); border-radius:4px; cursor:pointer; padding:4px 6px;" title="Eliminar">🗑️</button>
+                </div>
+              </td>
+              <td data-label="Fecha">${fmtDateHora(c.fecha_terminado || c.fecha_hora)}</td>
+              <td data-label="Cliente/Archivo">${formatearAnidadosHTML(c.cliente_archivo)}</td>
+              <td data-label="Diseño" style="text-align:center;">${renderMiniaturaDiseno60(c.color_tela, c.diseno, c.cliente_archivo)}</td>
+              <td data-label="Tela">${escHtml(c.tela_destino || "")}</td>
+              <td data-label="Nº Rollo">${escHtml(c.num_rollo_tela || "")}</td>
+              <td data-label="Color">${escHtml(c.color_tela || "")}</td>
+              <td data-label="Metros" style="color:var(--accent); font-weight:bold;">${fmtNum(c.metros)}m</td>
+              <td data-label="Perfil">${escHtml(c.perfil || "")}</td>
+              <td data-label="Ruta">${escHtml(c.ruta || "Solo Calandrado")}</td>
+              <td data-label="Notas">${c.observaciones ? `<span style="color:var(--accent-orange); font-weight:bold;">📝 ${escHtml(c.observaciones)}</span>` : "-"}</td>
+            </tr>
+          `;
+        });
+      }
+    }
     tbodyHist.innerHTML = htmlHist;
+
+    tbodyHist.querySelectorAll(".tr-toggle-hist-cal").forEach(tr => {
+      tr.addEventListener("click", () => {
+        const rId = tr.getAttribute("data-rollo-hist");
+        if (STATE.rollosHistCalCerrados.has(rId)) STATE.rollosHistCalCerrados.delete(rId);
+        else STATE.rollosHistCalCerrados.add(rId);
+        renderModuloCalandrado();
+      });
+    });
   }
 }
 
@@ -1746,10 +1780,23 @@ function imprimirEtiquetaRollo(loteId, metrosTotales) {
   setTimeout(() => win.print(), 400);
 }
 
+function renderCeldaDisenoPDF(c) {
+  const textoFallback = escHtml(c.diseno || c.cliente_archivo || "-");
+  // Si el campo diseno es una URL o data URI de imagen, intentamos mostrar la miniatura con fallback al nombre
+  const d = String(c.diseno || "").trim();
+  if (d.startsWith("http://") || d.startsWith("https://") || d.startsWith("data:image/")) {
+    return `<img src="${escHtml(d)}" alt="${textoFallback}" style="max-height:24px; max-width:95px; object-fit:contain; display:block; margin:0 auto;" onerror="this.outerHTML='<span>${textoFallback}</span>'" />`;
+  }
+  return `<span>${textoFallback}</span>`;
+}
+
 function emitirPDFCalandrado(rolloId) {
-  const items = STATE.colaCalandrado.filter(c => c.id_rollo_papel === rolloId && !String(c.estado).toLowerCase().includes("terminado"));
+  let items = STATE.colaCalandrado.filter(c => c.id_rollo_papel === rolloId && !String(c.estado).toLowerCase().includes("terminado"));
   if (items.length === 0) {
-    toast(`No hay trabajos pendientes para el rollo ${rolloId}.`, "error");
+    items = STATE.colaCalandrado.filter(c => c.id_rollo_papel === rolloId);
+  }
+  if (items.length === 0) {
+    toast(`No hay trabajos registrados para el rollo ${rolloId}.`, "error");
     return;
   }
   const totalMts = items.reduce((a, b) => a + (Number(b.metros) || 0), 0);
@@ -1763,21 +1810,24 @@ function emitirPDFCalandrado(rolloId) {
       <meta charset="utf-8">
       <title>Hoja de Ruta Calandrado - ${escHtml(rolloId)}</title>
       <style>
-        @page { size: landscape; margin: 8mm; }
+        @page { size: landscape; margin: 6mm; }
         * { box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; margin: 0; padding: 12px; font-size: 11px; color: #111; background: #fff; }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #d81b60; padding-bottom: 8px; margin-bottom: 10px; }
-        .title { font-size: 17px; font-weight: bold; color: #d81b60; text-transform: uppercase; }
-        .subtitle { font-size: 12px; color: #555; margin-top: 3px; }
-        .total-badge { font-size: 17px; font-weight: bold; color: #d81b60; background: #fce4ec; border: 1px solid #f48fb1; padding: 6px 14px; border-radius: 6px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 11px; }
-        th { background: #f0f0f0; border: 1px solid #999; padding: 6px 8px; text-align: left; font-size: 10px; text-transform: uppercase; font-weight: bold; }
-        td { border: 1px solid #bbb; padding: 6px 8px; vertical-align: middle; }
-        tr:nth-child(even) td { background: #fafafa; }
-        .mts-cell { font-weight: bold; font-size: 12px; text-align: right; color: #d81b60; }
-        .footer { margin-top: 14px; display: flex; justify-content: space-between; align-items: flex-end; }
-        .firmas { display: flex; gap: 30px; font-size: 11px; color: #666; margin-top: 20px; }
-        .firma-box { border-top: 1px dashed #888; width: 140px; text-align: center; padding-top: 4px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; margin: 0; padding: 6px; font-size: 10px; color: #111; background: #fff; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #d81b60; padding-bottom: 5px; margin-bottom: 6px; }
+        .title { font-size: 15px; font-weight: bold; color: #d81b60; text-transform: uppercase; }
+        .subtitle { font-size: 11px; color: #444; margin-top: 2px; }
+        .total-badge { font-size: 14px; font-weight: bold; color: #d81b60; background: #fce4ec; border: 1px solid #f48fb1; padding: 4px 12px; border-radius: 5px; }
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 10px; }
+        th { background: #e8e8e8; border: 1px solid #777; padding: 4px 5px; text-align: left; font-size: 9.5px; text-transform: uppercase; font-weight: bold; color: #111; }
+        td { border: 1px solid #999; padding: 3px 5px; vertical-align: middle; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; }
+        .job-group { break-inside: avoid; page-break-inside: avoid; }
+        .row-top td { background: #f2f4f7; font-weight: bold; font-size: 10px; border-top: 1.5px solid #444; padding: 2.5px 5px; }
+        .row-data td { background: #fff; padding: 3px 5px; border-bottom: 1.5px solid #444; }
+        .mts-cell { font-weight: bold; font-size: 11px; text-align: right; color: #d81b60; white-space: nowrap; }
+        .mts-reales-cell { background: #fff; }
+        .footer { margin-top: 10px; display: flex; justify-content: space-between; align-items: flex-end; }
+        .firmas { display: flex; gap: 28px; font-size: 10px; color: #555; margin-top: 14px; }
+        .firma-box { border-top: 1px dashed #777; width: 135px; text-align: center; padding-top: 3px; }
         @media print {
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
@@ -1794,42 +1844,44 @@ function emitirPDFCalandrado(rolloId) {
       <table>
         <thead>
           <tr>
-            <th style="width:110px;">ID Bobina</th>
-            <th>Cliente / Archivo</th>
-            <th style="width:110px;">Diseño</th>
-            <th style="width:110px;">Tela</th>
-            <th style="width:70px;">Nº Rollo</th>
-            <th style="width:80px;">Color</th>
-            <th style="width:75px; text-align:right;">Metros</th>
-            <th style="width:90px;">Perfil</th>
-            <th style="width:130px;">Ruta Producción</th>
-            <th>Observaciones</th>
+            <th style="width:9%;">DISEÑO</th>
+            <th style="width:11%;">TELA</th>
+            <th style="width:7%;">Nº ROLLO</th>
+            <th style="width:8%;">COLOR</th>
+            <th style="width:7%; text-align:right;">METROS</th>
+            <th style="width:9%;">METROS REALES</th>
+            <th style="width:15%;">PERFIL</th>
+            <th style="width:12%;">RUTA PRODUCCIÓN</th>
+            <th style="width:22%;">OBSERVACIONES</th>
           </tr>
         </thead>
-        <tbody>
-          ${items.map(c => `
-            <tr>
-              <td><strong>${escHtml(c.id_rollo_papel)}</strong></td>
-              <td><strong>${escHtml(c.cliente_archivo)}</strong></td>
-              <td>${escHtml(c.diseno || "-")}</td>
+        ${items.map(c => `
+          <tbody class="job-group">
+            <tr class="row-top">
+              <td>${escHtml(c.id_rollo_papel || rolloId)}</td>
+              <td colspan="8">${escHtml(c.cliente_archivo || "-")}</td>
+            </tr>
+            <tr class="row-data">
+              <td>${renderCeldaDisenoPDF(c)}</td>
               <td><strong>${escHtml(c.tela_destino || "-")}</strong></td>
               <td>${escHtml(c.num_rollo_tela || "-")}</td>
               <td>${escHtml(c.color_tela || "-")}</td>
               <td class="mts-cell">${fmtNum(c.metros)} m</td>
+              <td class="mts-reales-cell">&nbsp;</td>
               <td>${escHtml(c.perfil || "-")}</td>
               <td>${escHtml(c.ruta || "Solo Calandrado")}</td>
-              <td>${escHtml(c.observaciones || "-")}</td>
+              <td>${escHtml(c.observaciones && c.observaciones !== "-" ? c.observaciones : "")}</td>
             </tr>
-          `).join("")}
-        </tbody>
+          </tbody>
+        `).join("")}
       </table>
       <div class="footer">
         <div class="firmas">
           <div class="firma-box">Operador Calandra</div>
           <div class="firma-box">Control Calidad</div>
         </div>
-        <div style="font-size:13px; font-weight:bold;">
-          Total Trabajos: ${items.length} | Total Metros: <span style="color:#d81b60; font-size:15px;">${fmtNum(totalMts)} m</span>
+        <div style="font-size:12px; font-weight:bold;">
+          Total Trabajos: ${items.length} | Total Metros: <span style="color:#d81b60; font-size:14px;">${fmtNum(totalMts)} m</span>
         </div>
       </div>
     </body>
@@ -2015,95 +2067,381 @@ async function editarNotaRapida(tabla, id, batchId) {
   await cargarDatosTodo();
 }
 
-function abrirKioscoCalandra(idCal, rolloId = null) {
+function obtenerMsTranscurridosKiosco() {
+  if (STATE.kiosco.pausado) return STATE.kiosco.acumuladoMs;
+  return STATE.kiosco.acumuladoMs + Math.max(0, Date.now() - (STATE.kiosco.ultimoInicioMs || Date.now()));
+}
+
+function formatearRelojKiosco(ms) {
+  const seg = Math.floor(ms / 1000);
+  const mm = String(Math.floor(seg / 60)).padStart(2, "0");
+  const ss = String(seg % 60).padStart(2, "0");
+  return `${mm}:${ss}`;
+}
+
+function actualizarDisplayCronometroKiosco() {
+  const txt = formatearRelojKiosco(obtenerMsTranscurridosKiosco());
+  const elModal = document.getElementById("kioscoCronometro");
+  if (elModal) {
+    elModal.textContent = txt;
+    elModal.style.color = STATE.kiosco.pausado ? "#ff9800" : "#fff";
+  }
+  const elBg = document.getElementById("kioscoBgCronometro");
+  if (elBg) {
+    elBg.textContent = txt;
+    elBg.style.color = STATE.kiosco.pausado ? "#ff9800" : "#00E676";
+  }
+  const badgePausa = document.getElementById("kioscoEstadoPausaBadge");
+  if (badgePausa) badgePausa.style.display = STATE.kiosco.pausado ? "inline-block" : "none";
+
+  const btnPausaModal = document.getElementById("btnKioscoPausarReanudar");
+  if (btnPausaModal) {
+    btnPausaModal.innerHTML = STATE.kiosco.pausado ? "▶️ REANUDAR RELOJ" : "⏸️ PAUSAR RELOJ";
+    btnPausaModal.style.borderColor = STATE.kiosco.pausado ? "#00E676" : "#ff9800";
+    btnPausaModal.style.color = STATE.kiosco.pausado ? "#00E676" : "#ff9800";
+  }
+
+  const btnPausaBg = document.getElementById("btnKioscoBgPausar");
+  if (btnPausaBg) {
+    btnPausaBg.innerHTML = STATE.kiosco.pausado ? "▶️ Reanudar" : "⏸️ Pausar";
+  }
+
+  const bannerBg = document.getElementById("kioscoBackgroundBanner");
+  if (bannerBg) {
+    bannerBg.style.display = STATE.kiosco.corriendoEnFondo ? "flex" : "none";
+    const trabActual = STATE.kiosco.trabajos[STATE.kiosco.indiceActual];
+    const lblRollo = document.getElementById("kioscoBgRollo");
+    const lblTrab = document.getElementById("kioscoBgTrabajoActual");
+    if (lblRollo) lblRollo.textContent = STATE.kiosco.rolloId || "Sin Rollo";
+    if (lblTrab) lblTrab.textContent = trabActual ? `${trabActual.cliente_archivo} (${fmtNum(trabActual.metros)}m)` : "-";
+  }
+}
+
+function alternarPausaKiosco() {
+  if (!STATE.kiosco.abierto && !STATE.kiosco.corriendoEnFondo) return;
+  if (STATE.kiosco.pausado) {
+    STATE.kiosco.pausado = false;
+    STATE.kiosco.ultimoInicioMs = Date.now();
+    toast("▶️ Cronómetro reanudado.");
+  } else {
+    STATE.kiosco.acumuladoMs = obtenerMsTranscurridosKiosco();
+    STATE.kiosco.pausado = true;
+    toast("⏸️ Cronómetro en pausa (ajustes de máquina).");
+  }
+  actualizarDisplayCronometroKiosco();
+}
+
+function minimizarKioscoAFondo() {
+  const modal = document.getElementById("modalKioscoOperativo");
+  if (modal) modal.classList.remove("open");
+  STATE.kiosco.abierto = false;
+  STATE.kiosco.corriendoEnFondo = true;
+  actualizarDisplayCronometroKiosco();
+  toast("👁️ Kiosko en 2º plano. El tiempo sigue corriendo arriba.");
+}
+
+function restaurarKioscoDesdeFondo() {
+  const modal = document.getElementById("modalKioscoOperativo");
+  if (!modal) return;
+  STATE.kiosco.corriendoEnFondo = false;
+  STATE.kiosco.abierto = true;
+  renderContenidoModalKiosco();
+  modal.classList.add("open");
+  actualizarDisplayCronometroKiosco();
+}
+
+function cerrarKioscoDefinitivo() {
+  if (STATE.kiosco.timerInterval) clearInterval(STATE.kiosco.timerInterval);
+  STATE.kiosco.abierto = false;
+  STATE.kiosco.corriendoEnFondo = false;
+  STATE.kiosco.pausado = false;
+  STATE.kiosco.acumuladoMs = 0;
+  const modal = document.getElementById("modalKioscoOperativo");
+  if (modal) modal.classList.remove("open");
+  const bannerBg = document.getElementById("kioscoBackgroundBanner");
+  if (bannerBg) bannerBg.style.display = "none";
+}
+
+function buscarSiguienteIndicePendienteKiosco(desdeIdx) {
+  const n = STATE.kiosco.trabajos.length;
+  for (let offset = 1; offset <= n; offset++) {
+    const idx = (desdeIdx + offset) % n;
+    const id = STATE.kiosco.trabajos[idx].id;
+    if (!STATE.kiosco.completadosIds.has(id) && !STATE.kiosco.descartadosIds.has(id)) {
+      return idx;
+    }
+  }
+  return -1;
+}
+
+function renderContenidoModalKiosco() {
   const modal = document.getElementById("modalKioscoOperativo");
   if (!modal) return;
 
-  let trabajos = [];
-  if (rolloId) {
-    trabajos = STATE.colaCalandrado.filter(c => c.id_rollo_papel === rolloId && !String(c.estado).toLowerCase().includes("terminado"));
-  } else {
-    const r = STATE.colaCalandrado.find(c => c.id === idCal);
-    if (r) trabajos = [r];
-  }
+  const trabajos = STATE.kiosco.trabajos || [];
   if (trabajos.length === 0) return;
 
-  const totalM = trabajos.reduce((a, b) => a + (Number(b.metros) || 0), 0);
-  STATE.kiosco.abierto = true;
-  STATE.kiosco.registroIds = trabajos.map(t => t.id);
-  STATE.kiosco.inicioMs = Date.now();
+  const rolloNombre = STATE.kiosco.rolloId || trabajos[0].id_rollo_papel || "Sin Rollo";
+  const trabActual = trabajos[STATE.kiosco.indiceActual] || trabajos[0];
 
-  const rolloNombre = trabajos[0].id_rollo_papel || "Sin Rollo";
-  const velInicial = trabajos[0].velocidad || 50;
-  const tempInicial = trabajos[0].temperatura || 205;
+  const velActual = document.getElementById("kioscoInputVelocidad")?.value || trabActual.velocidad || 50;
+  const tempActual = document.getElementById("kioscoInputTemperatura")?.value || trabActual.temperatura || 205;
+
+  const pendientesRestantes = trabajos.filter(t => !STATE.kiosco.completadosIds.has(t.id) && !STATE.kiosco.descartadosIds.has(t.id));
+  const totalM = pendientesRestantes.reduce((a, b) => a + (Number(b.metros) || 0), 0);
 
   document.getElementById("kioscoTitulo").textContent = `▶️ MODO KIOSKO - ROLLO: ${rolloNombre}`;
   document.getElementById("kioscoSubtitulo").innerHTML = `
-    <div style="font-size:28px; color:#4CAF50; font-weight:bold; margin-bottom:8px; text-align:center;">${fmtNum(totalM)} m</div>
-
-    <!-- Parámetros operativos del trabajo / máquina (Pedido #2) -->
-    <div style="background:#111; border:1px solid #333; padding:12px; border-radius:8px; margin-bottom:12px; display:flex; justify-content:space-around; align-items:center; flex-wrap:wrap; gap:10px;">
-      <div style="text-align:center;">
-        <label style="font-size:11px; color:#aaa; display:block; margin-bottom:4px; font-weight:bold;">⚙️ VELOCIDAD (m/min)</label>
-        <input type="number" id="kioscoInputVelocidad" value="${velInicial}" step="1" style="width:110px; font-size:20px; text-align:center; padding:6px; background:#1a1c23; color:#00E676; border:1px solid #4CAF50; border-radius:6px; font-weight:bold;" />
+    <div style="display:flex; justify-content:space-between; align-items:center; background:#151821; border:1px solid #2a324b; padding:10px 14px; border-radius:8px; margin-bottom:10px;">
+      <div>
+        <div style="font-size:11px; color:#aaa; text-transform:uppercase;">TRABAJO EN CURSO (${STATE.kiosco.indiceActual + 1} de ${trabajos.length}):</div>
+        <div style="font-size:15px; font-weight:bold; color:#00E676;">🔥 ${escHtml(trabActual.cliente_archivo)} (${fmtNum(trabActual.metros)} m)</div>
       </div>
-      <div style="text-align:center;">
-        <label style="font-size:11px; color:#aaa; display:block; margin-bottom:4px; font-weight:bold;">🔥 TEMPERATURA (°C)</label>
-        <input type="number" id="kioscoInputTemperatura" value="${tempInicial}" step="1" style="width:110px; font-size:20px; text-align:center; padding:6px; background:#1a1c23; color:#ff9800; border:1px solid #ff9800; border-radius:6px; font-weight:bold;" />
+      <div style="text-align:right;">
+        <div style="font-size:11px; color:#aaa;">RESTANTE DEL ROLLO</div>
+        <div style="font-size:22px; color:#4CAF50; font-weight:bold;">${fmtNum(totalM)} m</div>
       </div>
     </div>
 
-    <div style="color:#aaa; font-size:12px; font-weight:bold; margin-bottom:6px;">LISTA DE TRABAJOS A CALANDRAR (${trabajos.length}):</div>
-    ${trabajos.map(t => `
-      <div style="background:#1a1c23; padding:12px; border-radius:6px; border:1px solid #333; margin-bottom:8px; font-size:13px;">
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-          <div>
-            <div style="font-weight:bold; font-size:14px; color:#fff; margin-bottom:4px;">${escHtml(t.cliente_archivo)}</div>
-            <div><strong>Tela:</strong> <span style="color:#2196F3; font-weight:bold;">${escHtml(t.tela_destino || "-")}</span> | <strong>Rollo:</strong> ${escHtml(t.num_rollo_tela || "-")} | <strong>Color:</strong> ${escHtml(t.color_tela || "-")}</div>
-            ${t.observaciones ? `<div style="color:#ff9800; font-weight:bold; margin-top:4px;">Obs: ${escHtml(t.observaciones)}</div>` : ""}
-          </div>
-          <div style="font-size:16px; font-weight:bold; color:var(--accent); white-space:nowrap;">${fmtNum(t.metros)}m</div>
-        </div>
-
-        <!-- Botones de reporte de fallas dentro del Kiosco (Pedido #3) -->
-        <div style="margin-top:10px; padding-top:8px; border-top:1px solid #2a2a2a; display:flex; gap:8px; flex-wrap:wrap;">
-          <button type="button" class="btn-kiosco-reportar-falla" data-id="${t.id}" data-estacion="Calandrado" style="background:rgba(216,27,96,0.15); border:1px solid var(--accent-magenta); color:#ff4081; padding:6px 12px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">⚠️ Falla Calandrado</button>
-          <button type="button" class="btn-kiosco-reportar-falla" data-id="${t.id}" data-estacion="Impresión" style="background:rgba(255,152,0,0.15); border:1px solid var(--accent-orange); color:#ff9800; padding:6px 12px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">⚠️ Falla Impresión</button>
-        </div>
+    <!-- Parámetros operativos del trabajo / máquina -->
+    <div style="background:#111; border:1px solid #333; padding:10px; border-radius:8px; margin-bottom:12px; display:flex; justify-content:space-around; align-items:center; flex-wrap:wrap; gap:10px;">
+      <div style="text-align:center;">
+        <label style="font-size:11px; color:#aaa; display:block; margin-bottom:4px; font-weight:bold;">⚙️ VELOCIDAD (m/min)</label>
+        <input type="number" id="kioscoInputVelocidad" value="${velActual}" step="1" style="width:110px; font-size:20px; text-align:center; padding:6px; background:#1a1c23; color:#00E676; border:1px solid #4CAF50; border-radius:6px; font-weight:bold;" />
       </div>
-    `).join("")}
+      <div style="text-align:center;">
+        <label style="font-size:11px; color:#aaa; display:block; margin-bottom:4px; font-weight:bold;">🔥 TEMPERATURA (°C)</label>
+        <input type="number" id="kioscoInputTemperatura" value="${tempActual}" step="1" style="width:110px; font-size:20px; text-align:center; padding:6px; background:#1a1c23; color:#ff9800; border:1px solid #ff9800; border-radius:6px; font-weight:bold;" />
+      </div>
+    </div>
+
+    <div style="color:#aaa; font-size:12px; font-weight:bold; margin-bottom:6px;">
+      SECUENCIA DE TRABAJOS DEL ROLLO (${pendientesRestantes.length} pendientes de ${trabajos.length}) — <span style="color:#00E676;">Tocá un trabajo para seleccionarlo</span>:
+    </div>
+    ${trabajos.map((t, idx) => {
+      const esActual = idx === STATE.kiosco.indiceActual;
+      const esCompletado = STATE.kiosco.completadosIds.has(t.id);
+      const esDescartado = STATE.kiosco.descartadosIds.has(t.id);
+
+      let borderStyle = "1px solid #333";
+      let bgStyle = "#1a1c23";
+      let badgeEstado = `<span style="background:#333; color:#ccc; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:bold;">#${idx + 1} EN COLA</span>`;
+
+      if (esCompletado) {
+        borderStyle = "1px solid #2e7d32";
+        bgStyle = "rgba(46, 125, 50, 0.12)";
+        badgeEstado = `<span style="background:#2e7d32; color:#fff; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:bold;">✅ YA CALANDRADO</span>`;
+      } else if (esDescartado) {
+        borderStyle = "1px solid #b71c1c";
+        bgStyle = "rgba(183, 28, 28, 0.12)";
+        badgeEstado = `<span style="background:#b71c1c; color:#fff; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:bold;">✂️ PAPEL DESECHADO</span>`;
+      } else if (esActual) {
+        borderStyle = "2px solid #00E676";
+        bgStyle = "rgba(0, 230, 118, 0.10)";
+        badgeEstado = `<span style="background:#00E676; color:#000; padding:3px 10px; border-radius:4px; font-size:11px; font-weight:bold;">🔥 CALANDRANDO AHORA</span>`;
+      }
+
+      return `
+        <div class="kiosco-item-card" data-kiosco-idx="${idx}" style="background:${bgStyle}; padding:10px 12px; border-radius:6px; border:${borderStyle}; margin-bottom:8px; font-size:13px; cursor:pointer; transition:all 0.15s;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+            <div>
+              <div style="margin-bottom:4px;">${badgeEstado}</div>
+              <div style="font-weight:bold; font-size:14px; color:#fff; margin-bottom:4px;">${escHtml(t.cliente_archivo)}</div>
+              <div><strong>Tela:</strong> <span style="color:#2196F3; font-weight:bold;">${escHtml(t.tela_destino || "-")}</span> | <strong>Rollo:</strong> ${escHtml(t.num_rollo_tela || "-")} | <strong>Color:</strong> ${escHtml(t.color_tela || "-")}</div>
+              ${t.observaciones ? `<div style="color:#ff9800; font-weight:bold; margin-top:4px;">Obs: ${escHtml(t.observaciones)}</div>` : ""}
+            </div>
+            <div style="font-size:16px; font-weight:bold; color:var(--accent); white-space:nowrap;">${fmtNum(t.metros)}m</div>
+          </div>
+
+          <div style="margin-top:8px; padding-top:8px; border-top:1px solid #2a2a2a; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            ${!esActual && !esCompletado && !esDescartado ? `<button type="button" class="btn-kiosco-elegir-este" data-idx="${idx}" style="background:#2196F3; border:none; color:#fff; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">🎯 Cronometrar este</button>` : ""}
+            <button type="button" class="btn-kiosco-reportar-falla" data-id="${t.id}" data-estacion="Calandrado" style="background:rgba(216,27,96,0.15); border:1px solid var(--accent-magenta); color:#ff4081; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">⚠️ Falla Calandrado</button>
+            <button type="button" class="btn-kiosco-reportar-falla" data-id="${t.id}" data-estacion="Impresión" style="background:rgba(255,152,0,0.15); border:1px solid var(--accent-orange); color:#ff9800; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">⚠️ Falla Impresión</button>
+          </div>
+        </div>
+      `;
+    }).join("")}
   `;
 
+  // Mostrar u ocultar botones de secuencia según cantidad de trabajos pendientes
+  const btnSig = document.getElementById("btnKioscoSiguienteTrabajo");
+  const btnDesc = document.getElementById("btnKioscoDescartarSiguiente");
+  if (btnSig) btnSig.style.display = trabajos.length > 1 ? "block" : "none";
+  if (btnDesc) btnDesc.style.display = "block";
+
+  // Seleccionar trabajo al hacer clic en la tarjeta
+  modal.querySelectorAll(".kiosco-item-card").forEach(card => {
+    card.onclick = (e) => {
+      if (e.target.closest(".btn-kiosco-reportar-falla")) return;
+      const idx = parseInt(card.getAttribute("data-kiosco-idx"), 10);
+      if (!isNaN(idx) && idx !== STATE.kiosco.indiceActual) {
+        STATE.kiosco.indiceActual = idx;
+        renderContenidoModalKiosco();
+        actualizarDisplayCronometroKiosco();
+      }
+    };
+  });
+
   modal.querySelectorAll(".btn-kiosco-reportar-falla").forEach(btn => {
-    btn.onclick = async () => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();
       const id = btn.getAttribute("data-id");
       const est = btn.getAttribute("data-estacion");
       const reg = STATE.colaCalandrado.find(c => c.id === id);
       if (reg) await reportarFallaConReposicion(reg, est);
     };
   });
+}
 
+function abrirKioscoCalandra(idCal, rolloId = null) {
+  const modal = document.getElementById("modalKioscoOperativo");
+  if (!modal) return;
+
+  // Si ya estaba corriendo en segundo plano para el mismo rollo/trabajo, simplemente restauramos la ventana
+  if (STATE.kiosco.corriendoEnFondo && ((rolloId && STATE.kiosco.rolloId === rolloId) || (!rolloId && STATE.kiosco.registroIds.includes(idCal)))) {
+    restaurarKioscoDesdeFondo();
+    return;
+  }
+
+  let trabajos = [];
+  if (rolloId) {
+    trabajos = STATE.colaCalandrado.filter(c => c.id_rollo_papel === rolloId && !String(c.estado).toLowerCase().includes("terminado"));
+  } else {
+    const r = STATE.colaCalandrado.find(c => c.id === idCal);
+    if (r) {
+      // Si abrimos desde un trabajo individual pero pertenece a un rollo con más trabajos, cargamos el rollo y posicionamos el foco en ese trabajo
+      const delMismoRollo = STATE.colaCalandrado.filter(c => c.id_rollo_papel === r.id_rollo_papel && !String(c.estado).toLowerCase().includes("terminado"));
+      trabajos = delMismoRollo.length > 0 ? delMismoRollo : [r];
+    }
+  }
+  if (trabajos.length === 0) return;
+
+  const idxInicial = idCal ? Math.max(0, trabajos.findIndex(t => t.id === idCal)) : 0;
+
+  STATE.kiosco.abierto = true;
+  STATE.kiosco.corriendoEnFondo = false;
+  STATE.kiosco.pausado = false;
+  STATE.kiosco.acumuladoMs = 0;
+  STATE.kiosco.ultimoInicioMs = Date.now();
+  STATE.kiosco.inicioMs = Date.now();
+  STATE.kiosco.rolloId = rolloId || trabajos[0].id_rollo_papel || "Sin Rollo";
+  STATE.kiosco.trabajos = trabajos;
+  STATE.kiosco.indiceActual = idxInicial;
+  STATE.kiosco.registroIds = trabajos.map(t => t.id);
+  STATE.kiosco.completadosIds = new Set();
+  STATE.kiosco.descartadosIds = new Set();
+
+  renderContenidoModalKiosco();
   modal.classList.add("open");
-  if (STATE.kiosco.timerInterval) clearInterval(STATE.kiosco.timerInterval);
-  STATE.kiosco.timerInterval = setInterval(() => {
-    const seg = Math.floor((Date.now() - STATE.kiosco.inicioMs) / 1000);
-    const mm = String(Math.floor(seg / 60)).padStart(2, "0");
-    const ss = String(seg % 60).padStart(2, "0");
-    const el = document.getElementById("kioscoCronometro");
-    if (el) el.textContent = `${mm}:${ss}`;
-  }, 1000);
+  actualizarDisplayCronometroKiosco();
 
-  document.getElementById("btnKioscoFinalizar").onclick = async () => {
-    clearInterval(STATE.kiosco.timerInterval);
-    const min = Math.max(1, Math.round((Date.now() - STATE.kiosco.inicioMs) / 60000));
+  if (STATE.kiosco.timerInterval) clearInterval(STATE.kiosco.timerInterval);
+  STATE.kiosco.timerInterval = setInterval(actualizarDisplayCronometroKiosco, 1000);
+
+  // Botones de pausa y segundo plano
+  document.getElementById("btnKioscoPausarReanudar").onclick = alternarPausaKiosco;
+  document.getElementById("btnKioscoMinimizar").onclick = minimizarKioscoAFondo;
+  document.getElementById("btnKioscoMinimizar2").onclick = minimizarKioscoAFondo;
+  document.getElementById("btnKioscoCancelarDefinitivo").onclick = () => {
+    if (confirm("¿Cerrar el Modo Kiosko y detener el cronómetro sin guardar?")) {
+      cerrarKioscoDefinitivo();
+    }
+  };
+
+  // Botón: Terminar el trabajo actual y pasar automáticamente al siguiente sin salir del Kiosko
+  document.getElementById("btnKioscoSiguienteTrabajo").onclick = async () => {
+    const trabActual = STATE.kiosco.trabajos[STATE.kiosco.indiceActual];
+    if (!trabActual) return;
+
+    const min = Math.max(1, Math.round(obtenerMsTranscurridosKiosco() / 60000));
     const vel = parseFloat(document.getElementById("kioscoInputVelocidad")?.value) || 50;
     const temp = parseFloat(document.getElementById("kioscoInputTemperatura")?.value) || 205;
 
-    modal.classList.remove("open");
-    for (const id of STATE.kiosco.registroIds) {
+    await finalizarTrabajoCalandrado(trabActual.id, min, true, vel, temp);
+    STATE.kiosco.completadosIds.add(trabActual.id);
+
+    const sigIdx = buscarSiguienteIndicePendienteKiosco(STATE.kiosco.indiceActual);
+    if (sigIdx === -1) {
+      cerrarKioscoDefinitivo();
+      toast(`✅ ¡Todos los trabajos del rollo fueron calandrados!`);
+      await cargarDatosTodo();
+      return;
+    }
+
+    // Reiniciar cronómetro para el siguiente trabajo y continuar corriendo
+    STATE.kiosco.indiceActual = sigIdx;
+    STATE.kiosco.acumuladoMs = 0;
+    STATE.kiosco.ultimoInicioMs = Date.now();
+    STATE.kiosco.pausado = false;
+    toast(`✅ "${trabActual.cliente_archivo}" guardado (${min} min). Pasando al siguiente trabajo.`);
+    renderContenidoModalKiosco();
+    actualizarDisplayCronometroKiosco();
+    await cargarDatosTodo();
+  };
+
+  // Botón: Desechar papel del trabajo actual (merma/descarte) y pasar al siguiente
+  document.getElementById("btnKioscoDescartarSiguiente").onclick = async () => {
+    const trabActual = STATE.kiosco.trabajos[STATE.kiosco.indiceActual];
+    if (!trabActual) return;
+
+    const motivo = prompt(`Vas a desechar el papel de "${trabActual.cliente_archivo}" (${fmtNum(trabActual.metros)}m).\nMotivo del descarte / falla:`, "Papel desechado en Calandra");
+    if (motivo === null) return;
+
+    // Registrar en fallas/reposiciones y marcar como descartado/terminado con nota
+    await sb().from("prod_fallas_reposiciones").insert({
+      empresa_id: "vvgrafic-principal",
+      tipo_registro: "ALERTA_REPOSICION",
+      estacion: "Calandrado",
+      id_rollo: trabActual.id_rollo_papel,
+      batch_id: trabActual.batch_id,
+      archivo_afectado: trabActual.cliente_archivo,
+      tela: trabActual.tela_destino,
+      metros_merma: Number(trabActual.metros) || 0,
+      detalle_reposicion: `Papel desechado (${fmtNum(trabActual.metros)}m)`,
+      motivo: motivo || "Papel desechado en Calandra",
+      estado: "Pendiente"
+    });
+
+    await sb().from("prod_cola_calandrado").update({
+      estado: "Terminado",
+      fecha_terminado: new Date().toISOString(),
+      observaciones: `[PAPEL DESECHADO: ${motivo}] ${trabActual.observaciones || ""}`.trim()
+    }).eq("id", trabActual.id);
+
+    STATE.kiosco.descartadosIds.add(trabActual.id);
+
+    const sigIdx = buscarSiguienteIndicePendienteKiosco(STATE.kiosco.indiceActual);
+    if (sigIdx === -1) {
+      cerrarKioscoDefinitivo();
+      toast(`✂️ Papel desechado registrado. No quedan más trabajos en el rollo.`);
+      await cargarDatosTodo();
+      return;
+    }
+
+    STATE.kiosco.indiceActual = sigIdx;
+    STATE.kiosco.acumuladoMs = 0;
+    STATE.kiosco.ultimoInicioMs = Date.now();
+    toast(`✂️ Papel desechado registrado. Avanzando al siguiente trabajo.`);
+    renderContenidoModalKiosco();
+    actualizarDisplayCronometroKiosco();
+    await cargarDatosTodo();
+  };
+
+  // Botón: Finalizar todo lo pendiente del rollo y cerrar Kiosko
+  document.getElementById("btnKioscoFinalizar").onclick = async () => {
+    const min = Math.max(1, Math.round(obtenerMsTranscurridosKiosco() / 60000));
+    const vel = parseFloat(document.getElementById("kioscoInputVelocidad")?.value) || 50;
+    const temp = parseFloat(document.getElementById("kioscoInputTemperatura")?.value) || 205;
+
+    const pendientesIds = STATE.kiosco.trabajos
+      .map(t => t.id)
+      .filter(id => !STATE.kiosco.completadosIds.has(id) && !STATE.kiosco.descartadosIds.has(id));
+
+    cerrarKioscoDefinitivo();
+    for (const id of pendientesIds) {
       await finalizarTrabajoCalandrado(id, min, true, vel, temp);
     }
-    toast(`✅ Kiosko finalizado (${STATE.kiosco.registroIds.length} trabajos guardados con Vel: ${vel}m/min y Temp: ${temp}°C).`);
+    toast(`✅ Kiosko finalizado (${pendientesIds.length} trabajo(s) guardados con Vel: ${vel}m/min y Temp: ${temp}°C).`);
     await cargarDatosTodo();
   };
 }
@@ -2544,6 +2882,8 @@ export function inicializarEventosUI() {
   });
 
   document.getElementById("btnGuardarModalCrud")?.addEventListener("click", guardarModalCrudUniversal);
+  document.getElementById("btnKioscoBgPausar")?.addEventListener("click", alternarPausaKiosco);
+  document.getElementById("btnKioscoBgVolver")?.addEventListener("click", restaurarKioscoDesdeFondo);
 
   document.querySelectorAll(".vg-modal-close").forEach(btn => {
     btn.addEventListener("click", () => {

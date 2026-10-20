@@ -108,9 +108,29 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
 
 .font-mono { font-family: var(--vg-font-mono) !important; }
 
+/* Grid de 2 filas x 3 botones en Calandrado */
+.cal-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 5px;
+  width: max-content;
+  align-items: center;
+}
+
 /* ESTILOS TARJETAS RESPONSIVAS MÓVIL */
 @media (max-width: 768px) {
   .vg-route-group { grid-template-columns: 1fr; }
+  .cal-actions-grid {
+    width: 100% !important;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .cal-actions-grid button {
+    width: 100% !important;
+    padding: 10px 6px !important;
+    font-size: 13px !important;
+    justify-content: center;
+  }
   .tabla-tarjetas thead { display: none; }
   .tabla-tarjetas { min-width: 100% !important; }
   .tabla-tarjetas, .tabla-tarjetas tbody, .tabla-tarjetas tr { display: block; width: 100%; }
