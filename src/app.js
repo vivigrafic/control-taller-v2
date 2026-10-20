@@ -62,6 +62,7 @@ const STATE = {
 
   kiosco: {
     abierto: false,
+    modo: "rollo", // "individual" (modalEnfoqueCalandra) o "rollo" (modalKioscoOperativo)
     corriendoEnFondo: false,
     pausado: false,
     acumuladoMs: 0,
@@ -124,24 +125,23 @@ function toast(msg, tipo = "info") {
   setTimeout(() => el.remove(), 3500);
 }
 
-// Miniatura cuadrada de 60x60px idéntica a la columna "Diseño" de la Captura 2
-function renderMiniaturaDiseno60(colorStr, disenoStr, nombreStr) {
-  const texto = `${colorStr || ""} ${disenoStr || ""} ${nombreStr || ""}`.toUpperCase();
-  let bg = "#2b0b3f";
-  if (texto.includes("AMARILLO") && texto.includes("ROJO")) {
-    bg = "repeating-linear-gradient(90deg, #ffb300, #ffb300 3px, #e53935 3px, #e53935 6px)";
-  } else if (texto.includes("ROSA")) {
-    bg = "#fdf5e6";
-  } else if (texto.includes("AMARILLO")) {
-    bg = "#fdd835";
-  } else if (texto.includes("VERDE")) {
-    bg = "#43a047";
-  } else if (texto.includes("AZUL") || texto.includes("FRANCIA") || texto.includes("MARINO")) {
-    bg = "#1e88e5";
-  } else if (texto.includes("NEGRO")) {
-    bg = "#212121";
+// Extrae el ID real de Google Drive exactamente como JS_Impresion.html (línea 231) y JS_Calandrado.html (línea 68)
+function extraerThumbIdDrive(fileIdStr) {
+  if (!fileIdStr || String(fileIdStr).trim() === "null" || String(fileIdStr).trim() === "undefined") return null;
+  const s = String(fileIdStr).trim();
+  if (s.startsWith("SUB-PEND-") || s.startsWith("DTF-") || s.startsWith("LOCAL-") || s.startsWith("REPO-")) return null;
+  const matches = s.match(/[a-zA-Z0-9_-]{25,45}/g);
+  return matches && matches.length > 0 ? matches[0] : null;
+}
+
+// Renderiza la miniatura real de Google Drive (60x60px) + texto del Diseño tal cual la App en Uso
+function renderMiniaturaDiseno60(fileIdStr, disenoStr, nombreStr = "") {
+  const thumbId = extraerThumbIdDrive(fileIdStr);
+  const textoDiseno = escHtml(disenoStr || "");
+  if (thumbId) {
+    return `<img src="https://drive.google.com/thumbnail?id=${escHtml(thumbId)}&sz=w100-h100" onerror="this.style.display='none'" style="width:60px; height:60px; margin:0 auto 4px auto; object-fit:cover; border-radius:4px; cursor:pointer; display:block;" onclick="event.stopPropagation(); window.open('https://drive.google.com/file/d/${escHtml(thumbId)}/view', '_blank')" title="${escHtml(nombreStr || disenoStr || "Ver archivo en Drive")}" />${textoDiseno}`;
   }
-  return `<div style="width:56px; height:56px; margin:0 auto; border-radius:4px; background:${bg}; border:1px solid #444;" title="${escHtml(disenoStr || nombreStr || "")}"></div>`;
+  return textoDiseno || `<span style="color:#666; font-size:10px;">-</span>`;
 }
 
 // ============================================================================
@@ -740,9 +740,14 @@ function sincronizarInputsImpresionConState() {
 
   const thumb = document.getElementById("thumbPreviewBox");
   if (thumb) {
-    thumb.innerHTML = STATE.impForm.diseno
-      ? renderMiniaturaDiseno60(STATE.impForm.color, STATE.impForm.diseno, STATE.impForm.diseno)
-      : `<span style="color:#666; font-size:10px;">IMG</span>`;
+    const seleccionados = STATE.pendientesDrive.filter(p => STATE.impForm.archivosSeleccionadosIds.has(p.id));
+    const fId = seleccionados.length > 0 ? seleccionados[0].file_id : "";
+    const tId = extraerThumbIdDrive(fId);
+    if (tId) {
+      thumb.innerHTML = `<img src="https://drive.google.com/thumbnail?id=${escHtml(tId)}&sz=w100-h100" style="width:100%; height:100%; object-fit:cover; cursor:pointer;" onclick="window.open('https://drive.google.com/file/d/${escHtml(tId)}/view', '_blank')" onerror="this.outerHTML='<span style=\\'color:#666; font-size:10px;\\'>IMG</span>'" />`;
+    } else {
+      thumb.innerHTML = `<span style="color:#666; font-size:10px;">IMG</span>`;
+    }
   }
 
   const banner = document.getElementById("impAutoDetectBanner");
@@ -836,7 +841,7 @@ function renderTablaImpresionesConBloques() {
           <td>${actionBtn}</td>
           <td>${fmtDateHora(row.fecha_hora)}</td>
           <td>${formatearAnidadosHTML(row.cliente_archivo)}</td>
-          <td style="text-align:center;">${renderMiniaturaDiseno60(row.color_tela, row.diseno, row.cliente_archivo)}</td>
+          <td style="text-align:center;">${renderMiniaturaDiseno60(row.file_id, row.diseno, row.cliente_archivo)}</td>
           <td>${escHtml(row.tela_destino || "")}</td>
           <td>${escHtml(row.num_rollo_tela || "")}</td>
           <td>${escHtml(row.color_tela || "")}</td>
@@ -905,13 +910,13 @@ function renderModuloCalandrado() {
       let btnAccion = "";
       if (isActivo) {
         btnAccion = `<button type="button" class="btn-cal-montar-rollo" data-rollo="${escHtml(lote)}" style="background:var(--danger); border:none; padding:6px 12px; border-radius:4px; color:#fff; font-weight:bold; cursor:pointer;">⏸️ Desmontar</button>`;
-        btnAccion += `<button type="button" class="btn-cal-kiosco-rollo" data-rollo="${escHtml(lote)}" style="background:#2196F3; border:none; padding:6px 12px; border-radius:4px; color:#fff; font-weight:bold; cursor:pointer; margin-left:5px;">▶️ KIOSKO</button>`;
+        btnAccion += `<button type="button" class="btn-cal-kiosco-rollo" data-rollo="${escHtml(lote)}" style="background:#2196F3; border:none; padding:6px 12px; border-radius:4px; color:#fff; font-weight:bold; cursor:pointer; margin-left:5px;" title="Modo Kiosko / Reproductor de todo el Rollo">▶️ KIOSKO</button>`;
       } else if (isImprimiendo) {
         btnAccion = `<button type="button" disabled style="background:#444; border:none; padding:6px 12px; border-radius:4px; color:#888; font-weight:bold; cursor:not-allowed;">🖨️ Aún Imprimiendo</button>`;
-        btnAccion += `<button type="button" class="btn-cal-kiosco-rollo" data-rollo="${escHtml(lote)}" style="background:#2196F3; border:none; padding:6px 12px; border-radius:4px; color:#fff; font-weight:bold; cursor:pointer; margin-left:5px;">▶️ KIOSKO</button>`;
+        btnAccion += `<button type="button" class="btn-cal-kiosco-rollo" data-rollo="${escHtml(lote)}" style="background:#2196F3; border:none; padding:6px 12px; border-radius:4px; color:#fff; font-weight:bold; cursor:pointer; margin-left:5px;" title="Modo Kiosko / Reproductor de todo el Rollo">▶️ KIOSKO</button>`;
       } else {
         btnAccion = `<button type="button" class="btn-cal-montar-rollo" data-rollo="${escHtml(lote)}" style="background:var(--accent); border:none; padding:6px 12px; border-radius:4px; color:#000; font-weight:bold; cursor:pointer;">⚙️ Montar</button>`;
-        btnAccion += `<button type="button" class="btn-cal-kiosco-rollo" data-rollo="${escHtml(lote)}" style="background:#2196F3; border:none; padding:6px 12px; border-radius:4px; color:#fff; font-weight:bold; cursor:pointer; margin-left:5px;">▶️ KIOSKO</button>`;
+        btnAccion += `<button type="button" class="btn-cal-kiosco-rollo" data-rollo="${escHtml(lote)}" style="background:#2196F3; border:none; padding:6px 12px; border-radius:4px; color:#fff; font-weight:bold; cursor:pointer; margin-left:5px;" title="Modo Kiosko / Reproductor de todo el Rollo">▶️ KIOSKO</button>`;
       }
       const procesarBtn = `<button type="button" class="btn-cal-procesar-rollo" data-rollo="${escHtml(lote)}" style="background:var(--accent); border:none; padding:6px 12px; border-radius:4px; color:#000; font-weight:bold; cursor:pointer; margin-left:5px;">✅ Procesar</button>`;
       const pdfBtn = `<button type="button" class="btn-cal-pdf-rollo" data-rollo="${escHtml(lote)}" style="background:var(--accent-blue); border:none; padding:6px 12px; border-radius:4px; color:#fff; font-weight:bold; cursor:pointer; margin-left:5px;">🖨️ PDF</button>`;
@@ -949,7 +954,7 @@ function renderModuloCalandrado() {
                     <td data-label="Acción" style="width:1%; white-space:nowrap;">
                       <div class="cal-actions-grid">
                         <button type="button" class="btn-secondary btn-cal-terminar" data-id="${c.id}" style="width:auto; padding:5px 8px; border-color:var(--accent); color:var(--accent); cursor:pointer;">✅ Hecho</button>
-                        <button type="button" class="btn-secondary btn-cal-kiosco" data-id="${c.id}" style="width:auto; padding:5px 8px; cursor:pointer;" title="Modo Kiosko">▶️</button>
+                        <button type="button" class="btn-secondary btn-cal-kiosco" data-id="${c.id}" style="width:auto; padding:5px 8px; cursor:pointer;" title="Modo Enfoque Individual (Este trabajo)">▶️</button>
                         <button type="button" class="btn-secondary btn-cal-falla" data-id="${c.id}" style="width:auto; padding:5px 8px; border-color:var(--danger); color:var(--danger); cursor:pointer;" title="Reportar Falla">⚠️</button>
                         <button type="button" class="btn-secondary btn-nota-rapida" data-table="prod_cola_calandrado" data-id="${c.id}" data-batch="${escHtml(c.batch_id)}" style="width:auto; padding:5px 8px; cursor:pointer;" title="Nota">📝</button>
                         <button type="button" class="btn-secondary btn-crud-edit" data-table="prod_cola_calandrado" data-id="${c.id}" style="width:auto; padding:5px 8px; cursor:pointer;" title="Editar">✏️</button>
@@ -958,7 +963,7 @@ function renderModuloCalandrado() {
                     </td>
                     <td data-label="Fecha">${fmtDateHora(c.fecha_hora)}</td>
                     <td data-label="Cliente/Archivo">${formatearAnidadosHTML(c.cliente_archivo)}</td>
-                    <td data-label="Diseño" style="text-align:center;">${renderMiniaturaDiseno60(c.color_tela, c.diseno, c.cliente_archivo)}</td>
+                    <td data-label="Diseño" style="text-align:center;">${renderMiniaturaDiseno60(c.file_id, c.diseno, c.cliente_archivo)}</td>
                     <td data-label="Tela">${escHtml(c.tela_destino || "")}</td>
                     <td data-label="Nº Rollo">${escHtml(c.num_rollo_tela || "")}</td>
                     <td data-label="Color">${escHtml(c.color_tela || "")}</td>
@@ -1113,7 +1118,7 @@ function renderModuloCalandrado() {
               </td>
               <td data-label="Fecha">${fmtDateHora(c.fecha_terminado || c.fecha_hora)}</td>
               <td data-label="Cliente/Archivo">${formatearAnidadosHTML(c.cliente_archivo)}</td>
-              <td data-label="Diseño" style="text-align:center;">${renderMiniaturaDiseno60(c.color_tela, c.diseno, c.cliente_archivo)}</td>
+              <td data-label="Diseño" style="text-align:center;">${renderMiniaturaDiseno60(c.file_id, c.diseno, c.cliente_archivo)}</td>
               <td data-label="Tela">${escHtml(c.tela_destino || "")}</td>
               <td data-label="Nº Rollo">${escHtml(c.num_rollo_tela || "")}</td>
               <td data-label="Color">${escHtml(c.color_tela || "")}</td>
@@ -1782,7 +1787,10 @@ function imprimirEtiquetaRollo(loteId, metrosTotales) {
 
 function renderCeldaDisenoPDF(c) {
   const textoFallback = escHtml(c.diseno || c.cliente_archivo || "-");
-  // Si el campo diseno es una URL o data URI de imagen, intentamos mostrar la miniatura con fallback al nombre
+  const thumbId = extraerThumbIdDrive(c.file_id);
+  if (thumbId) {
+    return `<img src="https://drive.google.com/thumbnail?id=${escHtml(thumbId)}&sz=w120-h120" alt="${textoFallback}" style="max-height:24px; max-width:95px; object-fit:contain; display:block; margin:0 auto;" onerror="this.outerHTML='<span>${textoFallback}</span>'" />`;
+  }
   const d = String(c.diseno || "").trim();
   if (d.startsWith("http://") || d.startsWith("https://") || d.startsWith("data:image/")) {
     return `<img src="${escHtml(d)}" alt="${textoFallback}" style="max-height:24px; max-width:95px; object-fit:contain; display:block; margin:0 auto;" onerror="this.outerHTML='<span>${textoFallback}</span>'" />`;
@@ -2074,33 +2082,50 @@ function obtenerMsTranscurridosKiosco() {
 
 function formatearRelojKiosco(ms) {
   const seg = Math.floor(ms / 1000);
-  const mm = String(Math.floor(seg / 60)).padStart(2, "0");
+  const hh = String(Math.floor(seg / 3600)).padStart(2, "0");
+  const mm = String(Math.floor((seg % 3600) / 60)).padStart(2, "0");
   const ss = String(seg % 60).padStart(2, "0");
-  return `${mm}:${ss}`;
+  return `${hh}:${mm}:${ss}`;
 }
 
 function actualizarDisplayCronometroKiosco() {
   const txt = formatearRelojKiosco(obtenerMsTranscurridosKiosco());
+
+  // Reloj en Modo Enfoque Individual
+  const elEnf = document.getElementById("enfReloj");
+  if (elEnf) {
+    elEnf.textContent = txt;
+    elEnf.style.color = STATE.kiosco.pausado ? "#ff9800" : "#00E676";
+  }
+  const btnEnfPausa = document.getElementById("btnEnfPausaReanudar");
+  if (btnEnfPausa) {
+    btnEnfPausa.innerHTML = STATE.kiosco.pausado ? "▶️ REANUDAR" : "⏸️ PAUSAR";
+    btnEnfPausa.style.borderColor = STATE.kiosco.pausado ? "#00E676" : "#ff9800";
+    btnEnfPausa.style.color = STATE.kiosco.pausado ? "#00E676" : "#ff9800";
+  }
+
+  // Reloj en Modo Kiosko General (Rollo Completo)
   const elModal = document.getElementById("kioscoCronometro");
   if (elModal) {
     elModal.textContent = txt;
-    elModal.style.color = STATE.kiosco.pausado ? "#ff9800" : "#fff";
-  }
-  const elBg = document.getElementById("kioscoBgCronometro");
-  if (elBg) {
-    elBg.textContent = txt;
-    elBg.style.color = STATE.kiosco.pausado ? "#ff9800" : "#00E676";
+    elModal.style.color = STATE.kiosco.pausado ? "#ff9800" : "#00E676";
   }
   const badgePausa = document.getElementById("kioscoEstadoPausaBadge");
   if (badgePausa) badgePausa.style.display = STATE.kiosco.pausado ? "inline-block" : "none";
 
   const btnPausaModal = document.getElementById("btnKioscoPausarReanudar");
   if (btnPausaModal) {
-    btnPausaModal.innerHTML = STATE.kiosco.pausado ? "▶️ REANUDAR RELOJ" : "⏸️ PAUSAR RELOJ";
+    btnPausaModal.innerHTML = STATE.kiosco.pausado ? "▶️ REANUDAR" : "⏸️ PAUSAR";
     btnPausaModal.style.borderColor = STATE.kiosco.pausado ? "#00E676" : "#ff9800";
     btnPausaModal.style.color = STATE.kiosco.pausado ? "#00E676" : "#ff9800";
   }
 
+  // Banner flotante en 2º plano
+  const elBg = document.getElementById("kioscoBgCronometro");
+  if (elBg) {
+    elBg.textContent = txt;
+    elBg.style.color = STATE.kiosco.pausado ? "#ff9800" : "#00E676";
+  }
   const btnPausaBg = document.getElementById("btnKioscoBgPausar");
   if (btnPausaBg) {
     btnPausaBg.innerHTML = STATE.kiosco.pausado ? "▶️ Reanudar" : "⏸️ Pausar";
@@ -2112,7 +2137,7 @@ function actualizarDisplayCronometroKiosco() {
     const trabActual = STATE.kiosco.trabajos[STATE.kiosco.indiceActual];
     const lblRollo = document.getElementById("kioscoBgRollo");
     const lblTrab = document.getElementById("kioscoBgTrabajoActual");
-    if (lblRollo) lblRollo.textContent = STATE.kiosco.rolloId || "Sin Rollo";
+    if (lblRollo) lblRollo.textContent = STATE.kiosco.modo === "INDIVIDUAL" ? `ENFOQUE (${STATE.kiosco.rolloId || "-"})` : (STATE.kiosco.rolloId || "Sin Rollo");
     if (lblTrab) lblTrab.textContent = trabActual ? `${trabActual.cliente_archivo} (${fmtNum(trabActual.metros)}m)` : "-";
   }
 }
@@ -2132,21 +2157,32 @@ function alternarPausaKiosco() {
 }
 
 function minimizarKioscoAFondo() {
-  const modal = document.getElementById("modalKioscoOperativo");
-  if (modal) modal.classList.remove("open");
+  const modalK = document.getElementById("modalKioscoOperativo");
+  const modalE = document.getElementById("modalEnfoqueCalandra");
+  if (modalK) modalK.classList.remove("open");
+  if (modalE) modalE.classList.remove("open");
   STATE.kiosco.abierto = false;
   STATE.kiosco.corriendoEnFondo = true;
   actualizarDisplayCronometroKiosco();
-  toast("👁️ Kiosko en 2º plano. El tiempo sigue corriendo arriba.");
+  toast("👁️ Cronómetro en 2º plano. El tiempo sigue corriendo arriba.");
 }
 
 function restaurarKioscoDesdeFondo() {
-  const modal = document.getElementById("modalKioscoOperativo");
-  if (!modal) return;
   STATE.kiosco.corriendoEnFondo = false;
   STATE.kiosco.abierto = true;
-  renderContenidoModalKiosco();
-  modal.classList.add("open");
+  if (STATE.kiosco.modo === "INDIVIDUAL") {
+    const modalE = document.getElementById("modalEnfoqueCalandra");
+    if (modalE) {
+      renderContenidoModalEnfoqueIndividual();
+      modalE.classList.add("open");
+    }
+  } else {
+    const modalK = document.getElementById("modalKioscoOperativo");
+    if (modalK) {
+      renderContenidoModalKiosco();
+      modalK.classList.add("open");
+    }
+  }
   actualizarDisplayCronometroKiosco();
 }
 
@@ -2156,8 +2192,10 @@ function cerrarKioscoDefinitivo() {
   STATE.kiosco.corriendoEnFondo = false;
   STATE.kiosco.pausado = false;
   STATE.kiosco.acumuladoMs = 0;
-  const modal = document.getElementById("modalKioscoOperativo");
-  if (modal) modal.classList.remove("open");
+  const modalK = document.getElementById("modalKioscoOperativo");
+  const modalE = document.getElementById("modalEnfoqueCalandra");
+  if (modalK) modalK.classList.remove("open");
+  if (modalE) modalE.classList.remove("open");
   const bannerBg = document.getElementById("kioscoBackgroundBanner");
   if (bannerBg) bannerBg.style.display = "none";
 }
@@ -2174,6 +2212,49 @@ function buscarSiguienteIndicePendienteKiosco(desdeIdx) {
   return -1;
 }
 
+// ============================================================================
+// 1. MODO ENFOQUE INDIVIDUAL (1 SOLO TRABAJO - #modalEnfoqueCalandra)
+// ============================================================================
+function renderContenidoModalEnfoqueIndividual() {
+  const t = STATE.kiosco.trabajos[0];
+  if (!t) return;
+
+  const thumbId = extraerThumbIdDrive(t.file_id);
+  const imgContainer = document.getElementById("enfoqueImgContainer");
+  const imgEl = document.getElementById("enfoqueImg");
+  if (thumbId && imgContainer && imgEl) {
+    imgEl.src = `https://drive.google.com/thumbnail?id=${encodeURIComponent(thumbId)}&sz=w400-h400`;
+    imgContainer.style.display = "block";
+    imgEl.onerror = () => { imgContainer.style.display = "none"; };
+  } else if (imgContainer) {
+    imgContainer.style.display = "none";
+  }
+
+  document.getElementById("enfoqueTela").textContent = t.tela_destino || "-";
+  document.getElementById("enfoqueMetros").textContent = `${fmtNum(t.metros)} m`;
+  document.getElementById("enfoqueBobina").textContent = t.id_rollo_papel || "Sin Rollo";
+  document.getElementById("enfoqueCliente").textContent = t.cliente_archivo || "-";
+  document.getElementById("enfoqueNRollo").textContent = t.num_rollo_tela || "-";
+  document.getElementById("enfoqueColor").textContent = t.color_tela || "-";
+
+  const obsRow = document.getElementById("enfoqueObsRow");
+  const obsEl = document.getElementById("enfoqueObs");
+  if (t.observaciones && t.observaciones !== "-") {
+    obsEl.textContent = t.observaciones;
+    obsRow.style.display = "flex";
+  } else {
+    obsRow.style.display = "none";
+  }
+
+  const inpVel = document.getElementById("enfVel");
+  const inpTemp = document.getElementById("enfTemp");
+  if (inpVel && !inpVel.value) inpVel.value = t.velocidad || 50;
+  if (inpTemp && !inpTemp.value) inpTemp.value = t.temperatura || 205;
+}
+
+// ============================================================================
+// 2. MODO KIOSKO GENERAL DE ROLLO COMPLETO (#modalKioscoOperativo)
+// ============================================================================
 function renderContenidoModalKiosco() {
   const modal = document.getElementById("modalKioscoOperativo");
   if (!modal) return;
@@ -2190,20 +2271,64 @@ function renderContenidoModalKiosco() {
   const pendientesRestantes = trabajos.filter(t => !STATE.kiosco.completadosIds.has(t.id) && !STATE.kiosco.descartadosIds.has(t.id));
   const totalM = pendientesRestantes.reduce((a, b) => a + (Number(b.metros) || 0), 0);
 
-  document.getElementById("kioscoTitulo").textContent = `▶️ MODO KIOSKO - ROLLO: ${rolloNombre}`;
+  const thumbIdActual = extraerThumbIdDrive(trabActual.file_id);
+  const imgPreviewHtml = thumbIdActual
+    ? `<img src="https://drive.google.com/thumbnail?id=${escHtml(thumbIdActual)}&sz=w600-h600" style="width:100%; height:240px; object-fit:contain; background:#000; border:2px solid var(--accent-magenta); border-radius:8px; margin-bottom:10px;" onerror="this.style.display='none';" />`
+    : `<div style="width:100%; height:140px; background:#000; border:2px dashed #444; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#888; font-weight:bold; margin-bottom:10px;">${escHtml(trabActual.diseno || "SIN VISTA PREVIA")}</div>`;
+
+  document.getElementById("kioscoTitulo").textContent = `🔥 MODO KIOSKO ACTIVO (BOBINA: ${rolloNombre})`;
+  const proximoTrab = trabajos[STATE.kiosco.indiceActual + 1];
+
   document.getElementById("kioscoSubtitulo").innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center; background:#151821; border:1px solid #2a324b; padding:10px 14px; border-radius:8px; margin-bottom:10px;">
-      <div>
-        <div style="font-size:11px; color:#aaa; text-transform:uppercase;">TRABAJO EN CURSO (${STATE.kiosco.indiceActual + 1} de ${trabajos.length}):</div>
-        <div style="font-size:15px; font-weight:bold; color:#00E676;">🔥 ${escHtml(trabActual.cliente_archivo)} (${fmtNum(trabActual.metros)} m)</div>
+    <!-- Encabezado Kiosko General igual al original -->
+    <div style="display:flex; justify-content:space-between; align-items:center; background:#151821; border:1px solid #2a324b; padding:8px 14px; border-radius:8px; margin-bottom:12px;">
+      <div style="font-size:15px; font-weight:bold; color:#00E676;">
+        TRABAJO ${STATE.kiosco.indiceActual + 1} DE ${trabajos.length}
       </div>
-      <div style="text-align:right;">
-        <div style="font-size:11px; color:#aaa;">RESTANTE DEL ROLLO</div>
-        <div style="font-size:22px; color:#4CAF50; font-weight:bold;">${fmtNum(totalM)} m</div>
+      <div style="text-align:right; font-size:13px; color:#aaa;">
+        Restante del Rollo: <strong style="color:#4CAF50; font-size:16px;">${fmtNum(totalM)} m</strong>
       </div>
     </div>
 
-    <!-- Parámetros operativos del trabajo / máquina -->
+    <!-- Reproductor Principal de 2 Columnas (igual a panelReproductorCalandra original) -->
+    <div style="display:grid; grid-template-columns: 1fr 1.6fr; gap:16px; align-items:center; background:#141720; padding:14px; border-radius:8px; border:1px solid #2a324b; margin-bottom:14px;">
+      <div style="text-align:center;">
+        ${imgPreviewHtml}
+        <div style="font-size:34px; font-weight:bold; color:var(--accent-magenta); line-height:1;">${fmtNum(trabActual.metros)} m</div>
+        <div style="color:#aaa; font-size:11px; margin-top:2px;">METROS A CALANDRAR</div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <div style="background:#0f1117; padding:10px 12px; border-radius:8px; border-left:5px solid #2196F3;">
+          <div style="color:#888; font-size:11px; font-weight:bold;">TELA A BUSCAR EN DEPÓSITO:</div>
+          <div style="font-size:26px; font-weight:bold; color:#2196F3; text-transform:uppercase;">${escHtml(trabActual.tela_destino || "-")}</div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1.5fr 1fr; gap:10px;">
+          <div style="background:#0f1117; padding:10px; border-radius:8px; border:1px solid #333;">
+            <div style="color:#888; font-size:11px;">CLIENTE / DISEÑO:</div>
+            <div style="font-size:15px; font-weight:bold; color:#fff; word-break:break-word;">${escHtml(trabActual.cliente_archivo)}</div>
+          </div>
+          <div style="background:#0f1117; padding:10px; border-radius:8px; border:1px solid #333;">
+            <div style="color:#888; font-size:11px;">Nº ROLLO / COLOR:</div>
+            <div style="font-size:16px; font-weight:bold; color:#ff9800;">${escHtml(trabActual.num_rollo_tela || "-")} (${escHtml(trabActual.color_tela || "-")})</div>
+          </div>
+        </div>
+
+        ${trabActual.observaciones && trabActual.observaciones !== "-" ? `
+          <div style="background:rgba(255,152,0,0.12); padding:8px 12px; border-radius:6px; border:1px solid #ff9800; color:#ff9800; font-weight:bold; font-size:13px;">
+            ⚠️ NOTA: ${escHtml(trabActual.observaciones)}
+          </div>
+        ` : ""}
+
+        <div style="background:rgba(255, 152, 0, 0.08); padding:8px 12px; border-radius:6px; border:1px dashed #ff9800; font-size:12px;">
+          <span style="color:#ff9800; font-weight:bold;">⏭️ PRÓXIMO EN LA BOBINA:</span>
+          <span style="color:#ccc; margin-left:6px;">${proximoTrab ? `${escHtml(proximoTrab.tela_destino)} — ${fmtNum(proximoTrab.metros)}m (${escHtml(proximoTrab.cliente_archivo)})` : "🏁 Fin de la Bobina"}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Parámetros operativos (Velocidad y Temperatura) -->
     <div style="background:#111; border:1px solid #333; padding:10px; border-radius:8px; margin-bottom:12px; display:flex; justify-content:space-around; align-items:center; flex-wrap:wrap; gap:10px;">
       <div style="text-align:center;">
         <label style="font-size:11px; color:#aaa; display:block; margin-bottom:4px; font-weight:bold;">⚙️ VELOCIDAD (m/min)</label>
@@ -2213,10 +2338,14 @@ function renderContenidoModalKiosco() {
         <label style="font-size:11px; color:#aaa; display:block; margin-bottom:4px; font-weight:bold;">🔥 TEMPERATURA (°C)</label>
         <input type="number" id="kioscoInputTemperatura" value="${tempActual}" step="1" style="width:110px; font-size:20px; text-align:center; padding:6px; background:#1a1c23; color:#ff9800; border:1px solid #ff9800; border-radius:6px; font-weight:bold;" />
       </div>
+      <div style="display:flex; gap:8px;">
+        <button type="button" class="btn-kiosco-reportar-falla" data-id="${trabActual.id}" data-estacion="Calandrado" style="background:rgba(216,27,96,0.18); border:1px solid var(--accent-magenta); color:#ff4081; padding:10px 14px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">⚠️ FALLA CALANDRA</button>
+        <button type="button" class="btn-kiosco-reportar-falla" data-id="${trabActual.id}" data-estacion="Impresión" style="background:rgba(255,152,0,0.18); border:1px solid var(--accent-orange); color:#ff9800; padding:10px 14px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">⚠️ FALLA IMPRESIÓN</button>
+      </div>
     </div>
 
     <div style="color:#aaa; font-size:12px; font-weight:bold; margin-bottom:6px;">
-      SECUENCIA DE TRABAJOS DEL ROLLO (${pendientesRestantes.length} pendientes de ${trabajos.length}) — <span style="color:#00E676;">Tocá un trabajo para seleccionarlo</span>:
+      SECUENCIA DEL ROLLO (${pendientesRestantes.length} pendientes de ${trabajos.length}) — <span style="color:#00E676;">Tocá cualquier trabajo para saltar a él</span>:
     </div>
     ${trabajos.map((t, idx) => {
       const esActual = idx === STATE.kiosco.indiceActual;
@@ -2242,37 +2371,25 @@ function renderContenidoModalKiosco() {
       }
 
       return `
-        <div class="kiosco-item-card" data-kiosco-idx="${idx}" style="background:${bgStyle}; padding:10px 12px; border-radius:6px; border:${borderStyle}; margin-bottom:8px; font-size:13px; cursor:pointer; transition:all 0.15s;">
-          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-            <div>
-              <div style="margin-bottom:4px;">${badgeEstado}</div>
-              <div style="font-weight:bold; font-size:14px; color:#fff; margin-bottom:4px;">${escHtml(t.cliente_archivo)}</div>
-              <div><strong>Tela:</strong> <span style="color:#2196F3; font-weight:bold;">${escHtml(t.tela_destino || "-")}</span> | <strong>Rollo:</strong> ${escHtml(t.num_rollo_tela || "-")} | <strong>Color:</strong> ${escHtml(t.color_tela || "-")}</div>
-              ${t.observaciones ? `<div style="color:#ff9800; font-weight:bold; margin-top:4px;">Obs: ${escHtml(t.observaciones)}</div>` : ""}
-            </div>
-            <div style="font-size:16px; font-weight:bold; color:var(--accent); white-space:nowrap;">${fmtNum(t.metros)}m</div>
+        <div class="kiosco-item-card" data-kiosco-idx="${idx}" style="background:${bgStyle}; padding:8px 12px; border-radius:6px; border:${borderStyle}; margin-bottom:6px; font-size:12px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+          <div>
+            ${badgeEstado}
+            <strong style="color:#fff; margin-left:6px;">${escHtml(t.cliente_archivo)}</strong>
+            <span style="color:#2196F3; font-weight:bold; margin-left:6px;">[${escHtml(t.tela_destino || "-")}]</span>
           </div>
-
-          <div style="margin-top:8px; padding-top:8px; border-top:1px solid #2a2a2a; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-            ${!esActual && !esCompletado && !esDescartado ? `<button type="button" class="btn-kiosco-elegir-este" data-idx="${idx}" style="background:#2196F3; border:none; color:#fff; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">🎯 Cronometrar este</button>` : ""}
-            <button type="button" class="btn-kiosco-reportar-falla" data-id="${t.id}" data-estacion="Calandrado" style="background:rgba(216,27,96,0.15); border:1px solid var(--accent-magenta); color:#ff4081; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">⚠️ Falla Calandrado</button>
-            <button type="button" class="btn-kiosco-reportar-falla" data-id="${t.id}" data-estacion="Impresión" style="background:rgba(255,152,0,0.15); border:1px solid var(--accent-orange); color:#ff9800; padding:5px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">⚠️ Falla Impresión</button>
-          </div>
+          <div style="font-size:14px; font-weight:bold; color:var(--accent); white-space:nowrap;">${fmtNum(t.metros)}m</div>
         </div>
       `;
     }).join("")}
   `;
 
-  // Mostrar u ocultar botones de secuencia según cantidad de trabajos pendientes
   const btnSig = document.getElementById("btnKioscoSiguienteTrabajo");
   const btnDesc = document.getElementById("btnKioscoDescartarSiguiente");
   if (btnSig) btnSig.style.display = trabajos.length > 1 ? "block" : "none";
   if (btnDesc) btnDesc.style.display = "block";
 
-  // Seleccionar trabajo al hacer clic en la tarjeta
   modal.querySelectorAll(".kiosco-item-card").forEach(card => {
-    card.onclick = (e) => {
-      if (e.target.closest(".btn-kiosco-reportar-falla")) return;
+    card.onclick = () => {
       const idx = parseInt(card.getAttribute("data-kiosco-idx"), 10);
       if (!isNaN(idx) && idx !== STATE.kiosco.indiceActual) {
         STATE.kiosco.indiceActual = idx;
@@ -2294,30 +2411,81 @@ function renderContenidoModalKiosco() {
 }
 
 function abrirKioscoCalandra(idCal, rolloId = null) {
-  const modal = document.getElementById("modalKioscoOperativo");
-  if (!modal) return;
+  const esModoRolloGeneral = Boolean(rolloId);
 
-  // Si ya estaba corriendo en segundo plano para el mismo rollo/trabajo, simplemente restauramos la ventana
-  if (STATE.kiosco.corriendoEnFondo && ((rolloId && STATE.kiosco.rolloId === rolloId) || (!rolloId && STATE.kiosco.registroIds.includes(idCal)))) {
-    restaurarKioscoDesdeFondo();
+  // Si ya estaba corriendo en segundo plano para el mismo rollo/trabajo, restauramos la ventana correspondiente
+  if (STATE.kiosco.corriendoEnFondo) {
+    if ((esModoRolloGeneral && STATE.kiosco.modo === "ROLLO" && STATE.kiosco.rolloId === rolloId) ||
+        (!esModoRolloGeneral && STATE.kiosco.modo === "INDIVIDUAL" && STATE.kiosco.registroIds.includes(idCal))) {
+      restaurarKioscoDesdeFondo();
+      return;
+    }
+  }
+
+  if (!esModoRolloGeneral) {
+    // ========================================================================
+    // MODO ENFOQUE INDIVIDUAL (1 SOLO TRABAJO - #modalEnfoqueCalandra)
+    // ========================================================================
+    const r = STATE.colaCalandrado.find(c => c.id === idCal);
+    if (!r) return;
+    const modalE = document.getElementById("modalEnfoqueCalandra");
+    if (!modalE) return;
+
+    STATE.kiosco.modo = "INDIVIDUAL";
+    STATE.kiosco.abierto = true;
+    STATE.kiosco.corriendoEnFondo = false;
+    STATE.kiosco.pausado = false;
+    STATE.kiosco.acumuladoMs = 0;
+    STATE.kiosco.ultimoInicioMs = Date.now();
+    STATE.kiosco.inicioMs = Date.now();
+    STATE.kiosco.rolloId = r.id_rollo_papel || "Sin Rollo";
+    STATE.kiosco.trabajos = [r];
+    STATE.kiosco.indiceActual = 0;
+    STATE.kiosco.registroIds = [r.id];
+    STATE.kiosco.completadosIds = new Set();
+    STATE.kiosco.descartadosIds = new Set();
+
+    document.getElementById("enfVel").value = r.velocidad || 50;
+    document.getElementById("enfTemp").value = r.temperatura || 205;
+
+    renderContenidoModalEnfoqueIndividual();
+    modalE.classList.add("open");
+    actualizarDisplayCronometroKiosco();
+
+    if (STATE.kiosco.timerInterval) clearInterval(STATE.kiosco.timerInterval);
+    STATE.kiosco.timerInterval = setInterval(actualizarDisplayCronometroKiosco, 1000);
+
+    document.getElementById("btnEnfPausaReanudar").onclick = alternarPausaKiosco;
+    document.getElementById("btnEnfMinimizar").onclick = minimizarKioscoAFondo;
+    document.getElementById("btnEnfCerrar").onclick = () => {
+      if (confirm("¿Salir del Modo Enfoque y detener el cronómetro sin guardar?")) {
+        cerrarKioscoDefinitivo();
+      }
+    };
+    document.getElementById("btnEnfFallaCal").onclick = () => reportarFallaConReposicion(r, "Calandrado");
+    document.getElementById("btnEnfFallaImp").onclick = () => reportarFallaConReposicion(r, "Impresión");
+    document.getElementById("btnEnfTerminar").onclick = async () => {
+      const min = Math.max(1, Math.round(obtenerMsTranscurridosKiosco() / 60000));
+      const vel = parseFloat(document.getElementById("enfVel")?.value) || 50;
+      const temp = parseFloat(document.getElementById("enfTemp")?.value) || 205;
+      cerrarKioscoDefinitivo();
+      await finalizarTrabajoCalandrado(r.id, min, true, vel, temp);
+      toast(`✅ Trabajo finalizado (${min} min | Vel: ${vel} | Temp: ${temp}°C).`);
+      await cargarDatosTodo();
+    };
     return;
   }
 
-  let trabajos = [];
-  if (rolloId) {
-    trabajos = STATE.colaCalandrado.filter(c => c.id_rollo_papel === rolloId && !String(c.estado).toLowerCase().includes("terminado"));
-  } else {
-    const r = STATE.colaCalandrado.find(c => c.id === idCal);
-    if (r) {
-      // Si abrimos desde un trabajo individual pero pertenece a un rollo con más trabajos, cargamos el rollo y posicionamos el foco en ese trabajo
-      const delMismoRollo = STATE.colaCalandrado.filter(c => c.id_rollo_papel === r.id_rollo_papel && !String(c.estado).toLowerCase().includes("terminado"));
-      trabajos = delMismoRollo.length > 0 ? delMismoRollo : [r];
-    }
-  }
+  // ==========================================================================
+  // MODO KIOSKO GENERAL DE ROLLO COMPLETO (#modalKioscoOperativo)
+  // ==========================================================================
+  const modal = document.getElementById("modalKioscoOperativo");
+  if (!modal) return;
+
+  const trabajos = STATE.colaCalandrado.filter(c => c.id_rollo_papel === rolloId && !String(c.estado).toLowerCase().includes("terminado"));
   if (trabajos.length === 0) return;
 
-  const idxInicial = idCal ? Math.max(0, trabajos.findIndex(t => t.id === idCal)) : 0;
-
+  STATE.kiosco.modo = "ROLLO";
   STATE.kiosco.abierto = true;
   STATE.kiosco.corriendoEnFondo = false;
   STATE.kiosco.pausado = false;
@@ -2326,7 +2494,7 @@ function abrirKioscoCalandra(idCal, rolloId = null) {
   STATE.kiosco.inicioMs = Date.now();
   STATE.kiosco.rolloId = rolloId || trabajos[0].id_rollo_papel || "Sin Rollo";
   STATE.kiosco.trabajos = trabajos;
-  STATE.kiosco.indiceActual = idxInicial;
+  STATE.kiosco.indiceActual = 0;
   STATE.kiosco.registroIds = trabajos.map(t => t.id);
   STATE.kiosco.completadosIds = new Set();
   STATE.kiosco.descartadosIds = new Set();
@@ -2338,7 +2506,6 @@ function abrirKioscoCalandra(idCal, rolloId = null) {
   if (STATE.kiosco.timerInterval) clearInterval(STATE.kiosco.timerInterval);
   STATE.kiosco.timerInterval = setInterval(actualizarDisplayCronometroKiosco, 1000);
 
-  // Botones de pausa y segundo plano
   document.getElementById("btnKioscoPausarReanudar").onclick = alternarPausaKiosco;
   document.getElementById("btnKioscoMinimizar").onclick = minimizarKioscoAFondo;
   document.getElementById("btnKioscoMinimizar2").onclick = minimizarKioscoAFondo;
@@ -2348,7 +2515,6 @@ function abrirKioscoCalandra(idCal, rolloId = null) {
     }
   };
 
-  // Botón: Terminar el trabajo actual y pasar automáticamente al siguiente sin salir del Kiosko
   document.getElementById("btnKioscoSiguienteTrabajo").onclick = async () => {
     const trabActual = STATE.kiosco.trabajos[STATE.kiosco.indiceActual];
     if (!trabActual) return;
@@ -2368,7 +2534,6 @@ function abrirKioscoCalandra(idCal, rolloId = null) {
       return;
     }
 
-    // Reiniciar cronómetro para el siguiente trabajo y continuar corriendo
     STATE.kiosco.indiceActual = sigIdx;
     STATE.kiosco.acumuladoMs = 0;
     STATE.kiosco.ultimoInicioMs = Date.now();
@@ -2379,7 +2544,6 @@ function abrirKioscoCalandra(idCal, rolloId = null) {
     await cargarDatosTodo();
   };
 
-  // Botón: Desechar papel del trabajo actual (merma/descarte) y pasar al siguiente
   document.getElementById("btnKioscoDescartarSiguiente").onclick = async () => {
     const trabActual = STATE.kiosco.trabajos[STATE.kiosco.indiceActual];
     if (!trabActual) return;
@@ -2387,7 +2551,6 @@ function abrirKioscoCalandra(idCal, rolloId = null) {
     const motivo = prompt(`Vas a desechar el papel de "${trabActual.cliente_archivo}" (${fmtNum(trabActual.metros)}m).\nMotivo del descarte / falla:`, "Papel desechado en Calandra");
     if (motivo === null) return;
 
-    // Registrar en fallas/reposiciones y marcar como descartado/terminado con nota
     await sb().from("prod_fallas_reposiciones").insert({
       empresa_id: "vvgrafic-principal",
       tipo_registro: "ALERTA_REPOSICION",
@@ -2427,7 +2590,6 @@ function abrirKioscoCalandra(idCal, rolloId = null) {
     await cargarDatosTodo();
   };
 
-  // Botón: Finalizar todo lo pendiente del rollo y cerrar Kiosko
   document.getElementById("btnKioscoFinalizar").onclick = async () => {
     const min = Math.max(1, Math.round(obtenerMsTranscurridosKiosco() / 60000));
     const vel = parseFloat(document.getElementById("kioscoInputVelocidad")?.value) || 50;

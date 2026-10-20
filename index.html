@@ -634,32 +634,76 @@
     </div>
   </div>
 
+  <!-- MODAL 1: MODO ENFOQUE / KIOSKO INDIVIDUAL (Un solo trabajo — idéntico a modalEnfoqueCalandra de Index.html) -->
+  <div id="modalEnfoqueCalandra" class="modal-overlay">
+    <div class="modal-content" style="background:#1a1c23; border:1px solid #333; border-radius:12px; max-width:520px; width:100%; padding:18px; text-align:center; position:relative; box-shadow:0 10px 30px rgba(0,0,0,0.7); max-height:92dvh; overflow-y:auto;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <span style="font-size:12px; font-weight:bold; color:var(--accent-blue); text-transform:uppercase;">🎯 MODO ENFOQUE INDIVIDUAL</span>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <button type="button" id="btnEnfMinimizar" style="background:#2196F3; border:none; color:#fff; padding:5px 10px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer;">👁️ Salir (Sigue el reloj)</button>
+          <button type="button" id="btnEnfCerrar" style="background:none; border:1px solid #ff5252; color:#ff5252; padding:4px 9px; border-radius:6px; font-size:13px; font-weight:bold; cursor:pointer;">✖</button>
+        </div>
+      </div>
+
+      <div id="enfoqueImgCont" style="width:100%; height:150px; background:#000; border-radius:8px; margin-bottom:12px; display:flex; align-items:center; justify-content:center; overflow:hidden; border:1px solid #333;">
+        <img id="enfoqueImg" src="" alt="Vista previa diseño" style="max-width:100%; max-height:100%; object-fit:contain;" onerror="this.style.display='none'" />
+      </div>
+
+      <h2 id="enfoqueTela" style="color:#2196F3; font-size:28px; margin:0 0 4px 0; border:none; padding:0;">TELA</h2>
+      <div id="enfoqueMetros" style="color:#4CAF50; font-size:34px; font-weight:bold; margin-bottom:10px;">0.00 m</div>
+
+      <div style="background:#222; padding:10px 12px; border-radius:8px; text-align:left; font-size:13px; margin-bottom:12px; color:#ddd; line-height:1.45;">
+        <p style="margin:0 0 4px 0;"><strong>Bobina Papel:</strong> <span id="enfoqueBobina" style="color:var(--accent);"></span></p>
+        <p style="margin:0 0 4px 0;"><strong>Cliente/Diseño:</strong> <span id="enfoqueCliente"></span></p>
+        <p style="margin:0 0 4px 0;"><strong>Nº Rollo:</strong> <span id="enfoqueNRollo"></span> | <strong>Color:</strong> <span id="enfoqueColor"></span></p>
+        <p style="margin:0; color:#ff9800;"><strong>Obs:</strong> <span id="enfoqueObs"></span></p>
+      </div>
+
+      <div style="display:flex; gap:10px; justify-content:center; margin-bottom:12px;">
+        <div style="flex:1;">
+          <label style="font-size:11px; color:#aaa; display:block; margin-bottom:3px;">⚙️ Velocidad (m/min)</label>
+          <input type="number" id="enfVel" placeholder="Velocidad" style="width:100%; padding:8px; font-size:18px; font-weight:bold; border-radius:6px; background:#111; color:#00E676; border:1px solid #4CAF50; text-align:center; margin:0;" />
+        </div>
+        <div style="flex:1;">
+          <label style="font-size:11px; color:#aaa; display:block; margin-bottom:3px;">🔥 Temp ºC</label>
+          <input type="number" id="enfTemp" placeholder="Temp ºC" style="width:100%; padding:8px; font-size:18px; font-weight:bold; border-radius:6px; background:#111; color:#ff9800; border:1px solid #ff9800; text-align:center; margin:0;" />
+        </div>
+      </div>
+
+      <!-- Cronómetro de Enfoque Individual -->
+      <div style="background:#000; padding:10px 14px; border-radius:8px; border:1px solid #4CAF50; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+        <div style="text-align:left;">
+          <div style="font-size:10px; color:#aaa; font-weight:bold;">TIEMPO TRABAJO <span id="enfEstadoBadge" style="color:#00E676;">● EN CURSO</span></div>
+          <div id="enfReloj" style="font-family:monospace; font-size:28px; color:#fff; font-weight:bold;">00:00:00</div>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button type="button" id="btnEnfPausaReanudar" style="background:#ff9800; color:#000; border:none; padding:10px 14px; font-size:14px; font-weight:bold; border-radius:6px; cursor:pointer;">⏸️ PAUSAR</button>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:8px; flex-direction:column;">
+        <button type="button" id="btnEnfTerminar" class="btn-main" style="width:100%; font-size:17px; padding:13px; border-radius:8px; font-weight:bold; margin:0;">✔️ FINALIZAR TRABAJO</button>
+        <div style="display:flex; gap:8px;">
+          <button type="button" id="btnEnfFallaCal" class="btn-danger" style="flex:1; font-size:13px; padding:10px; border-radius:8px; font-weight:bold; margin:0;">⚠️ FALLA CALANDRA</button>
+          <button type="button" id="btnEnfFallaImp" style="flex:1; background:var(--accent-orange); color:#000; border:none; font-size:13px; padding:10px; border-radius:8px; font-weight:bold; cursor:pointer; margin:0;">⚠️ FALLA IMPRESIÓN</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: MODO KIOSKO GENERAL / REPRODUCTOR DE ROLLO COMPLETO (Idéntico a panelReproductorCalandra de Index.html + Secuencia Interactiva) -->
   <div id="modalKioscoOperativo" class="modal-overlay">
-    <div class="modal-content" style="max-width:780px; border-color:var(--accent-blue); background:#0a0c10; padding:0; overflow:hidden; display:flex; flex-direction:column; max-height:90dvh;">
-      <div style="background:#1a1c23; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #333; flex-wrap:wrap; gap:8px;">
-        <h2 id="kioscoTitulo" style="margin:0; border:none; padding:0; color:#fff; font-size:16px;">▶️ MODO KIOSKO</h2>
+    <div class="modal-content" style="max-width:900px; width:95%; border-color:#333; background:#0a0c10; padding:0; overflow:hidden; display:flex; flex-direction:column; max-height:92dvh; border-radius:12px; box-shadow:0 0 50px rgba(0,0,0,0.9);">
+      <div style="background:#1a1c23; padding:12px 18px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #333; flex-wrap:wrap; gap:8px;">
+        <h2 id="kioscoTitulo" style="margin:0; border:none; padding:0; color:#fff; font-size:18px;">▶️ MODO KIOSKO - ROLLO: <span id="kioskRolloId" style="color:#d81b60;"></span></h2>
         <div style="display:flex; gap:8px; align-items:center;">
-          <button type="button" id="btnKioscoMinimizar" style="background:#2196F3; border:none; color:#fff; padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer; font-weight:bold;" title="Salir para ver otros módulos sin detener el reloj">🗕 Salir (Tiempo sigue corriendo)</button>
-          <button type="button" id="btnKioscoCancelarDefinitivo" style="background:none; border:1px solid #ff5252; color:#ff5252; padding:5px 10px; border-radius:6px; font-size:12px; cursor:pointer; font-weight:bold;">✖ Cancelar Kiosko</button>
+          <button type="button" id="btnKioscoMinimizar" style="background:#2196F3; border:none; color:#fff; padding:7px 12px; border-radius:6px; font-size:12px; cursor:pointer; font-weight:bold;" title="Salir para ver otros módulos sin detener el reloj">👁️ Salir (Sigue el reloj)</button>
+          <button type="button" id="btnKioscoCancelarDefinitivo" style="background:none; border:1px solid #ff5252; color:#ff5252; padding:6px 12px; border-radius:6px; font-size:13px; cursor:pointer; font-weight:bold;">✖ CERRAR</button>
         </div>
       </div>
-      <div style="padding:14px 16px; overflow-y:auto; flex:1;">
-        <div style="display:flex; justify-content:space-between; align-items:center; background:#000; padding:10px 16px; border-radius:8px; border:1px solid #2196F3; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
-          <div>
-            <div style="color:#2196F3; font-size:11px; font-weight:bold; margin-bottom:2px;">CRONÓMETRO DEL TRABAJO ACTIVO <span id="kioscoEstadoPausaBadge" style="color:#00E676; margin-left:6px;">● EN CURSO</span></div>
-            <div id="kioscoCronometro" style="font-family:monospace; font-size:30px; color:#fff; font-weight:bold;">00:00</div>
-          </div>
-          <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button type="button" id="btnKioscoPausarReanudar" style="background:#ff9800; color:#000; border:none; padding:10px 16px; border-radius:6px; font-size:14px; font-weight:bold; cursor:pointer;">⏸️ PAUSAR TIEMPO</button>
-            <button type="button" id="btnKioscoMinimizar2" style="background:#252525; color:#fff; border:1px solid #555; padding:10px 14px; border-radius:6px; font-size:13px; font-weight:bold; cursor:pointer;">👁️ Ir a ver otros trabajos</button>
-          </div>
-        </div>
-        <div id="kioscoSubtitulo" style="margin-bottom:10px;"></div>
-      </div>
-      <div style="background:#1a1c23; padding:12px 16px; border-top:1px solid #333; display:flex; gap:8px; flex-wrap:wrap;">
-        <button type="button" id="btnKioscoDescartarSiguiente" style="flex:1; min-width:150px; background:rgba(216,27,96,0.2); color:#ff4081; border:1px solid #d81b60; padding:12px 10px; font-size:13px; font-weight:bold; border-radius:8px; cursor:pointer;">✂️ Desechar Papel y Siguiente</button>
-        <button type="button" id="btnKioscoSiguienteTrabajo" style="flex:2; min-width:190px; background:#00E676; color:#000; border:none; padding:12px 14px; font-size:15px; font-weight:bold; border-radius:8px; cursor:pointer;">✅ TERMINAR ESTE Y SIGUIENTE ➔</button>
-        <button type="button" id="btnKioscoFinalizar" style="flex:1; min-width:150px; background:#2196F3; color:#fff; border:none; padding:12px 10px; font-size:13px; font-weight:bold; border-radius:8px; cursor:pointer;">🏁 Todo el Rollo Listo</button>
+
+      <div style="padding:14px 18px; overflow-y:auto; flex:1;">
+        <div id="kioscoSubtitulo"></div>
       </div>
     </div>
   </div>
