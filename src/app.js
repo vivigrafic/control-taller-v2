@@ -23,7 +23,7 @@ const STATE = {
   filtroCalandraLocal: "",
   ordenCalandraAsc: true,
   rollosCalandraAbiertos: new Set(),
-  carpetasPendientesCerradas: new Set(),
+  carpetasPendientesAbiertas: new Set(),
   rolloMontadoCalandra: localStorage.getItem("vg_rollo_calandra_montado") || "",
   usuarioActual: localStorage.getItem("vg_operador_actual") || "Roberto",
   areaActual: localStorage.getItem("vg_area_actual") || "General",
@@ -607,19 +607,19 @@ function renderPendientesDriveSublimacion() {
 
   let html = "";
   for (const [cliente, archivos] of carpetas.entries()) {
-    const cerrada = STATE.carpetasPendientesCerradas.has(cliente);
+    const abierta = STATE.carpetasPendientesAbiertas.has(cliente);
     const totalMtsCarpeta = archivos.reduce((a, b) => a + (Number(b.metros_totales) || 0), 0);
     const todosMarcados = archivos.every(a => STATE.impForm.archivosSeleccionadosIds.has(a.id));
 
     html += `
-      <div class="folder-header" data-folder-cli="${escHtml(cliente)}" style="display:flex; justify-content:space-between; align-items:center;">
+      <div class="folder-header" data-folder-cli="${escHtml(cliente)}" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
         <span>
           <input type="checkbox" class="chk-folder-all" data-folder-cli="${escHtml(cliente)}" ${todosMarcados ? "checked" : ""} style="margin-right:10px; width:16px; height:16px; cursor:pointer;" title="Seleccionar todo" />
-          📁 ${escHtml(cliente)}
+          📁 <strong>${escHtml(cliente)}</strong> (${archivos.length})
         </span>
-        <span style="cursor:pointer;">${fmtNum(totalMtsCarpeta)}m ▼</span>
+        <span style="cursor:pointer; font-weight:bold; color:var(--accent);">${fmtNum(totalMtsCarpeta)}m ${abierta ? "▼" : "►"}</span>
       </div>
-      <div class="folder-content" style="display:${cerrada ? "none" : "block"};">
+      <div class="folder-content" style="display:${abierta ? "block" : "none"};">
         ${archivos.map(p => {
           const checked = STATE.impForm.archivosSeleccionadosIds.has(p.id);
           return `
@@ -663,8 +663,8 @@ function renderPendientesDriveSublimacion() {
         renderPendientesDriveSublimacion();
         return;
       }
-      if (STATE.carpetasPendientesCerradas.has(cli)) STATE.carpetasPendientesCerradas.delete(cli);
-      else STATE.carpetasPendientesCerradas.add(cli);
+      if (STATE.carpetasPendientesAbiertas.has(cli)) STATE.carpetasPendientesAbiertas.delete(cli);
+      else STATE.carpetasPendientesAbiertas.add(cli);
       renderPendientesDriveSublimacion();
     });
   });
@@ -767,66 +767,77 @@ function renderTablaImpresionesConBloques() {
     return;
   }
 
-  let html = "";
-  let ultimoBloque = null;
-
+  // Agrupar por bloque de rollo
+  const bloquesMap = new Map();
   filtradas.forEach(row => {
     const bloqueId = row.id_rollo_papel || row.id_rollo_base || "Desconocido";
-    if (bloqueId !== ultimoBloque) {
-      ultimoBloque = bloqueId;
-      const filasDelBloque = STATE.impresiones.filter(x => x.id_rollo_papel === bloqueId && !x.anulado);
-      const sumaImpresosBloque = filasDelBloque
-        .filter(x => x.accion === "Impresion Normal")
-        .reduce((acc, x) => acc + (Number(x.metros_impresos) || 0), 0);
+    if (!bloquesMap.has(bloqueId)) bloquesMap.set(bloqueId, []);
+    bloquesMap.get(bloqueId).push(row);
+  });
 
-      html += `
-        <tr class="row-corte" style="background:#5e35b1 !important; color:#fff !important;">
-          <td colspan="11">🔄 --- ROLLO NUEVO: ${escHtml(bloqueId)} | METROS SUMADOS DEL BLOQUE: ${fmtNum(sumaImpresosBloque)}m ---</td>
-        </tr>
-      `;
-    }
-
-    if (row.accion && row.accion.includes("Corte de Papel")) {
-      html += `<tr class="row-corte" style="background:var(--accent-magenta) !important; color:#fff !important;"><td colspan="11">✂️ --- CORTE DE PAPEL (-${fmtNum(row.metros_desperdicio)}m) ---</td></tr>`;
-      return;
-    }
-    if (row.accion && row.accion.includes("Avance")) {
-      html += `<tr class="row-corte" style="background:#e65100 !important;"><td colspan="11">📏 --- PURGA/AVANCE (${fmtNum(row.metros_desperdicio)}m) --- ${escHtml(row.observaciones || "")}</td></tr>`;
-      return;
-    }
-    if (row.accion && row.accion.includes("Calibración")) {
-      html += `<tr class="row-corte" style="background:#b71c1c !important;"><td colspan="11">⚙️ --- CALIBRACIÓN (${fmtNum(row.metros_desperdicio)}m) --- ${escHtml(row.observaciones || "")}</td></tr>`;
-      return;
-    }
-
-    const m = fmtNum(row.metros_impresos || row.metros_desperdicio || 0);
-    const actionBtn = `
-      <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; max-width:90px;">
-        <button type="button" class="btn-imp-falla" data-id="${row.id}" style="background:transparent; border:1px solid var(--danger); border-radius:4px; cursor:pointer; color:var(--danger); padding:3px;" title="Reportar Falla">⚠️</button>
-        <button type="button" class="btn-imp-deshacer" data-id="${row.id}" style="background:transparent; border:1px solid #aaa; color:#aaa; border-radius:4px; cursor:pointer; padding:3px;" title="Revertir">🔙</button>
-        <button type="button" class="btn-nota-rapida" data-table="prod_impresiones" data-id="${row.id}" data-batch="${escHtml(row.batch_id)}" style="background:transparent; border:1px solid var(--accent-orange); color:var(--accent-orange); border-radius:4px; cursor:pointer; padding:3px;" title="Añadir/Editar Nota">📝</button>
-        <button type="button" class="btn-imp-etiqueta" data-rollo="${escHtml(bloqueId)}" data-metros="${m}" style="background:var(--accent-blue); border:1px solid var(--accent-blue); border-radius:4px; cursor:pointer; color:#fff; padding:3px;" title="Etiqueta Lote">🖨️</button>
-        <button type="button" class="btn-crud-edit" data-table="prod_impresiones" data-id="${row.id}" style="background:transparent; border:1px solid var(--accent-blue); color:var(--accent-blue); border-radius:4px; cursor:pointer; padding:3px;" title="Editar">✏️</button>
-        <button type="button" class="btn-crud-del" data-table="prod_impresiones" data-id="${row.id}" style="background:transparent; border:1px solid var(--danger); color:var(--danger); border-radius:4px; cursor:pointer; padding:3px;" title="Eliminar">🗑️</button>
-      </div>
-    `;
+  let html = "";
+  for (const [bloqueId, filas] of bloquesMap.entries()) {
+    const filasDelBloque = STATE.impresiones.filter(x => x.id_rollo_papel === bloqueId && !x.anulado);
+    const sumaImpresosBloque = filasDelBloque
+      .filter(x => x.accion === "Impresion Normal")
+      .reduce((acc, x) => acc + (Number(x.metros_impresos) || 0), 0);
 
     html += `
-      <tr>
-        <td>${actionBtn}</td>
-        <td>${fmtDateHora(row.fecha_hora)}</td>
-        <td>${formatearAnidadosHTML(row.cliente_archivo)}</td>
-        <td style="text-align:center;">${renderMiniaturaDiseno60(row.color_tela, row.diseno, row.cliente_archivo)}</td>
-        <td>${escHtml(row.tela_destino || "")}</td>
-        <td>${escHtml(row.num_rollo_tela || "")}</td>
-        <td>${escHtml(row.color_tela || "")}</td>
-        <td style="color:var(--accent); font-weight:bold;">${m}m</td>
-        <td>${escHtml(row.perfil || "")}</td>
-        <td><span class="badge">${escHtml(row.ruta || "Solo Calandrado")}</span></td>
-        <td>${row.observaciones ? `<span style="color:var(--accent-orange); font-weight:bold;">📝 ${escHtml(row.observaciones)}</span>` : "-"}</td>
+      <tr class="row-corte" style="background:#5e35b1 !important; color:#fff !important;">
+        <td colspan="11">🔄 --- ROLLO NUEVO: ${escHtml(bloqueId)} | METROS SUMADOS DEL BLOQUE: ${fmtNum(sumaImpresosBloque)}m ---</td>
       </tr>
     `;
-  });
+
+    // Dentro de cada bloque: orden cronológico ascendente (el primero impreso arriba, el último impreso abajo)
+    const filasOrdenadas = [...filas].sort((a, b) => {
+      const da = new Date(a.fecha_hora).getTime() || 0;
+      const db = new Date(b.fecha_hora).getTime() || 0;
+      return da - db;
+    });
+
+    filasOrdenadas.forEach(row => {
+      if (row.accion && row.accion.includes("Corte de Papel")) {
+        html += `<tr class="row-corte" style="background:var(--accent-magenta) !important; color:#fff !important;"><td colspan="11">✂️ --- CORTE DE PAPEL (-${fmtNum(row.metros_desperdicio)}m) ---</td></tr>`;
+        return;
+      }
+      if (row.accion && row.accion.includes("Avance")) {
+        html += `<tr class="row-corte" style="background:#e65100 !important;"><td colspan="11">📏 --- PURGA/AVANCE (${fmtNum(row.metros_desperdicio)}m) --- ${escHtml(row.observaciones || "")}</td></tr>`;
+        return;
+      }
+      if (row.accion && row.accion.includes("Calibración")) {
+        html += `<tr class="row-corte" style="background:#b71c1c !important;"><td colspan="11">⚙️ --- CALIBRACIÓN (${fmtNum(row.metros_desperdicio)}m) --- ${escHtml(row.observaciones || "")}</td></tr>`;
+        return;
+      }
+
+      const m = fmtNum(row.metros_impresos || row.metros_desperdicio || 0);
+      const actionBtn = `
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; max-width:90px;">
+          <button type="button" class="btn-imp-falla" data-id="${row.id}" style="background:transparent; border:1px solid var(--danger); border-radius:4px; cursor:pointer; color:var(--danger); padding:3px;" title="Reportar Falla">⚠️</button>
+          <button type="button" class="btn-imp-deshacer" data-id="${row.id}" style="background:transparent; border:1px solid #aaa; color:#aaa; border-radius:4px; cursor:pointer; padding:3px;" title="Revertir">🔙</button>
+          <button type="button" class="btn-nota-rapida" data-table="prod_impresiones" data-id="${row.id}" data-batch="${escHtml(row.batch_id)}" style="background:transparent; border:1px solid var(--accent-orange); color:var(--accent-orange); border-radius:4px; cursor:pointer; padding:3px;" title="Añadir/Editar Nota">📝</button>
+          <button type="button" class="btn-imp-etiqueta" data-rollo="${escHtml(bloqueId)}" data-metros="${m}" style="background:var(--accent-blue); border:1px solid var(--accent-blue); border-radius:4px; cursor:pointer; color:#fff; padding:3px;" title="Etiqueta Lote">🖨️</button>
+          <button type="button" class="btn-crud-edit" data-table="prod_impresiones" data-id="${row.id}" style="background:transparent; border:1px solid var(--accent-blue); color:var(--accent-blue); border-radius:4px; cursor:pointer; padding:3px;" title="Editar">✏️</button>
+          <button type="button" class="btn-crud-del" data-table="prod_impresiones" data-id="${row.id}" style="background:transparent; border:1px solid var(--danger); color:var(--danger); border-radius:4px; cursor:pointer; padding:3px;" title="Eliminar">🗑️</button>
+        </div>
+      `;
+
+      html += `
+        <tr>
+          <td>${actionBtn}</td>
+          <td>${fmtDateHora(row.fecha_hora)}</td>
+          <td>${formatearAnidadosHTML(row.cliente_archivo)}</td>
+          <td style="text-align:center;">${renderMiniaturaDiseno60(row.color_tela, row.diseno, row.cliente_archivo)}</td>
+          <td>${escHtml(row.tela_destino || "")}</td>
+          <td>${escHtml(row.num_rollo_tela || "")}</td>
+          <td>${escHtml(row.color_tela || "")}</td>
+          <td style="color:var(--accent); font-weight:bold;">${m}m</td>
+          <td>${escHtml(row.perfil || "")}</td>
+          <td><span class="badge">${escHtml(row.ruta || "Solo Calandrado")}</span></td>
+          <td>${row.observaciones ? `<span style="color:var(--accent-orange); font-weight:bold;">📝 ${escHtml(row.observaciones)}</span>` : "-"}</td>
+        </tr>
+      `;
+    });
+  }
 
   tbody.innerHTML = html;
 }
@@ -974,9 +985,7 @@ function renderModuloCalandrado() {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
         const rId = btn.getAttribute("data-rollo");
-        STATE.rollosCalandraAbiertos.add(rId);
-        renderModuloCalandrado();
-        setTimeout(() => window.print(), 200);
+        emitirPDFCalandrado(rId);
       });
     });
 
@@ -1643,18 +1652,22 @@ async function registrarAvanceOCalibracion(tipoAccion) {
   await cargarDatosTodo();
 }
 
-async function finalizarTrabajoCalandrado(idCal, minutosExtra = 0, skipReload = false) {
+async function finalizarTrabajoCalandrado(idCal, minutosExtra = 0, skipReload = false, velocidad = null, temperatura = null) {
   const reg = STATE.colaCalandrado.find(c => c.id === idCal);
   if (!reg) return;
 
   const inputFechaManual = document.getElementById("calInputFechaManual")?.value;
   const fechaFinIso = inputFechaManual ? new Date(inputFechaManual).toISOString() : new Date().toISOString();
 
-  await sb().from("prod_cola_calandrado").update({
+  const updatePayload = {
     estado: "Terminado",
     fecha_terminado: fechaFinIso,
     minutos_trabajados: minutosExtra || reg.minutos_trabajados || Math.max(5, Math.round((Number(reg.metros) || 10) * 1.2))
-  }).eq("id", idCal);
+  };
+  if (velocidad !== null && !isNaN(velocidad)) updatePayload.velocidad = velocidad;
+  if (temperatura !== null && !isNaN(temperatura)) updatePayload.temperatura = temperatura;
+
+  await sb().from("prod_cola_calandrado").update(updatePayload).eq("id", idCal);
 
   const rLower = String(reg.ruta || "").toLowerCase();
   if (rLower.includes("laser") || rLower.includes("láser") || rLower.includes("corte")) {
@@ -1731,6 +1744,99 @@ function imprimirEtiquetaRollo(loteId, metrosTotales) {
     </body></html>
   `);
   setTimeout(() => win.print(), 400);
+}
+
+function emitirPDFCalandrado(rolloId) {
+  const items = STATE.colaCalandrado.filter(c => c.id_rollo_papel === rolloId && !String(c.estado).toLowerCase().includes("terminado"));
+  if (items.length === 0) {
+    toast(`No hay trabajos pendientes para el rollo ${rolloId}.`, "error");
+    return;
+  }
+  const totalMts = items.reduce((a, b) => a + (Number(b.metros) || 0), 0);
+  const win = window.open("", "_blank");
+  if (!win) { alert("Habilitá las ventanas emergentes del navegador para imprimir la Hoja de Ruta."); return; }
+
+  win.document.write(`
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="utf-8">
+      <title>Hoja de Ruta Calandrado - ${escHtml(rolloId)}</title>
+      <style>
+        @page { size: landscape; margin: 8mm; }
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; margin: 0; padding: 12px; font-size: 11px; color: #111; background: #fff; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #d81b60; padding-bottom: 8px; margin-bottom: 10px; }
+        .title { font-size: 17px; font-weight: bold; color: #d81b60; text-transform: uppercase; }
+        .subtitle { font-size: 12px; color: #555; margin-top: 3px; }
+        .total-badge { font-size: 17px; font-weight: bold; color: #d81b60; background: #fce4ec; border: 1px solid #f48fb1; padding: 6px 14px; border-radius: 6px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 11px; }
+        th { background: #f0f0f0; border: 1px solid #999; padding: 6px 8px; text-align: left; font-size: 10px; text-transform: uppercase; font-weight: bold; }
+        td { border: 1px solid #bbb; padding: 6px 8px; vertical-align: middle; }
+        tr:nth-child(even) td { background: #fafafa; }
+        .mts-cell { font-weight: bold; font-size: 12px; text-align: right; color: #d81b60; }
+        .footer { margin-top: 14px; display: flex; justify-content: space-between; align-items: flex-end; }
+        .firmas { display: flex; gap: 30px; font-size: 11px; color: #666; margin-top: 20px; }
+        .firma-box { border-top: 1px dashed #888; width: 140px; text-align: center; padding-top: 4px; }
+        @media print {
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div>
+          <div class="title">V&V GRAFIC — Hoja de Ruta de Calandrado</div>
+          <div class="subtitle">Bobina: <strong>${escHtml(rolloId)}</strong> | Fecha: <strong>${new Date().toLocaleDateString("es-AR")} ${new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}</strong></div>
+        </div>
+        <div class="total-badge">Total a Calandrar: ${fmtNum(totalMts)} m</div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:110px;">ID Bobina</th>
+            <th>Cliente / Archivo</th>
+            <th style="width:110px;">Diseño</th>
+            <th style="width:110px;">Tela</th>
+            <th style="width:70px;">Nº Rollo</th>
+            <th style="width:80px;">Color</th>
+            <th style="width:75px; text-align:right;">Metros</th>
+            <th style="width:90px;">Perfil</th>
+            <th style="width:130px;">Ruta Producción</th>
+            <th>Observaciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map(c => `
+            <tr>
+              <td><strong>${escHtml(c.id_rollo_papel)}</strong></td>
+              <td><strong>${escHtml(c.cliente_archivo)}</strong></td>
+              <td>${escHtml(c.diseno || "-")}</td>
+              <td><strong>${escHtml(c.tela_destino || "-")}</strong></td>
+              <td>${escHtml(c.num_rollo_tela || "-")}</td>
+              <td>${escHtml(c.color_tela || "-")}</td>
+              <td class="mts-cell">${fmtNum(c.metros)} m</td>
+              <td>${escHtml(c.perfil || "-")}</td>
+              <td>${escHtml(c.ruta || "Solo Calandrado")}</td>
+              <td>${escHtml(c.observaciones || "-")}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+      <div class="footer">
+        <div class="firmas">
+          <div class="firma-box">Operador Calandra</div>
+          <div class="firma-box">Control Calidad</div>
+        </div>
+        <div style="font-size:13px; font-weight:bold;">
+          Total Trabajos: ${items.length} | Total Metros: <span style="color:#d81b60; font-size:15px;">${fmtNum(totalMts)} m</span>
+        </div>
+      </div>
+    </body>
+    </html>
+  `);
+  win.document.close();
+  setTimeout(() => win.print(), 350);
 }
 
 // ============================================================================
@@ -1927,17 +2033,55 @@ function abrirKioscoCalandra(idCal, rolloId = null) {
   STATE.kiosco.registroIds = trabajos.map(t => t.id);
   STATE.kiosco.inicioMs = Date.now();
 
-  document.getElementById("kioscoTitulo").textContent = `▶️ MODO KIOSKO - ROLLO: ${trabajos[0].id_rollo_papel}`;
+  const rolloNombre = trabajos[0].id_rollo_papel || "Sin Rollo";
+  const velInicial = trabajos[0].velocidad || 50;
+  const tempInicial = trabajos[0].temperatura || 205;
+
+  document.getElementById("kioscoTitulo").textContent = `▶️ MODO KIOSKO - ROLLO: ${rolloNombre}`;
   document.getElementById("kioscoSubtitulo").innerHTML = `
-    <div style="font-size:26px; color:#4CAF50; font-weight:bold; margin-bottom:6px;">${fmtNum(totalM)} m</div>
+    <div style="font-size:28px; color:#4CAF50; font-weight:bold; margin-bottom:8px; text-align:center;">${fmtNum(totalM)} m</div>
+
+    <!-- Parámetros operativos del trabajo / máquina (Pedido #2) -->
+    <div style="background:#111; border:1px solid #333; padding:12px; border-radius:8px; margin-bottom:12px; display:flex; justify-content:space-around; align-items:center; flex-wrap:wrap; gap:10px;">
+      <div style="text-align:center;">
+        <label style="font-size:11px; color:#aaa; display:block; margin-bottom:4px; font-weight:bold;">⚙️ VELOCIDAD (m/min)</label>
+        <input type="number" id="kioscoInputVelocidad" value="${velInicial}" step="1" style="width:110px; font-size:20px; text-align:center; padding:6px; background:#1a1c23; color:#00E676; border:1px solid #4CAF50; border-radius:6px; font-weight:bold;" />
+      </div>
+      <div style="text-align:center;">
+        <label style="font-size:11px; color:#aaa; display:block; margin-bottom:4px; font-weight:bold;">🔥 TEMPERATURA (°C)</label>
+        <input type="number" id="kioscoInputTemperatura" value="${tempInicial}" step="1" style="width:110px; font-size:20px; text-align:center; padding:6px; background:#1a1c23; color:#ff9800; border:1px solid #ff9800; border-radius:6px; font-weight:bold;" />
+      </div>
+    </div>
+
+    <div style="color:#aaa; font-size:12px; font-weight:bold; margin-bottom:6px;">LISTA DE TRABAJOS A CALANDRAR (${trabajos.length}):</div>
     ${trabajos.map(t => `
-      <div style="background:#1a1c23; padding:10px; border-radius:6px; border:1px solid #333; margin-bottom:6px; font-size:13px;">
-        <div><strong>Archivo:</strong> ${escHtml(t.cliente_archivo)}</div>
-        <div><strong>Tela:</strong> <span style="color:#2196F3; font-weight:bold;">${escHtml(t.tela_destino || "-")}</span> | <strong>Rollo:</strong> ${escHtml(t.num_rollo_tela || "-")}</div>
-        ${t.observaciones ? `<div style="color:#ff9800; font-weight:bold; margin-top:4px;">Obs: ${escHtml(t.observaciones)}</div>` : ""}
+      <div style="background:#1a1c23; padding:12px; border-radius:6px; border:1px solid #333; margin-bottom:8px; font-size:13px;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+          <div>
+            <div style="font-weight:bold; font-size:14px; color:#fff; margin-bottom:4px;">${escHtml(t.cliente_archivo)}</div>
+            <div><strong>Tela:</strong> <span style="color:#2196F3; font-weight:bold;">${escHtml(t.tela_destino || "-")}</span> | <strong>Rollo:</strong> ${escHtml(t.num_rollo_tela || "-")} | <strong>Color:</strong> ${escHtml(t.color_tela || "-")}</div>
+            ${t.observaciones ? `<div style="color:#ff9800; font-weight:bold; margin-top:4px;">Obs: ${escHtml(t.observaciones)}</div>` : ""}
+          </div>
+          <div style="font-size:16px; font-weight:bold; color:var(--accent); white-space:nowrap;">${fmtNum(t.metros)}m</div>
+        </div>
+
+        <!-- Botones de reporte de fallas dentro del Kiosco (Pedido #3) -->
+        <div style="margin-top:10px; padding-top:8px; border-top:1px solid #2a2a2a; display:flex; gap:8px; flex-wrap:wrap;">
+          <button type="button" class="btn-kiosco-reportar-falla" data-id="${t.id}" data-estacion="Calandrado" style="background:rgba(216,27,96,0.15); border:1px solid var(--accent-magenta); color:#ff4081; padding:6px 12px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">⚠️ Falla Calandrado</button>
+          <button type="button" class="btn-kiosco-reportar-falla" data-id="${t.id}" data-estacion="Impresión" style="background:rgba(255,152,0,0.15); border:1px solid var(--accent-orange); color:#ff9800; padding:6px 12px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;">⚠️ Falla Impresión</button>
+        </div>
       </div>
     `).join("")}
   `;
+
+  modal.querySelectorAll(".btn-kiosco-reportar-falla").forEach(btn => {
+    btn.onclick = async () => {
+      const id = btn.getAttribute("data-id");
+      const est = btn.getAttribute("data-estacion");
+      const reg = STATE.colaCalandrado.find(c => c.id === id);
+      if (reg) await reportarFallaConReposicion(reg, est);
+    };
+  });
 
   modal.classList.add("open");
   if (STATE.kiosco.timerInterval) clearInterval(STATE.kiosco.timerInterval);
@@ -1952,11 +2096,14 @@ function abrirKioscoCalandra(idCal, rolloId = null) {
   document.getElementById("btnKioscoFinalizar").onclick = async () => {
     clearInterval(STATE.kiosco.timerInterval);
     const min = Math.max(1, Math.round((Date.now() - STATE.kiosco.inicioMs) / 60000));
+    const vel = parseFloat(document.getElementById("kioscoInputVelocidad")?.value) || 50;
+    const temp = parseFloat(document.getElementById("kioscoInputTemperatura")?.value) || 205;
+
     modal.classList.remove("open");
     for (const id of STATE.kiosco.registroIds) {
-      await finalizarTrabajoCalandrado(id, min, true);
+      await finalizarTrabajoCalandrado(id, min, true, vel, temp);
     }
-    toast(`✅ Kiosko finalizado (${STATE.kiosco.registroIds.length} trabajos).`);
+    toast(`✅ Kiosko finalizado (${STATE.kiosco.registroIds.length} trabajos guardados con Vel: ${vel}m/min y Temp: ${temp}°C).`);
     await cargarDatosTodo();
   };
 }
@@ -2134,10 +2281,7 @@ export function inicializarEventosUI() {
 
   document.getElementById("btnAbrirPrevisionTelas")?.addEventListener("click", () => {
     const p = document.getElementById("panelPrevisionTelasInline");
-    if (p) {
-      const isHidden = window.getComputedStyle(p).display === "none";
-      p.style.display = isHidden ? "block" : "none";
-    }
+    if (p) p.style.display = p.style.display === "none" ? "block" : "none";
   });
 
   document.getElementById("btnSyncDriveSandbox")?.addEventListener("click", async () => {
@@ -2351,9 +2495,7 @@ export function inicializarEventosUI() {
     const btnCalPdfRollo = e.target.closest(".btn-cal-pdf-rollo");
     if (btnCalPdfRollo) {
       const rId = btnCalPdfRollo.getAttribute("data-rollo");
-      STATE.rollosCalandraAbiertos.add(rId);
-      renderModuloCalandrado();
-      window.print();
+      emitirPDFCalandrado(rId);
       return;
     }
 
@@ -2403,41 +2545,9 @@ export function inicializarEventosUI() {
 
   document.getElementById("btnGuardarModalCrud")?.addEventListener("click", guardarModalCrudUniversal);
 
-  document.getElementById("btnGuardarCompraFinanzas")?.addEventListener("click", async () => {
-    const tipo = document.getElementById("finCompraTipo")?.value || "Insumo";
-    const det = document.getElementById("finCompraDetalle")?.value || "";
-    const cant = parseFloat(document.getElementById("finCompraCant")?.value) || 1;
-    const costo = parseFloat(document.getElementById("finCompraCosto")?.value) || 0;
-    if (!det) { alert("Ingresa el detalle de la compra."); return; }
-
-    await sb().from("prod_catalogos").insert({
-      empresa_id: "vvgrafic-principal",
-      tipo: "COMPRA_INSUMO",
-      nombre: `${tipo}: ${det}`,
-      valor_1: String(cant),
-      valor_2: String(costo)
-    });
-    toast("✅ Compra registrada.");
-    const inpDet = document.getElementById("finCompraDetalle");
-    const inpCos = document.getElementById("finCompraCosto");
-    if (inpDet) inpDet.value = "";
-    if (inpCos) inpCos.value = "";
-    await cargarDatosTodo();
-  });
-
   document.querySelectorAll(".vg-modal-close").forEach(btn => {
     btn.addEventListener("click", () => {
       btn.closest(".modal-overlay")?.classList.remove("open");
-      if (STATE.kiosco.timerInterval) clearInterval(STATE.kiosco.timerInterval);
-    });
-  });
-
-  document.querySelectorAll(".modal-overlay").forEach(overlay => {
-    overlay.addEventListener("click", (e) => {
-      if (e.target === overlay) {
-        overlay.classList.remove("open");
-        if (STATE.kiosco.timerInterval) clearInterval(STATE.kiosco.timerInterval);
-      }
     });
   });
 
