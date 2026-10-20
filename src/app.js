@@ -2235,31 +2235,38 @@ function renderContenidoModalKiosco() {
         <div style="color:#aaa; font-size:11px; margin-top:2px;">METROS A CALANDRAR</div>
       </div>
 
-      <div style="display:flex; flex-direction:column; gap:10px;">
-        <div style="background:#0f1117; padding:10px 12px; border-radius:8px; border-left:5px solid #2196F3;">
-          <div style="color:#888; font-size:11px; font-weight:bold;">TELA A BUSCAR EN DEPÓSITO:</div>
-          <div style="font-size:26px; font-weight:bold; color:#2196F3; text-transform:uppercase;">${escHtml(trabActual.tela_destino || "-")}</div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <!-- B: Nombre de la tela en una sola línea que ocupe la mitad de la altura -->
+        <div style="background:#0f1117; padding:6px 12px; border-radius:6px; border-left:4px solid #2196F3; display:flex; align-items:center; gap:8px; overflow:hidden;">
+          <span style="color:#888; font-size:11px; font-weight:bold; white-space:nowrap;">TELA:</span>
+          <span style="font-size:16px; font-weight:bold; color:#2196F3; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escHtml(trabActual.tela_destino || "-")}">${escHtml(trabActual.tela_destino || "-")}</span>
         </div>
 
-        <div style="display:grid; grid-template-columns: 1.5fr 1fr; gap:10px;">
-          <div style="background:#0f1117; padding:10px; border-radius:8px; border:1px solid #333;">
-            <div style="color:#888; font-size:11px;">CLIENTE / DISEÑO:</div>
-            <div style="font-size:15px; font-weight:bold; color:#fff; word-break:break-word;">${escHtml(trabActual.cliente_archivo)}</div>
+        <!-- C & D: Cliente/Diseño máx 2 líneas, y abajo Rollo + Color en burbujas separadas en 1 sola línea -->
+        <div style="background:#0f1117; padding:8px 10px; border-radius:6px; border:1px solid #2a324b; display:flex; flex-direction:column; gap:6px;">
+          <!-- C: Cliente/Diseño en 1 linea (máximo 2) -->
+          <div style="font-size:13px; font-weight:bold; color:#fff; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.25;" title="${escHtml(trabActual.cliente_archivo)}">
+            <span style="color:#888; font-size:11px; font-weight:normal; margin-right:4px;">CLIENTE / DISEÑO:</span>${escHtml(trabActual.cliente_archivo)}
           </div>
-          <div style="background:#0f1117; padding:10px; border-radius:8px; border:1px solid #333;">
-            <div style="color:#888; font-size:11px;">Nº ROLLO / COLOR:</div>
-            <div style="font-size:16px; font-weight:bold; color:#ff9800;">${escHtml(trabActual.num_rollo_tela || "-")} (${escHtml(trabActual.color_tela || "-")})</div>
+          <!-- D: Número y color de rollo en una sola línea abajo en burbujas separadas -->
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:nowrap; overflow-x:auto;">
+            <span style="display:inline-flex; align-items:center; gap:4px; background:#1b2130; border:1px solid #ff9800; color:#ff9800; padding:2px 9px; border-radius:12px; font-size:11px; font-weight:bold; white-space:nowrap;">
+              🏷️ Rollo: ${escHtml(trabActual.num_rollo_tela || "N/A")}
+            </span>
+            <span style="display:inline-flex; align-items:center; gap:4px; background:#182533; border:1px solid #38BDF8; color:#38BDF8; padding:2px 9px; border-radius:12px; font-size:11px; font-weight:bold; white-space:nowrap;">
+              🎨 Color: ${escHtml(trabActual.color_tela || "Blanco")}
+            </span>
           </div>
         </div>
 
         ${trabActual.observaciones && trabActual.observaciones !== "-" ? `
-          <div style="background:rgba(255,152,0,0.12); padding:8px 12px; border-radius:6px; border:1px solid #ff9800; color:#ff9800; font-weight:bold; font-size:13px;">
+          <div style="background:rgba(255,152,0,0.12); padding:6px 10px; border-radius:6px; border:1px solid #ff9800; color:#ff9800; font-weight:bold; font-size:12px;">
             ⚠️ NOTA: ${escHtml(trabActual.observaciones)}
           </div>
         ` : ""}
 
-        <div style="background:rgba(255, 152, 0, 0.08); padding:8px 12px; border-radius:6px; border:1px dashed #ff9800; font-size:12px;">
-          <span style="color:#ff9800; font-weight:bold;">⏭️ PRÓXIMO EN LA BOBINA:</span>
+        <div style="background:rgba(255, 152, 0, 0.08); padding:6px 10px; border-radius:6px; border:1px dashed #ff9800; font-size:11px;">
+          <span style="color:#ff9800; font-weight:bold;">⏭️ PRÓXIMO:</span>
           <span style="color:#ccc; margin-left:6px;">${proximoTrab ? `${escHtml(proximoTrab.tela_destino)} — ${fmtNum(proximoTrab.metros)}m (${escHtml(proximoTrab.cliente_archivo)})` : "🏁 Fin de la Bobina"}</span>
         </div>
       </div>
