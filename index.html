@@ -2,680 +2,960 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Control de Taller 2.0 — V&amp;V Grafic (Modo Pruebas Supabase)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>V&amp;V Grafic - Terminal Completa 2.0 (Supabase)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;800&family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./src/config/conexion.js"></script>
+  <script src="./src/assets/logo.js"></script>
 </head>
 <body>
 
-  <!-- BANNER SUPERIOR DE AISLAMIENTO ESTRICTO -->
-  <div class="vg-sandbox-banner">
-    <div>🧪 MODO PRUEBAS AISLADO — CLON SUPABASE (kkvzzheccniclfwqzivu) · App actual en producción 100% intacta</div>
+  <!-- FRANJA DISCRETA DE CONEXIÓN AL CLON DE PRUEBAS + USUARIO ACTIVO -->
+  <div class="sandbox-top-strip">
+    <div>
+      <span class="badge mru-top">🧪 BASE DE PRUEBAS: kkvzzheccniclfwqzivu</span>
+      <span style="margin-left:6px;color:var(--vg-text-secondary);">Sistema actual en producción intacto · Edición, Eliminación y Carga Libre en todo el sistema</span>
+    </div>
     <div style="display:flex;align-items:center;gap:8px;">
-      <span>👤 Soy:</span>
-      <select id="vgSelectOperadorActual" style="background:#fff;color:#0f172a;border:none;border-radius:6px;padding:2px 8px;font-weight:800;font-size:12px;">
-        <option value="Roberto">Roberto (Dirección)</option>
-        <option value="Operador Impresión">Operador Impresión</option>
-        <option value="Operador Calandra">Operador Calandra</option>
-        <option value="Operador Láser">Operador Láser</option>
-        <option value="Operador DTF">Operador DTF</option>
+      <span style="color:var(--vg-text-secondary);font-weight:700;">👤 Operador:</span>
+      <select id="vgSelectOperadorActual" style="width:auto;padding:4px 8px;font-size:12px;font-weight:700;">
+        <option value="Roberto">Roberto</option>
+        <option value="Impresión">Impresión</option>
+        <option value="Calandra">Calandra</option>
+        <option value="Láser">Láser</option>
+        <option value="DTF">DTF</option>
       </select>
-      <button id="btnToggleDarkTheme" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.4);border-radius:6px;padding:2px 8px;cursor:pointer;font-weight:800;font-size:11px;">🌓 Tema</button>
+      <label class="badge mru-top" style="cursor:pointer;margin:0;" title="Leer medidas y DPI real desde el encabezado binario de imágenes PNG, JPG o TIFF">
+        🔬 Lector Binario DPI
+        <input type="file" id="inpInspectorArchivosLocales" multiple accept=".png,.jpg,.jpeg,.tif,.tiff,.pdf" style="display:none;" />
+      </label>
     </div>
   </div>
 
-  <!-- CABECERA PRINCIPAL + BUSCADOR UNIVERSAL OMNIPRESENTE + PESTAÑAS -->
-  <header class="vg-header">
-    <div class="vg-header-top">
-      <div class="vg-brand">
-        <div class="vg-brand-badge">V&amp;V</div>
-        <div>
-          <div class="vg-brand-title">Control de Taller y Producción 2.0</div>
-          <div class="vg-brand-sub">Sublimación · Calandrado · Corte Láser · DTF · Chat en Vivo</div>
-        </div>
-      </div>
-
-      <!-- BUSCADOR DE TRABAJOS EN TODOS LOS MÓDULOS (Pedido #5) -->
-      <div class="vg-omnisearch-wrap">
-        <span class="vg-omnisearch-icon">🔍</span>
-        <input
-          type="text"
-          id="vgOmniSearchInput"
-          class="vg-omnisearch-input"
-          placeholder="Buscar trabajo por cliente, archivo, perfil, tela, rollo, metros o nota..."
-        />
-        <button type="button" id="vgOmniSearchClear" class="vg-omnisearch-clear" title="Limpiar búsqueda">✖</button>
-      </div>
-
-      <div style="display:flex;gap:8px;align-items:center;">
-        <label class="vg-btn vg-btn-outline vg-btn-sm" style="cursor:pointer;" title="Leer medidas y DPI real desde el encabezado binario de imágenes PNG, JPG o TIFF">
-          🔬 Lector Binario DPI
-          <input type="file" id="inpInspectorArchivosLocales" multiple accept=".png,.jpg,.jpeg,.tif,.tiff,.pdf" style="display:none;" />
-        </label>
-        <button type="button" id="btnSyncDriveSandbox" class="vg-btn vg-btn-outline vg-btn-sm" title="Escanear carpetas de Google Drive en modo solo lectura">
-          🔄 Drive
-        </button>
-      </div>
-    </div>
-
-    <nav class="vg-nav-tabs">
-      <button type="button" class="vg-tab-btn active" data-tab="impresion">
-        🖨️ Impresión <span id="badgeTabImp" class="vg-tab-badge">0</span>
-      </button>
-      <button type="button" class="vg-tab-btn" data-tab="calandrado">
-        🔥 Calandrado <span id="badgeTabCal" class="vg-tab-badge">0</span>
-      </button>
-      <button type="button" class="vg-tab-btn" data-tab="laser">
-        ⚡ Corte Láser <span id="badgeTabLaser" class="vg-tab-badge">0</span>
-      </button>
-      <button type="button" class="vg-tab-btn" data-tab="dtf">
-        🎞️ Módulo DTF <span id="badgeTabDtf" class="vg-tab-badge">0</span>
-      </button>
-      <button type="button" class="vg-tab-btn" data-tab="chat">
-        💬 Chat Taller <span id="badgeTabChat" class="vg-tab-badge">0</span>
-      </button>
-      <button type="button" class="vg-tab-btn" data-tab="metricas">
-        📊 Métricas e Intervalos
-      </button>
-    </nav>
-  </header>
-
-  <!-- BARRA UNIVERSAL DE INTERVALOS DE TIEMPO (Hoy, Ayer, Semana Anterior, Rango — Pedido #4) -->
-  <div class="vg-time-filter-bar">
-    <div class="vg-period-pills">
-      <span style="font-weight:800;font-size:12px;color:var(--vg-text-secondary);margin-right:4px;">⏱️ Período:</span>
-      <button type="button" class="vg-period-pill active" data-period="todo">Todo</button>
-      <button type="button" class="vg-period-pill" data-period="hoy">Hoy</button>
-      <button type="button" class="vg-period-pill" data-period="ayer">Ayer</button>
-      <button type="button" class="vg-period-pill" data-period="semana_actual">Esta Semana</button>
-      <button type="button" class="vg-period-pill" data-period="semana_anterior">Semana Anterior</button>
-      <button type="button" class="vg-period-pill" data-period="mes_actual">Este Mes</button>
-    </div>
-
-    <div class="vg-period-custom">
-      <span>Desde:</span>
-      <input type="date" id="vgDateDesde" />
-      <span>Hasta:</span>
-      <input type="date" id="vgDateHasta" />
-    </div>
-
-    <div id="vgPeriodSummaryMetrics" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"></div>
+  <!-- LOGO OFICIAL V&V GRAFIC -->
+  <div style="text-align: center; margin-bottom: 10px;">
+    <img id="imgLogoVV" src="" alt="V&amp;V Grafic Logo" style="height: 56px; object-fit: contain;" />
   </div>
 
-  <main class="vg-container">
-    <!-- PANEL DESPLEGABLE DE RESULTADOS DEL BUSCADOR GLOBAL -->
-    <div id="vgOmnisearchPanel" class="vg-card" style="display:none;border:2px solid var(--vg-primary);"></div>
+  <!-- BARRA DE FILTRO RENDIMIENTO POR FECHA + BOTONES DE PERÍODO + BUSCADOR GLOBAL (Captura 1 Mejorada) -->
+  <div class="card" style="padding:10px 15px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; background:var(--vg-surface-dark); margin-bottom:14px;">
+    <strong style="color:var(--vg-text-secondary); font-size:12px;">📅 Filtro Rendimiento por Fecha:</strong>
+    <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+      <input type="date" id="vgDateDesde" style="width:135px; padding:5px 8px; font-size:12px;" />
+      <input type="date" id="vgDateHasta" style="width:135px; padding:5px 8px; font-size:12px;" />
+      <button type="button" id="btnCalcularRango" class="btn-main" style="width:auto; margin:0; padding:6px 14px; font-size:12px;">🔍 Calcular</button>
+    </div>
 
-    <!-- ======================================================================
-         SECCIÓN 1: IMPRESIÓN SUBLIMACIÓN
-         ====================================================================== -->
-    <section id="sec-impresion" class="vg-module-section">
-      <div id="vgRolloActivoHeader"></div>
+    <!-- BOTONES RÁPIDOS DE PERÍODO (Hoy, Día Anterior/Ayer, Semana Anterior, etc. — Pedido #4) -->
+    <div style="display:flex; gap:5px; flex-wrap:wrap; align-items:center;">
+      <button type="button" class="badge mru-top vg-period-pill" data-period="todo" style="cursor:pointer;">Histórico</button>
+      <button type="button" class="badge vg-period-pill" data-period="hoy" style="cursor:pointer;">Hoy</button>
+      <button type="button" class="badge vg-period-pill" data-period="ayer" style="cursor:pointer;">Día Anterior (Ayer)</button>
+      <button type="button" class="badge vg-period-pill" data-period="semana_actual" style="cursor:pointer;">Esta Semana</button>
+      <button type="button" class="badge vg-period-pill" data-period="semana_anterior" style="cursor:pointer;">Semana Anterior</button>
+      <button type="button" class="badge vg-period-pill" data-period="mes_actual" style="cursor:pointer;">Este Mes</button>
+    </div>
 
-      <div class="vg-grid-2">
-        <!-- COLUMNA IZQUIERDA: CONSOLA OPERATIVA CON PROTECCIÓN DIRTY-FORM Y BOTONES MRU -->
-        <div class="vg-card">
-          <div class="vg-card-header">
-            <div class="vg-card-title">🎛️ Consola de Impresión</div>
-            <div style="display:flex;gap:6px;">
-              <button type="button" id="btnAbrirModalMontarRollo" class="vg-btn vg-btn-primary vg-btn-sm">🧻 Montar Rollo</button>
-              <button type="button" id="btnCortarPapel4m" class="vg-btn vg-btn-warning vg-btn-sm" title="Cerrar bloque actual y descontar 4m">✂️ Cortar (-4m)</button>
-            </div>
-          </div>
+    <!-- BUSCADOR UNIVERSAL EN TODOS LOS MÓDULOS (Pedido #5) -->
+    <div style="flex:1; min-width:220px; position:relative;">
+      <input type="text" id="vgOmniSearchInput" class="search-input" style="margin:0; border-color:var(--vg-brand-secondary);" placeholder="🔍 Buscador Global (cliente, archivo, perfil, tela, rollo, metros, nota)..." />
+      <button type="button" id="vgOmniSearchClear" style="position:absolute;right:8px;top:6px;background:none;border:none;color:var(--vg-text-secondary);cursor:pointer;font-size:12px;">✖</button>
+    </div>
 
-          <!-- BANNER DE AUTODETECCIÓN DE NOMBRE DE ARCHIVO -->
-          <div id="impAutoDetectBanner" style="display:none;background:var(--vg-primary-soft);color:var(--vg-primary);border:1px solid var(--vg-primary);padding:8px 10px;border-radius:8px;font-weight:800;font-size:12px;margin-bottom:10px;"></div>
+    <div id="vgPeriodSummaryMetrics" style="width:100%; font-weight:700; color:var(--vg-brand-secondary); font-size:12px; text-align:right; padding-top:4px; border-top:1px solid var(--vg-border-subtle);"></div>
+  </div>
 
-          <!-- PERFIL FLEXIPRINT CON CHIPS MRU (#1 = ÚLTIMO USADO) -->
-          <label class="vg-label">🎨 Perfil de Impresión (Puesto #1 = Último Usado ⚡)</label>
-          <div id="chipsPerfilContainer" class="vg-chips-wrap"></div>
-          <input type="text" id="impInput_perfil" class="vg-input" placeholder="Escribí o tocá un botón de Perfil (vacío si no está en archivo)..." />
+  <!-- PANEL FLOTANTE DE RESULTADOS DEL BUSCADOR GLOBAL -->
+  <div id="vgOmnisearchPanel" class="card" style="display:none; border:2px solid var(--vg-brand-secondary);"></div>
 
-          <!-- TELA DESTINO CON CHIPS MRU (#1 = ÚLTIMO USADO) -->
-          <label class="vg-label">👕 Tela Destino (Puesto #1 = Último Usado ⚡)</label>
-          <div id="chipsTelaContainer" class="vg-chips-wrap"></div>
-          <input type="text" id="impInput_tela" class="vg-input" placeholder="Escribí o tocá un botón de Tela..." />
+  <!-- PESTAÑAS PRINCIPALES DE LA TERMINAL V&V GRAFIC -->
+  <div class="tab-container">
+    <button type="button" class="tab-btn active" data-tab="impresion">1. IMPRESIÓN (<span id="badgeTabImp">0</span>)</button>
+    <button type="button" class="tab-btn" data-tab="calandrado">2. CALANDRADO (<span id="badgeTabCal">0</span>)</button>
+    <button type="button" class="tab-btn" data-tab="laser">3. LÁSER &amp; QC (<span id="badgeTabLaser">0</span>)</button>
+    <button type="button" class="tab-btn" data-tab="dtf">4. MÓDULO DTF (<span id="badgeTabDtf">0</span>)</button>
+    <button type="button" class="tab-btn" data-tab="finanzas">5. FINANZAS</button>
+    <button type="button" class="tab-btn" data-tab="cierre">6. MANT. / CIERRE</button>
+    <button type="button" class="tab-btn" data-tab="metricas">7. MÉTRICAS (BI)</button>
+    <button type="button" class="tab-btn" data-tab="chat">8. 💬 CHAT (<span id="badgeTabChat">0</span>)</button>
+  </div>
 
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-            <div>
-              <label class="vg-label">🧻 Nº Rollo de Tela</label>
-              <input type="text" id="impInput_rolloTela" class="vg-input" placeholder="Ej: 42" />
-            </div>
-            <div>
-              <label class="vg-label">🎨 Color de Tela</label>
-              <input type="text" id="impInput_color" class="vg-input" placeholder="Ej: Blanco" />
-            </div>
-          </div>
-          <div id="chipsColorContainer" class="vg-chips-wrap"></div>
-
-          <!-- RUTA DE PRODUCCIÓN CONVERTIDA EN 3 BOTONES TÁCTILES (Pedido #4) -->
-          <label class="vg-label">🛤️ Ruta de Producción (Tocá el botón directo)</label>
-          <div class="vg-route-group">
-            <button type="button" class="vg-route-btn active-cal" data-ruta-val="Solo Calandrado">
-              <span style="font-size:18px;">🔥</span>
-              <span>1. Solo Calandrado</span>
-            </button>
-            <button type="button" class="vg-route-btn" data-ruta-val="Calandrado + Corte Láser">
-              <span style="font-size:18px;">🔥+⚡</span>
-              <span>2. Calandrado + Láser</span>
-            </button>
-            <button type="button" class="vg-route-btn" data-ruta-val="Solo Impresión">
-              <span style="font-size:18px;">🖨️</span>
-              <span>3. Solo Impresión</span>
-            </button>
-          </div>
-
-          <label class="vg-label">✏️ Diseño / Referencia (Opcional)</label>
-          <input type="text" id="impInput_diseno" class="vg-input" placeholder="Ej: Camisetas Titular..." />
-
-          <label class="vg-label">📝 Anotaciones / Especificaciones / Fallas (Visibles en todas las áreas)</label>
-          <textarea id="impInput_observaciones" class="vg-textarea" rows="2" placeholder="Cualquier nota que escribas acá se verá en Impresión, Calandrado y Corte Láser..."></textarea>
-
-          <button type="button" id="btnConfirmarImpresion" class="vg-btn vg-btn-success" style="width:100%;font-size:15px;padding:12px;">
-            ✅ PROCESAR IMPRESIÓN EN BLOQUE ACTUAL
-          </button>
-        </div>
-
-        <!-- COLUMNA DERECHA: PENDIENTES DE DRIVE + HISTORIAL POR BLOQUES CON SUMA DE METROS -->
-        <div>
-          <div class="vg-card">
-            <div class="vg-card-header">
-              <div>
-                <div class="vg-card-title">📂 Archivos Pendientes de Impresión (Auto-Lectura de Nombre)</div>
-                <div id="impSumaSeleccionadosBadge" style="font-size:12px;color:var(--vg-primary);margin-top:4px;"></div>
-              </div>
-              <button type="button" class="vg-btn vg-btn-outline vg-btn-sm btn-crud-add" data-table="prod_pendientes_drive">
-                ➕ Agregar Archivo Manual
-              </button>
-            </div>
-            <div class="vg-table-wrap">
-              <table class="vg-table">
-                <thead>
-                  <tr>
-                    <th style="width:36px;">Sel</th>
-                    <th>Cliente / Carpeta</th>
-                    <th>Archivo y Datos Autodetectados del Nombre</th>
-                    <th>Metros</th>
-                    <th>Prioridad</th>
-                    <th>Acciones CRUD</th>
-                  </tr>
-                </thead>
-                <tbody id="tbodyPendientesSublimacion"></tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="vg-card">
-            <div class="vg-card-header">
-              <div class="vg-card-title">📜 Registros de Impresión por Bloques (Suma de Metros en Vivo + Ruta + Notas + CRUD)</div>
-              <button type="button" class="vg-btn vg-btn-primary vg-btn-sm btn-crud-add" data-table="prod_impresiones">
-                ➕ Agregar Impresión Manual
-              </button>
-            </div>
-            <div class="vg-table-wrap">
-              <table class="vg-table">
-                <thead>
-                  <tr>
-                    <th>Fecha/Hora</th>
-                    <th>Bloque</th>
-                    <th>Cliente / Archivo(s)</th>
-                    <th>Tela / Rollo / Color</th>
-                    <th>Perfil</th>
-                    <th>Ruta de Producción</th>
-                    <th>Metros</th>
-                    <th>Notas / Fallas</th>
-                    <th>Acciones (Editar / Eliminar)</th>
-                  </tr>
-                </thead>
-                <tbody id="tbodyHistorialImpresion"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+  <!-- ========================================================================
+       TAB 1: IMPRESIÓN (Idéntica a Capturas 1 y 2 + Mejoras Solicitadas)
+       ======================================================================== -->
+  <div id="sec-impresion" class="tab-content active vg-module-section">
+    <!-- BARRA DE ROLLO ACTIVO Y SINCRONIZAR (Captura 1) -->
+    <div style="background: var(--vg-cyan-soft); border: 1px solid var(--vg-brand-secondary); padding: 10px 14px; border-radius: 6px; margin-bottom: 15px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+      <div>
+        <strong>Rollo Activo:</strong> <span id="lblRolloActivo" class="font-mono" style="font-size:16px; color:var(--vg-brand-secondary); font-weight:800;">29g-1910-1</span>
+        | <strong>Restante:</strong> <span id="lblMetrosRestantes" class="font-mono" style="font-size:16px; color:var(--vg-status-ready); font-weight:800;">0.00m</span>
+        | <strong>Suma del Bloque Actual:</strong> <span id="lblSumaBloqueActual" class="font-mono" style="font-size:15px; color:var(--vg-status-processing); font-weight:800;">0.00m</span>
       </div>
-    </section>
+      <div style="display:flex; gap:8px;">
+        <button type="button" class="btn-secondary btn-crud-add" data-table="prod_pendientes_drive" style="width:auto; padding:8px 12px;">+ Archivo Manual</button>
+        <button type="button" id="btnSyncDriveSandbox" style="background:var(--vg-brand-secondary); color:var(--vg-bg-app); border:none; padding:8px 15px; border-radius:4px; font-weight:800; cursor:pointer;">Sincronizar</button>
+      </div>
+    </div>
 
-    <!-- ======================================================================
-         SECCIÓN 2: CALANDRADO (Fecha Manual Respetada, Kiosco, Notas Visibles, CRUD)
-         ====================================================================== -->
-    <section id="sec-calandrado" class="vg-module-section" style="display:none;">
-      <div class="vg-card">
-        <div class="vg-card-header">
+    <!-- LAS 8 CAJAS KPI DE IMPRESIÓN (Captura 1 + Día Anterior y Semana Anterior) -->
+    <div class="stats-grid">
+      <div class="stat-box" style="border: 2px dashed var(--vg-brand-secondary); background:var(--vg-cyan-soft);">
+        <div class="stat-title" style="color:var(--vg-brand-secondary);">A IMPRIMIR</div>
+        <div class="stat-value" id="kpiImpPendiente">0.00m</div>
+      </div>
+      <div class="stat-box" style="border: 2px dashed var(--vg-status-alert); background:var(--vg-magenta-soft);">
+        <div class="stat-title" style="color:var(--vg-status-alert);">A CALANDRAR</div>
+        <div class="stat-value" id="kpiCalPendienteTop">0.00m</div>
+      </div>
+      <div class="stat-box" style="border: 2px dashed var(--vg-status-processing); background:var(--vg-amber-soft);">
+        <div class="stat-title" style="color:var(--vg-status-processing);">A CORTAR LÁSER</div>
+        <div class="stat-value" id="kpiLasPendienteTop">0.00m</div>
+      </div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--vg-brand-secondary);">
+        <div class="stat-title">IMP DIARIO (HOY)</div>
+        <div class="stat-value" id="kpiImpHoy">0.00m</div>
+        <div class="stat-sub" id="kpiImpAyerSub">Ayer: 0.00m</div>
+      </div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--vg-brand-primary);">
+        <div class="stat-title">IMP SEMANAL</div>
+        <div class="stat-value" id="kpiImpSemanal">0.00m</div>
+        <div class="stat-sub" id="kpiImpSemAntSub">Sem. Ant: 0.00m</div>
+      </div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--vg-status-processing);">
+        <div class="stat-title">IMP MENSUAL</div>
+        <div class="stat-value" id="kpiImpMensual">0.00m</div>
+      </div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--vg-text-secondary);">
+        <div class="stat-title">ESTE AÑO</div>
+        <div class="stat-value" id="kpiImpAnual">0.00m</div>
+      </div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--vg-text-primary);">
+        <div class="stat-title">HISTÓRICO TOTAL</div>
+        <div class="stat-value" id="kpiImpHistorico">0.00m</div>
+      </div>
+    </div>
+
+    <!-- LOS 4 BOTONES DE ROLLO (Captura 1: + Rollo Nuevo, Corte (-4m), Avance, Calibración) -->
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 15px;">
+      <button type="button" id="btnAbrirModalMontarRollo" class="btn-secondary">+ Rollo Nuevo</button>
+      <button type="button" id="btnCortarPapel4m" class="btn-secondary">Corte (-4m)</button>
+      <button type="button" id="btnAvanceManual" class="btn-secondary" style="border-color:var(--vg-status-processing); color:var(--vg-status-processing);">✏️ Avance</button>
+      <button type="button" id="btnCalibracionPapel" class="btn-secondary" style="border-color:var(--vg-status-alert); color:var(--vg-status-alert);">Calibración</button>
+    </div>
+
+    <!-- ACORDEÓN STOCK DE SOBRANTES DE PAPEL (Captura 1) -->
+    <div class="card" style="border-top: 3px solid var(--vg-brand-primary); padding: 12px; margin-bottom: 15px;">
+      <div id="btnToggleSobrantes" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
+        <h2 style="margin:0; border:none; padding:0; color:var(--vg-brand-secondary); font-size:13px;">📦 Stock de Sobrantes de Papel (Puchitos en Taller)</h2>
+        <span id="cantSobrantesBadge" class="badge">0 Disponibles</span>
+      </div>
+      <div id="panelSobrantes" style="display:none; margin-top:10px;">
+        <div id="listaSobrantesContainer" style="font-size:12px; color:var(--vg-text-secondary);">No hay puchitos en depósito.</div>
+      </div>
+    </div>
+
+    <!-- ALERTAS DE REPOSICIÓN URGENTE ENVIADAS DESDE CALANDRA / LÁSER -->
+    <div id="bannerAlertasReposicion"></div>
+
+    <!-- PANEL DE 2 COLUMNAS: COLA PENDIENTE (Izquierda) + PARÁMETROS DE IMPRESIÓN (Derecha con degradado) -->
+    <div class="grid-panel">
+      <div class="card" style="border-top: 3px solid var(--vg-brand-secondary); padding: 12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <h2 style="margin:0; border:none; padding:0;">Cola Pendiente</h2>
+          <div id="impSumaSeleccionadosBadge" style="font-size:11.5px; color:var(--vg-brand-secondary); font-weight:800;"></div>
+        </div>
+        <input type="text" id="searchPendientesLocal" class="search-input" placeholder="🔍 Buscar archivo en pendientes..." />
+        <div id="listaPendientesSublimacion" style="max-height: 520px; overflow-y: auto;"></div>
+      </div>
+
+      <div class="card card-params-gradient">
+        <h2>Parámetros de Impresión</h2>
+
+        <!-- AVISO DE AUTODETECCIÓN DEL NOMBRE DE ARCHIVO -->
+        <div id="impAutoDetectBanner" style="display:none; background:var(--vg-cyan-soft); border:1px solid var(--vg-brand-secondary); color:var(--vg-brand-secondary); padding:8px 10px; border-radius:6px; font-size:12px; font-weight:700; margin-bottom:10px;"></div>
+
+        <div style="text-align:center; margin-bottom: 12px;">
+          <label>METROS A DESCONTAR</label>
+          <input type="number" id="impInput_metrosLote" class="font-mono" value="0.00" step="0.01" style="font-size:18px; font-weight:800;" />
+        </div>
+
+        <div class="grid-2">
+          <div style="grid-column: span 2; display: flex; gap: 10px; align-items: flex-end;">
+            <div style="flex-grow: 1;">
+              <label>Diseño</label>
+              <input type="text" id="impInput_diseno" placeholder="Nombre del diseño..." />
+            </div>
+            <div id="thumbPreviewBox" style="width: 50px; height: 50px; border: 1px solid var(--vg-border-subtle); border-radius: 6px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: var(--vg-surface-dark);">
+              <span style="color:var(--vg-text-secondary); font-size:10px;">IMG</span>
+            </div>
+          </div>
+
           <div>
-            <div class="vg-card-title">🔥 Cola de Calandrado Pendiente</div>
-            <div id="calPronosticoTelas" style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;"></div>
+            <label>Tela Destino (⚡ #1 = Último Usado)</label>
+            <input type="text" id="impInput_tela" placeholder="En blanco si no está en el nombre..." />
+            <div id="chipsTelaContainer" class="chips-wrap"></div>
           </div>
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <div style="background:var(--vg-warning-soft);padding:6px 10px;border-radius:8px;border:1px solid var(--vg-warning);display:flex;align-items:center;gap:6px;">
-              <label style="font-size:11.5px;font-weight:800;">📅 Fecha Manual al marcar Hecho (Opcional):</label>
-              <input type="datetime-local" id="calInputFechaManual" style="padding:4px 6px;border-radius:6px;border:1px solid var(--vg-border-strong);font-size:12px;" />
-            </div>
-            <button type="button" class="vg-btn vg-btn-primary vg-btn-sm btn-crud-add" data-table="prod_cola_calandrado">
-              ➕ Agregar a Calandrado
-            </button>
-          </div>
-        </div>
 
-        <div class="vg-table-wrap">
-          <table class="vg-table">
-            <thead>
-              <tr>
-                <th>Ingreso</th>
-                <th>Bloque Papel</th>
-                <th>Cliente / Archivo(s)</th>
-                <th>Tela / Nº Rollo / Color</th>
-                <th>Metros</th>
-                <th>Ruta</th>
-                <th>Notas / Especificaciones</th>
-                <th>Acciones Operativas y CRUD</th>
-              </tr>
-            </thead>
-            <tbody id="tbodyColaCalandrado"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="vg-card">
-        <div class="vg-card-header">
-          <div class="vg-card-title">✅ Historial de Trabajos Calandrados</div>
-        </div>
-        <div class="vg-table-wrap">
-          <table class="vg-table">
-            <thead>
-              <tr>
-                <th>Fecha Terminado</th>
-                <th>Bloque Papel</th>
-                <th>Cliente / Archivo(s)</th>
-                <th>Tela / Rollo</th>
-                <th>Metros</th>
-                <th>Parámetros</th>
-                <th>Notas / Fallas</th>
-                <th>Acciones CRUD</th>
-              </tr>
-            </thead>
-            <tbody id="tbodyHistorialCalandrado"></tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- ======================================================================
-         SECCIÓN 3: CORTE LÁSER (Trabajos Anidados Agrupados por batch_id)
-         ====================================================================== -->
-    <section id="sec-laser" class="vg-module-section" style="display:none;">
-      <div class="vg-card">
-        <div class="vg-card-header">
           <div>
-            <div class="vg-card-title">⚡ Cola de Corte Láser (Trabajos Anidados Agrupados para Marcar con 1 Clic)</div>
-            <div style="font-size:12px;color:var(--vg-text-secondary);margin-top:2px;">
-              Los lotes compuestos por múltiples archivos anidados aparecen juntos igual que en Impresión y Calandrado.
-            </div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <input type="datetime-local" id="laserInputFechaManual" title="Fecha manual de corte (opcional)" style="padding:5px 8px;border-radius:6px;border:1px solid var(--vg-border);" />
-            <button type="button" class="vg-btn vg-btn-primary vg-btn-sm btn-crud-add" data-table="prod_cola_laser">
-              ➕ Agregar Lote Láser Manual
-            </button>
-          </div>
-        </div>
-
-        <div class="vg-table-wrap">
-          <table class="vg-table">
-            <thead>
-              <tr>
-                <th>Ingreso</th>
-                <th>Bloque</th>
-                <th>Lote Anidado / Archivos Incluidos</th>
-                <th>Tela / Rollo / Color</th>
-                <th>Metros Totales</th>
-                <th>Parámetros (Poder 90%)</th>
-                <th>Notas / Especificaciones</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="tbodyColaLaser"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="vg-card">
-        <div class="vg-card-header">
-          <div class="vg-card-title">✅ Historial de Cortes Láser Terminados</div>
-        </div>
-        <div class="vg-table-wrap">
-          <table class="vg-table">
-            <thead>
-              <tr>
-                <th>Fecha Fin</th>
-                <th>Bloque</th>
-                <th>Archivos Cortados</th>
-                <th>Tela / Rollo</th>
-                <th>Metros</th>
-                <th>Notas</th>
-                <th>CRUD</th>
-              </tr>
-            </thead>
-            <tbody id="tbodyHistorialLaser"></tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- ======================================================================
-         SECCIÓN 4: NUEVO MÓDULO DTF (Rollos 60cm x 100m, Escala Precios, Repo $0, Cuentas)
-         ====================================================================== -->
-    <section id="sec-dtf" class="vg-module-section" style="display:none;">
-      <div id="dtfRollosKpiContainer" class="vg-kpi-grid"></div>
-
-      <div class="vg-grid-2">
-        <!-- FORMULARIO OPERATIVO Y COMERCIAL DTF -->
-        <div class="vg-card">
-          <div class="vg-card-header">
-            <div class="vg-card-title">🎞️ Registrar Impresión / Pedido DTF</div>
-            <button type="button" class="vg-btn vg-btn-outline vg-btn-sm btn-crud-add" data-table="prod_dtf_rollos">
-              ➕ Nuevo Rollo 100m
-            </button>
+            <label>Perfil FlexiPRINT (⚡ #1 = Último Usado)</label>
+            <input type="text" id="impInput_perfil" placeholder="En blanco si no está en el nombre..." />
+            <div id="chipsPerfilContainer" class="chips-wrap"></div>
           </div>
 
-          <div id="dtfDuplicateAlert" style="display:none;background:var(--vg-danger-soft);color:#b91c1c;border:1px solid var(--vg-danger);padding:8px 10px;border-radius:8px;font-size:12px;margin-bottom:10px;"></div>
-
-          <label class="vg-label">🎞️ Rollo DTF (60cm x 100m por Marca y Perfil)</label>
-          <select id="dtfInputRollo" class="vg-select"></select>
-
-          <label class="vg-label">👤 Cliente DTF</label>
-          <input type="text" id="dtfInputCliente" class="vg-input" placeholder="Ej: ESTAMPADOS NORTE..." />
-
-          <label class="vg-label">📄 Nombre del Archivo (Si dice (repo) o (muestra) se tarifa a $0)</label>
-          <input type="text" id="dtfInputArchivo" class="vg-input" placeholder="Ej: LOGOS PECHO 14.5m.png o (repo)..." />
-
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-            <div>
-              <label class="vg-label">📏 Metros Archivo (Facturable)</label>
-              <input type="number" step="0.01" id="dtfInputMetrosArchivo" class="vg-input" value="10" />
-            </div>
-            <div>
-              <label class="vg-label">🧻 Metros Físicos Rollo (RIP)</label>
-              <input type="number" step="0.01" id="dtfInputMetrosRolloFisico" class="vg-input" placeholder="Igual o menor si anidado" />
-            </div>
+          <div>
+            <label>Nº Rollo Físico</label>
+            <input type="text" id="impInput_rolloTela" placeholder="Ej: ROLLO 17-18" />
           </div>
 
-          <label class="vg-label">🏷️ Tipo de Cargo</label>
-          <select id="dtfInputTipoCargo" class="vg-select">
-            <option value="VENTA">💲 VENTA (Escala Automática por Metros)</option>
-            <option value="REPOSICION">🔄 REPOSICIÓN ($0 — Sin Cargo al Cliente)</option>
-            <option value="MUESTRA">🧪 MUESTRA ($0 — Sin Cargo al Cliente)</option>
-          </select>
-
-          <div id="dtfPrecioPreviewBox" style="background:var(--vg-primary-soft);padding:10px;border-radius:8px;margin-bottom:10px;font-size:12.5px;">
-            Escala DTF: 1-9m $9.000 | 10-49m $8.500 | 50-99m $8.000 | 100-499m $7.500 | +500m $6.500
+          <div>
+            <label>Color (⚡ #1 = Último Usado)</label>
+            <input type="text" id="impInput_color" placeholder="Ej: AMARILLO" />
+            <div id="chipsColorContainer" class="chips-wrap"></div>
           </div>
 
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-            <div>
-              <label class="vg-label">💵 Monto Abonado Ahora ($)</label>
-              <input type="number" step="100" id="dtfInputMontoPagado" class="vg-input" value="0" />
-            </div>
-            <div>
-              <label class="vg-label">💳 Modalidad de Pago</label>
-              <select id="dtfInputModalidadPago" class="vg-select">
-                <option value="Paga al retirar">Paga al retirar</option>
-                <option value="Seña">Dejó Seña</option>
-                <option value="Pagado adelantado">Pagado adelantado</option>
-              </select>
-            </div>
-          </div>
-
-          <label class="vg-label">📝 Notas DTF</label>
-          <input type="text" id="dtfInputObs" class="vg-input" placeholder="Observaciones del pedido o tirada..." />
-
-          <button type="button" id="btnRegistrarPedidoDTF" class="vg-btn vg-btn-primary" style="width:100%;">
-            ✅ REGISTRAR PEDIDO Y DESCONTAR ROLLO DTF
-          </button>
-        </div>
-
-        <!-- TABLAS DTF: PENDIENTES DRIVE, PEDIDOS Y CUENTAS CORRIENTES -->
-        <div>
-          <div class="vg-card">
-            <div class="vg-card-header">
-              <div class="vg-card-title">📂 Archivos DTF Pendientes en Drive (Doble Verificación Nombre vs DPI)</div>
-            </div>
-            <div class="vg-table-wrap">
-              <table class="vg-table">
-                <thead>
-                  <tr>
-                    <th>Cliente</th>
-                    <th>Archivo</th>
-                    <th>Metros</th>
-                    <th>Cargo Detectado</th>
-                    <th>Subtotal Est.</th>
-                    <th>Acción</th>
-                  </tr>
-                </thead>
-                <tbody id="tbodyPendientesDTF"></tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="vg-card">
-            <div class="vg-card-header">
-              <div class="vg-card-title">💳 Cuentas Corrientes y Saldos por Cliente DTF</div>
-            </div>
-            <div class="vg-table-wrap">
-              <table class="vg-table">
-                <thead>
-                  <tr>
-                    <th>Cliente</th>
-                    <th>Mts Comprados</th>
-                    <th>Mts Repo ($0)</th>
-                    <th>Mts Muestra ($0)</th>
-                    <th>Facturado</th>
-                    <th>Abonado</th>
-                    <th>Saldo Pendiente</th>
-                  </tr>
-                </thead>
-                <tbody id="tbodyCuentasClientesDTF"></tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="vg-card">
-            <div class="vg-card-header">
-              <div class="vg-card-title">📜 Registro de Pedidos y Tiradas DTF (CRUD Completo)</div>
-              <button type="button" class="vg-btn vg-btn-outline vg-btn-sm btn-crud-add" data-table="prod_dtf_pedidos">
-                ➕ Agregar Pedido Manual
+          <!-- RUTA DE PRODUCCIÓN EN BOTONES TÁCTILES (Pedido #4) -->
+          <div style="grid-column: span 2;">
+            <label>Ruta de Producción (Botones Directos)</label>
+            <div class="vg-route-group">
+              <button type="button" class="vg-route-btn active" data-ruta-val="Solo Calandrado">
+                <span>🔥 1. Solo Calandrado</span>
+              </button>
+              <button type="button" class="vg-route-btn" data-ruta-val="Calandrado + Corte Láser">
+                <span>🔥+⚡ 2. Calandrado + Láser</span>
+              </button>
+              <button type="button" class="vg-route-btn" data-ruta-val="Solo Impresión">
+                <span>🖨️ 3. Solo Impresión</span>
               </button>
             </div>
-            <div class="vg-table-wrap">
-              <table class="vg-table">
-                <thead>
-                  <tr>
-                    <th>Fecha</th>
-                    <th>Cliente</th>
-                    <th>Archivo / Notas</th>
-                    <th>Cargo</th>
-                    <th>Metros</th>
-                    <th>Tarifa</th>
-                    <th>Total</th>
-                    <th>Estado Pago</th>
-                    <th>Acciones CRUD</th>
-                  </tr>
-                </thead>
-                <tbody id="tbodyPedidosDTF"></tbody>
-              </table>
-            </div>
+          </div>
+
+          <div style="grid-column: span 2;">
+            <label style="color:var(--vg-brand-secondary);">Fecha Manual (Opcional)</label>
+            <input type="datetime-local" id="impInput_fechaManual" />
+          </div>
+        </div>
+
+        <label style="margin-top:12px; color:var(--vg-status-processing);">Observaciones / Fallas / Anotaciones (Se ven en todas las áreas)</label>
+        <input type="text" id="impInput_observaciones" placeholder="Escribí cualquier nota o especificación..." style="border-color:var(--vg-status-processing);" />
+
+        <button type="button" class="btn-main" id="btnConfirmarImpresion">Confirmar Impresión (OK)</button>
+      </div>
+    </div>
+
+    <!-- TABLA DE REGISTROS DE IMPRESIÓN (Idéntica a Captura 2 + Columna Ruta + Columna Notas + Suma por Bloque + CRUD) -->
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+        <h2 style="margin:0; border:none; padding:0;">Historial Impresión Reciente (Por Rollos / Bloques con Metros Sumados)</h2>
+        <button type="button" class="btn-secondary btn-crud-add" data-table="prod_impresiones" style="width:auto; padding:6px 14px;">+ Agregar Impresión Manual</button>
+      </div>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Acción</th>
+              <th>Fecha</th>
+              <th>Cliente/Archivo</th>
+              <th>Diseño</th>
+              <th>Tela</th>
+              <th>Nº Rollo</th>
+              <th>Color</th>
+              <th>Metros</th>
+              <th>Perfil</th>
+              <th>Ruta de Producción</th>
+              <th>Notas / Fallas</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyHistorialImpresion"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       TAB 2: CALANDRADO (Idéntica a Captura 3 + Fecha Manual Respetada + Notas + CRUD)
+       ======================================================================== -->
+  <div id="sec-calandrado" class="tab-content vg-module-section">
+    <div class="stats-grid cols-6">
+      <div class="stat-box" style="border: 2px dashed var(--vg-status-alert); background:var(--vg-magenta-soft);">
+        <div class="stat-title" style="color:var(--vg-status-alert);">A CALANDRAR</div>
+        <div class="stat-value" id="kpiCalPendiente">0.00m</div>
+      </div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--vg-status-alert);">
+        <div class="stat-title">DIARIO (HOY)</div>
+        <div class="stat-value" id="kpiCalHoy">0.00m</div>
+        <div class="stat-sub" id="kpiCalAyerSub">Ayer: 0.00m</div>
+      </div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--vg-brand-secondary);">
+        <div class="stat-title">SEMANAL</div>
+        <div class="stat-value" id="kpiCalSemanal">0.00m</div>
+        <div class="stat-sub" id="kpiCalSemAntSub">Sem. Ant: 0.00m</div>
+      </div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--vg-brand-primary);">
+        <div class="stat-title">MENSUAL</div>
+        <div class="stat-value" id="kpiCalMensual">0.00m</div>
+      </div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--vg-status-processing);">
+        <div class="stat-title">ESTE AÑO</div>
+        <div class="stat-value" id="kpiCalAnual">0.00m</div>
+      </div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--vg-text-primary);">
+        <div class="stat-title">HISTÓRICO</div>
+        <div class="stat-value" id="kpiCalHistorico">0.00m</div>
+      </div>
+    </div>
+
+    <div class="card" style="border-top: 4px solid var(--vg-brand-secondary);">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
+        <h2 style="margin:0; border:none; padding:0;">Hoja de Trabajo - Cola Calandrado</h2>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <span style="font-size:11.5px; color:var(--vg-brand-secondary); font-weight:800;">📅 Fecha Proceso Manual (Opcional):</span>
+          <input type="datetime-local" id="calInputFechaManual" style="width:190px; padding:6px;" />
+          <button type="button" id="btnOrdenCalandra" class="btn-secondary" style="width:auto; padding:6px 12px;">⬇️ Orden: Más antiguos primero</button>
+          <button type="button" class="btn-secondary btn-crud-add" data-table="prod_cola_calandrado" style="width:auto; padding:6px 12px;">+ Agregar Trabajo</button>
+        </div>
+      </div>
+
+      <input type="text" id="searchCalandraLocal" class="search-input" placeholder="🔍 Buscar rollo, cliente o tela..." />
+
+      <!-- CONTENEDOR DE TARJETAS DE ROLLO EN CALANDRADO (Como en Captura 3) -->
+      <div id="contenedorRollosCalandrado"></div>
+    </div>
+
+    <div class="card">
+      <button type="button" id="btnAbrirPrevisionTelas" class="btn-main" style="width:100%; margin-top:0; margin-bottom:15px; font-size:15px; padding:12px; background:var(--vg-status-ready); color:var(--vg-bg-app);">
+        🛒 VER TELAS REQUERIDAS (PREVISIÓN)
+      </button>
+      <div id="panelPrevisionTelasInline" style="display:none; margin-bottom:15px; padding:12px; background:var(--vg-surface-dark); border:1px solid var(--vg-status-ready); border-radius:8px;"></div>
+
+      <h2>Historial Reciente (Procesados)</h2>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Acción</th>
+              <th>Fecha Fin</th>
+              <th>Rollo</th>
+              <th>Cliente/Archivo</th>
+              <th>Tela</th>
+              <th>Nº Rollo</th>
+              <th>Color</th>
+              <th>Metros</th>
+              <th>Perfil</th>
+              <th>Ruta</th>
+              <th>Notas / Fallas</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyHistorialCalandrado"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       TAB 3: LÁSER & QC (Con Trabajos Anidados Agrupados — Pedido #2)
+       ======================================================================== -->
+  <div id="sec-laser" class="tab-content vg-module-section">
+    <div class="stats-grid cols-6">
+      <div class="stat-box" style="border: 2px dashed var(--vg-brand-secondary); background:var(--vg-cyan-soft);">
+        <div class="stat-title" style="color:var(--vg-brand-secondary);">TOTAL A CORTAR</div>
+        <div class="stat-value" id="kpiLasPendiente">0.00m</div>
+      </div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--vg-status-alert);">
+        <div class="stat-title">HORAS EST. PENDIENTES</div>
+        <div class="stat-value" id="kpiLasHoras">0.0 hs</div>
+      </div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--vg-brand-primary);">
+        <div class="stat-title">DIARIO (HOY)</div>
+        <div class="stat-value" id="kpiLasHoy">0.00m</div>
+        <div class="stat-sub" id="kpiLasAyerSub">Ayer: 0.00m</div>
+      </div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--vg-status-processing);">
+        <div class="stat-title">SEMANAL</div>
+        <div class="stat-value" id="kpiLasSemanal">0.00m</div>
+        <div class="stat-sub" id="kpiLasSemAntSub">Sem. Ant: 0.00m</div>
+      </div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--vg-text-primary);">
+        <div class="stat-title">MENSUAL</div>
+        <div class="stat-value" id="kpiLasMensual">0.00m</div>
+      </div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--vg-text-secondary);">
+        <div class="stat-title">HISTÓRICO</div>
+        <div class="stat-value" id="kpiLasHistorico">0.00m</div>
+      </div>
+    </div>
+
+    <div class="card" style="border-top: 4px solid var(--vg-brand-secondary);">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
+        <div>
+          <h2 style="margin:0; border:none; padding:0;">⚡ Cola de Corte Láser (Trabajos Anidados Agrupados igual que en Impresión y Calandrado)</h2>
+          <div style="font-size:11.5px; color:var(--vg-text-secondary); margin-top:3px;">
+            Los trabajos compuestos por muchos archivos anidados aparecen juntos en una sola fila para marcarlos cortados de 1 solo clic.
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input type="datetime-local" id="laserInputFechaManual" style="width:185px; padding:6px;" title="Fecha manual opcional" />
+          <button type="button" class="btn-secondary btn-crud-add" data-table="prod_cola_laser" style="width:auto; padding:6px 12px;">+ Agregar Lote Láser</button>
+        </div>
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Acción</th>
+              <th>Fecha Ingreso</th>
+              <th>Rollo Papel</th>
+              <th>Archivos del Trabajo / Lote Anidado</th>
+              <th>Tela / Nº Rollo / Color</th>
+              <th>Metros Totales</th>
+              <th>Vel / Poder</th>
+              <th>Notas / Especificaciones</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyColaLaser"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Historial de Cortes Láser Terminados</h2>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Acción CRUD</th>
+              <th>Fecha Fin</th>
+              <th>Rollo</th>
+              <th>Lote / Archivos Cortados</th>
+              <th>Tela / Rollo</th>
+              <th>Metros</th>
+              <th>Notas</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyHistorialLaser"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       TAB 4: MÓDULO DTF (Nuevo — Con el mismo estilo oscuro V&V Grafic)
+       ======================================================================== -->
+  <div id="sec-dtf" class="tab-content vg-module-section">
+    <div id="dtfRollosKpiContainer" class="stats-grid cols-6"></div>
+
+    <div class="grid-panel">
+      <div class="card card-params-gradient">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h2 style="margin:0; border:none; padding:0;">🎞️ Registrar Impresión / Pedido DTF</h2>
+          <button type="button" class="btn-secondary btn-crud-add" data-table="prod_dtf_rollos" style="width:auto; padding:5px 10px;">+ Rollo 100m</button>
+        </div>
+
+        <div id="dtfDuplicateAlert" style="display:none; background:var(--vg-magenta-soft); border:1px solid var(--vg-status-alert); color:var(--vg-status-alert); padding:8px; border-radius:6px; font-size:12px; margin-top:8px;"></div>
+
+        <label>Rollo DTF Activo (60cm x 100m por Marca y Perfil)</label>
+        <select id="dtfInputRollo"></select>
+
+        <label>Cliente DTF</label>
+        <input type="text" id="dtfInputCliente" placeholder="Nombre del cliente..." />
+
+        <label>Nombre de Archivo (Si contiene (repo) o (muestra) se tarifa a $0)</label>
+        <input type="text" id="dtfInputArchivo" placeholder="Ej: LOGOS 12m.png o (repo)..." />
+
+        <div class="grid-2">
+          <div>
+            <label>Metros Archivo (Facturable)</label>
+            <input type="number" step="0.01" id="dtfInputMetrosArchivo" class="font-mono" value="10" />
+          </div>
+          <div>
+            <label>Metros Físicos Rollo (RIP)</label>
+            <input type="number" step="0.01" id="dtfInputMetrosRolloFisico" class="font-mono" placeholder="Metros reales consumidos" />
+          </div>
+        </div>
+
+        <label>Tipo de Cargo</label>
+        <select id="dtfInputTipoCargo">
+          <option value="VENTA">💲 VENTA (Escala Automática por Tramo)</option>
+          <option value="REPOSICION">🔄 REPOSICIÓN ($0 — Sin Cargo)</option>
+          <option value="MUESTRA">🧪 MUESTRA ($0 — Sin Cargo)</option>
+        </select>
+
+        <div id="dtfPrecioPreviewBox" style="background:var(--vg-cyan-soft); border:1px solid var(--vg-brand-secondary); padding:10px; border-radius:6px; margin-top:10px; font-size:12.5px;">
+          Escala: 1-9m $9.000 | 10-49m $8.500 | 50-99m $8.000 | 100-499m $7.500 | +500m $6.500
+        </div>
+
+        <div class="grid-2">
+          <div>
+            <label>Monto Abonado ($)</label>
+            <input type="number" step="100" id="dtfInputMontoPagado" class="font-mono" value="0" />
+          </div>
+          <div>
+            <label>Modalidad de Pago</label>
+            <select id="dtfInputModalidadPago">
+              <option value="Paga al retirar">Paga al retirar</option>
+              <option value="Seña">Dejó Seña</option>
+              <option value="Pagado adelantado">Pagado adelantado</option>
+            </select>
+          </div>
+        </div>
+
+        <label>Observaciones DTF</label>
+        <input type="text" id="dtfInputObs" placeholder="Opcional..." />
+
+        <button type="button" id="btnRegistrarPedidoDTF" class="btn-main">Confirmar Trabajo DTF (OK)</button>
+      </div>
+
+      <div>
+        <div class="card" style="border-top: 3px solid var(--vg-brand-secondary);">
+          <h2>📂 Cola DTF Pendiente en Drive</h2>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Archivo</th>
+                  <th>Metros</th>
+                  <th>Cargo</th>
+                  <th>Subtotal</th>
+                  <th>Acción</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyPendientesDTF"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" style="border-top: 3px solid var(--vg-status-ready);">
+          <h2>💳 Cuentas Corrientes y Saldos por Cliente DTF</h2>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Mts Venta</th>
+                  <th>Mts Repo ($0)</th>
+                  <th>Mts Muestra ($0)</th>
+                  <th>Facturado</th>
+                  <th>Abonado</th>
+                  <th>Saldo Pendiente</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyCuentasClientesDTF"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h2 style="margin:0; border:none; padding:0;">📜 Historial de Pedidos DTF</h2>
+            <button type="button" class="btn-secondary btn-crud-add" data-table="prod_dtf_pedidos" style="width:auto; padding:5px 10px;">+ Pedido Manual</button>
+          </div>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Acción</th>
+                  <th>Fecha</th>
+                  <th>Cliente</th>
+                  <th>Archivo / Notas</th>
+                  <th>Cargo</th>
+                  <th>Metros</th>
+                  <th>Tarifa</th>
+                  <th>Total</th>
+                  <th>Estado Pago</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyPedidosDTF"></tbody>
+            </table>
           </div>
         </div>
       </div>
-    </section>
+    </div>
+  </div>
 
-    <!-- ======================================================================
-         SECCIÓN 5: CHAT INTERNO DE TALLER (@Menciones, #Trabajos, Cámara Celular WebP)
-         ====================================================================== -->
-    <section id="sec-chat" class="vg-module-section" style="display:none;">
-      <div class="vg-grid-2">
-        <div class="vg-card">
-          <div class="vg-card-header">
-            <div class="vg-card-title">📣 Nuevo Mensaje / Nota Operativa de Taller</div>
-          </div>
-
-          <label class="vg-label">📍 Canal de Área Destino</label>
-          <select id="chatSelectCanal" class="vg-select">
-            <option value="General">🏢 General (Todo el Taller)</option>
-            <option value="Impresión">🖨️ Impresión Sublimación</option>
-            <option value="Calandrado">🔥 Calandrado</option>
-            <option value="Corte Láser">⚡ Corte Láser</option>
-            <option value="DTF">🎞️ Módulo DTF</option>
+  <!-- ========================================================================
+       TAB 5: FINANZAS Y STOCK DE INSUMOS
+       ======================================================================== -->
+  <div id="sec-finanzas" class="tab-content vg-module-section">
+    <div class="stats-grid cols-6">
+      <div class="stat-box" style="border-bottom: 3px solid var(--vg-status-processing);">
+        <div class="stat-title">RINDE TINTA TEÓRICO</div>
+        <div class="stat-value">400 m/Set</div>
+      </div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--vg-brand-secondary);">
+        <div class="stat-title">TOTAL METROS IMPRESOS</div>
+        <div class="stat-value" id="finTotalImpMts">0.00m</div>
+      </div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--vg-status-ready);">
+        <div class="stat-title">FACTURACIÓN DTF</div>
+        <div class="stat-value" id="finTotalDtfFacturado">$0</div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>🛒 Registrar Compra de Insumos (Papel / Tinta / Film DTF / Poliamida)</h2>
+      <div class="grid-2">
+        <div>
+          <label>Tipo de Insumo</label>
+          <select id="finCompraTipo">
+            <option value="Papel Sublimación">Papel Sublimación</option>
+            <option value="Tinta Sublimación">Tinta Sublimación</option>
+            <option value="Film DTF 60cm">Film DTF 60cm x 100m</option>
+            <option value="Tinta DTF Blanca / CMYK">Tinta DTF Blanca / CMYK</option>
+            <option value="Poliamida DTF">Poliamida DTF</option>
           </select>
-
-          <label class="vg-label">🔗 #Arrobar / Adjuntar un Trabajo Específico (Sincroniza la nota en la fila del trabajo)</label>
-          <select id="chatSelectTrabajo" class="vg-select"></select>
-
-          <label class="vg-label">👤 @Arrobar a un Miembro del Equipo (Tocá para insertar)</label>
-          <div id="chatChipsMencion" class="vg-chips-wrap"></div>
-
-          <label class="vg-label">💬 Mensaje / Acontecimiento</label>
-          <textarea id="chatInputMensaje" class="vg-textarea" rows="3" placeholder="Escribí tu mensaje, @mencioná a un compañero o comentá sobre un #trabajo..."></textarea>
-
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:6px;">
-            <label class="vg-btn vg-btn-outline" style="cursor:pointer;">
-              📷 Sacar Foto / Adjuntar (WebP)
-              <input type="file" id="chatInputFotoCamara" accept="image/*" capture="environment" style="display:none;" />
-            </label>
-            <span id="chatFotoPreviewBadge" class="vg-badge vg-badge-ok" style="display:none;"></span>
-            <button type="button" id="btnEnviarMensajeChat" class="vg-btn vg-btn-primary" style="flex:1;">
-              🚀 Enviar al Taller
-            </button>
-          </div>
         </div>
+        <div><label>Detalle / Marca</label><input type="text" id="finCompraDetalle" placeholder="Ej: Bobina 29g 500m" /></div>
+        <div><label>Cantidad</label><input type="number" id="finCompraCant" value="1" /></div>
+        <div><label>Costo Total ($)</label><input type="number" id="finCompraCosto" placeholder="0" /></div>
+      </div>
+      <button type="button" id="btnGuardarCompraFinanzas" class="btn-main">Guardar Compra de Insumo</button>
+    </div>
+  </div>
 
-        <div class="vg-card">
-          <div class="vg-card-header">
-            <div class="vg-card-title">💬 Muro en Vivo del Taller</div>
-            <div style="display:flex;gap:4px;flex-wrap:wrap;">
-              <button type="button" class="vg-period-pill btn-canal-chat active" data-canal="Todos">Todos</button>
-              <button type="button" class="vg-period-pill btn-canal-chat" data-canal="Mis Menciones">🔔 Mis Menciones</button>
-              <button type="button" class="vg-period-pill btn-canal-chat" data-canal="Impresión">🖨️ Imp</button>
-              <button type="button" class="vg-period-pill btn-canal-chat" data-canal="Calandrado">🔥 Calandra</button>
-              <button type="button" class="vg-period-pill btn-canal-chat" data-canal="Corte Láser">⚡ Láser</button>
-              <button type="button" class="vg-period-pill btn-canal-chat" data-canal="DTF">🎞️ DTF</button>
-            </div>
-          </div>
-          <div id="chatFeedContainer"></div>
+  <!-- ========================================================================
+       TAB 6: MANTENIMIENTO Y BITÁCORA DE FALLAS
+       ======================================================================== -->
+  <div id="sec-cierre" class="tab-content vg-module-section">
+    <div class="card" style="border-top: 4px solid var(--vg-status-alert);">
+      <h2 style="color:var(--vg-status-alert);">🚨 Bitácora de Fallas, Mermas y Reposiciones Técnicas</h2>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Estación</th>
+              <th>Rollo</th>
+              <th>Archivo / Operación</th>
+              <th>Merma (m)</th>
+              <th>Motivo / Detalle</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyBitacoraFallas"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       TAB 7: MÉTRICAS (BI) — Idéntica a Captura 4 + Día Anterior y Semana Anterior
+       ======================================================================== -->
+  <div id="sec-metricas" class="tab-content vg-module-section">
+    <div class="card" style="border-top: 4px solid var(--vg-brand-primary); background:var(--vg-surface-dark);">
+      <h2 style="color:var(--vg-brand-secondary); border:none; margin-bottom:4px;">🎯 Calculadora de Tiempos Estimados (SLA)</h2>
+      <p style="font-size:11px; color:var(--vg-text-secondary); margin-bottom:14px;">Proyección basada en 10 hs laborales (Imp: 650m/día | Cal: 650m/día | Láser: 300m/día)</p>
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:14px;">
+        <div class="stat-box">
+          <div class="stat-title">TANDA IMPRESIÓN</div>
+          <div class="stat-value" id="slaDiasImp" style="color:var(--vg-brand-secondary);">0 Días</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-title">TANDA CALANDRADO</div>
+          <div class="stat-value" id="slaDiasCal" style="color:var(--vg-status-alert);">0 Días</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-title">TANDA CORTE LÁSER</div>
+          <div class="stat-value" id="slaDiasLas" style="color:var(--vg-status-processing);">0 Días</div>
+        </div>
+        <div class="stat-box" style="border: 1px solid var(--vg-status-ready); background:var(--vg-ready-soft);">
+          <div class="stat-title" style="color:var(--vg-status-ready);">ENTREGA ESTIMADA (NUEVO LOTE)</div>
+          <div class="stat-value" id="slaDiasTotal">Aprox ~ 1 Día</div>
         </div>
       </div>
-    </section>
+    </div>
 
-    <!-- ======================================================================
-         SECCIÓN 6: MÉTRICAS Y COMPARATIVAS (Hoy, Ayer, Semana Anterior, Rango)
-         ====================================================================== -->
-    <section id="sec-metricas" class="vg-module-section" style="display:none;">
-      <div class="vg-card">
-        <div class="vg-card-header">
-          <div class="vg-card-title">📊 Cuadro Comparativo de Producción por Períodos (Metros Reales)</div>
-        </div>
-        <div class="vg-table-wrap">
-          <table class="vg-table">
-            <thead>
-              <tr>
-                <th>Área / Estación del Taller</th>
-                <th>Hoy</th>
-                <th>Día Anterior (Ayer)</th>
-                <th>Esta Semana</th>
-                <th>Semana Anterior</th>
-              </tr>
-            </thead>
-            <tbody id="metricasComparativaContainer"></tbody>
-          </table>
+    <!-- TARJETAS CON DEGRADADO DE PRODUCCIÓN (Captura 4: Violeta, Naranja, Azul + Esmeralda DTF) -->
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-bottom:16px;">
+      <!-- IMPRESIÓN -->
+      <div style="background:var(--vg-grad-imp); border-radius:12px; padding:20px; border:1px solid var(--vg-border-subtle);">
+        <h3 style="margin-top:0; font-size:15px; border-bottom:1px solid var(--vg-border-subtle); padding-bottom:10px; display:flex; justify-content:space-between;">
+          <span>🖨️ IMPRESIÓN</span>
+          <span class="badge">PRODUCCIÓN</span>
+        </h3>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:12px;">
+          <div>
+            <div class="stat-title">DIARIO (HOY)</div>
+            <div id="biImpHoy" class="font-mono" style="font-size:26px; font-weight:900;">0.00</div>
+          </div>
+          <div>
+            <div class="stat-title">DÍA ANTERIOR (AYER)</div>
+            <div id="biImpAyer" class="font-mono" style="font-size:26px; font-weight:900;">0.00</div>
+          </div>
+          <div>
+            <div class="stat-title">ESTA SEMANA</div>
+            <div id="biImpSem" class="font-mono" style="font-size:22px; font-weight:800;">0.00</div>
+          </div>
+          <div>
+            <div class="stat-title">SEMANA ANTERIOR</div>
+            <div id="biImpSemAnt" class="font-mono" style="font-size:22px; font-weight:800;">0.00</div>
+          </div>
+          <div>
+            <div class="stat-title">ESTE MES</div>
+            <div id="biImpMes" class="font-mono" style="font-size:18px; font-weight:800;">0.00</div>
+          </div>
+          <div>
+            <div class="stat-title">HISTÓRICO</div>
+            <div id="biImpHis" class="font-mono" style="font-size:18px; font-weight:800;">0.00</div>
+          </div>
         </div>
       </div>
-    </section>
-  </main>
+
+      <!-- CALANDRADO -->
+      <div style="background:var(--vg-grad-cal); border-radius:12px; padding:20px; border:1px solid var(--vg-border-subtle);">
+        <h3 style="margin-top:0; font-size:15px; border-bottom:1px solid var(--vg-border-subtle); padding-bottom:10px; display:flex; justify-content:space-between;">
+          <span>♨️ CALANDRADO</span>
+          <span class="badge">PRODUCCIÓN</span>
+        </h3>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:12px;">
+          <div>
+            <div class="stat-title">DIARIO (HOY)</div>
+            <div id="biCalHoy" class="font-mono" style="font-size:26px; font-weight:900;">0.00</div>
+          </div>
+          <div>
+            <div class="stat-title">DÍA ANTERIOR (AYER)</div>
+            <div id="biCalAyer" class="font-mono" style="font-size:26px; font-weight:900;">0.00</div>
+          </div>
+          <div>
+            <div class="stat-title">ESTA SEMANA</div>
+            <div id="biCalSem" class="font-mono" style="font-size:22px; font-weight:800;">0.00</div>
+          </div>
+          <div>
+            <div class="stat-title">SEMANA ANTERIOR</div>
+            <div id="biCalSemAnt" class="font-mono" style="font-size:22px; font-weight:800;">0.00</div>
+          </div>
+          <div>
+            <div class="stat-title">ESTE MES</div>
+            <div id="biCalMes" class="font-mono" style="font-size:18px; font-weight:800;">0.00</div>
+          </div>
+          <div>
+            <div class="stat-title">HISTÓRICO</div>
+            <div id="biCalHis" class="font-mono" style="font-size:18px; font-weight:800;">0.00</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CORTE LÁSER -->
+      <div style="background:var(--vg-grad-las); border-radius:12px; padding:20px; border:1px solid var(--vg-border-subtle);">
+        <h3 style="margin-top:0; font-size:15px; border-bottom:1px solid var(--vg-border-subtle); padding-bottom:10px; display:flex; justify-content:space-between;">
+          <span>⚡ CORTE LÁSER</span>
+          <span class="badge">PRODUCCIÓN</span>
+        </h3>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:12px;">
+          <div>
+            <div class="stat-title">DIARIO (HOY)</div>
+            <div id="biLasHoy" class="font-mono" style="font-size:26px; font-weight:900;">0.00</div>
+          </div>
+          <div>
+            <div class="stat-title">DÍA ANTERIOR (AYER)</div>
+            <div id="biLasAyer" class="font-mono" style="font-size:26px; font-weight:900;">0.00</div>
+          </div>
+          <div>
+            <div class="stat-title">ESTA SEMANA</div>
+            <div id="biLasSem" class="font-mono" style="font-size:22px; font-weight:800;">0.00</div>
+          </div>
+          <div>
+            <div class="stat-title">SEMANA ANTERIOR</div>
+            <div id="biLasSemAnt" class="font-mono" style="font-size:22px; font-weight:800;">0.00</div>
+          </div>
+          <div>
+            <div class="stat-title">ESTE MES</div>
+            <div id="biLasMes" class="font-mono" style="font-size:18px; font-weight:800;">0.00</div>
+          </div>
+          <div>
+            <div class="stat-title">HISTÓRICO</div>
+            <div id="biLasHis" class="font-mono" style="font-size:18px; font-weight:800;">0.00</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DTF -->
+      <div style="background:var(--vg-grad-dtf); border-radius:12px; padding:20px; border:1px solid var(--vg-border-subtle);">
+        <h3 style="margin-top:0; font-size:15px; border-bottom:1px solid var(--vg-border-subtle); padding-bottom:10px; display:flex; justify-content:space-between;">
+          <span>🎞️ DTF 60CM</span>
+          <span class="badge">PRODUCCIÓN</span>
+        </h3>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:12px;">
+          <div>
+            <div class="stat-title">DIARIO (HOY)</div>
+            <div id="biDtfHoy" class="font-mono" style="font-size:26px; font-weight:900;">0.00</div>
+          </div>
+          <div>
+            <div class="stat-title">DÍA ANTERIOR (AYER)</div>
+            <div id="biDtfAyer" class="font-mono" style="font-size:26px; font-weight:900;">0.00</div>
+          </div>
+          <div>
+            <div class="stat-title">ESTA SEMANA</div>
+            <div id="biDtfSem" class="font-mono" style="font-size:22px; font-weight:800;">0.00</div>
+          </div>
+          <div>
+            <div class="stat-title">SEMANA ANTERIOR</div>
+            <div id="biDtfSemAnt" class="font-mono" style="font-size:22px; font-weight:800;">0.00</div>
+          </div>
+          <div>
+            <div class="stat-title">ESTE MES</div>
+            <div id="biDtfMes" class="font-mono" style="font-size:18px; font-weight:800;">0.00</div>
+          </div>
+          <div>
+            <div class="stat-title">HISTÓRICO</div>
+            <div id="biDtfHis" class="font-mono" style="font-size:18px; font-weight:800;">0.00</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RADAR DE PRODUCCIÓN (EN COLA) — Captura 4 -->
+    <div class="card" style="background:var(--vg-surface-dark);">
+      <h3 style="color:var(--vg-text-secondary); font-size:13px; text-transform:uppercase;">RADAR DE PRODUCCIÓN (EN COLA)</h3>
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:14px;">
+        <div style="background:var(--vg-surface-input); padding:15px; border-radius:8px; border-left: 5px solid var(--vg-status-alert);">
+          <div class="stat-title">ESPERANDO IMPRESIÓN</div>
+          <div id="radarQImp" class="font-mono" style="font-size:30px; font-weight:900; margin-top:4px;">0m</div>
+        </div>
+        <div style="background:var(--vg-surface-input); padding:15px; border-radius:8px; border-left: 5px solid var(--vg-status-processing);">
+          <div class="stat-title">ESPERANDO CALANDRA</div>
+          <div id="radarQCal" class="font-mono" style="font-size:30px; font-weight:900; margin-top:4px;">0m</div>
+        </div>
+        <div style="background:var(--vg-surface-input); padding:15px; border-radius:8px; border-left: 5px solid var(--vg-status-ready);">
+          <div class="stat-title">ESPERANDO LÁSER</div>
+          <div id="radarQLas" class="font-mono" style="font-size:30px; font-weight:900; margin-top:4px;">0m</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       TAB 8: CHAT INTERNO DE TALLER (@Menciones, #Trabajos, Fotos Cámara WebP)
+       ======================================================================== -->
+  <div id="sec-chat" class="tab-content vg-module-section">
+    <div class="grid-panel">
+      <div class="card card-params-gradient">
+        <h2>📣 Enviar Mensaje / Acontecimiento al Taller</h2>
+
+        <label>📍 Área / Canal Destino</label>
+        <select id="chatSelectCanal">
+          <option value="General">🏢 General (Todo el Taller)</option>
+          <option value="Impresión">🖨️ Impresión Sublimación</option>
+          <option value="Calandrado">🔥 Calandrado</option>
+          <option value="Corte Láser">⚡ Corte Láser</option>
+          <option value="DTF">🎞️ Módulo DTF</option>
+        </select>
+
+        <label>🔗 #Arrobar un Trabajo (Copia la nota automáticamente en la fila del trabajo)</label>
+        <select id="chatSelectTrabajo"></select>
+
+        <label>👤 @Arrobar a un Miembro del Equipo (Tocá para mencionar)</label>
+        <div id="chatChipsMencion" class="chips-wrap"></div>
+
+        <label>💬 Mensaje / Nota</label>
+        <textarea id="chatInputMensaje" rows="3" placeholder="Escribí tu nota, @mencioná a un compañero o adjuntá una foto del trabajo..."></textarea>
+
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px;">
+          <label class="btn-secondary" style="width:auto; cursor:pointer; margin:0;">
+            📷 Cámara / Foto (WebP)
+            <input type="file" id="chatInputFotoCamara" accept="image/*" capture="environment" style="display:none;" />
+          </label>
+          <span id="chatFotoPreviewBadge" class="badge activo" style="display:none;"></span>
+          <button type="button" id="btnEnviarMensajeChat" class="btn-main" style="flex:1; margin:0;">Enviar Mensaje</button>
+        </div>
+      </div>
+
+      <div class="card" style="border-top: 3px solid var(--vg-brand-secondary);">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+          <h2 style="margin:0; border:none; padding:0;">💬 Muro Operativo en Tiempo Real</h2>
+          <div style="display:flex; gap:5px; flex-wrap:wrap;">
+            <button type="button" class="badge mru-top btn-canal-chat" data-canal="Todos" style="cursor:pointer;">Todos</button>
+            <button type="button" class="badge btn-canal-chat" data-canal="Mis Menciones" style="cursor:pointer;">🔔 Mis Menciones</button>
+            <button type="button" class="badge btn-canal-chat" data-canal="Impresión" style="cursor:pointer;">🖨️ Imp</button>
+            <button type="button" class="badge btn-canal-chat" data-canal="Calandrado" style="cursor:pointer;">🔥 Calandra</button>
+            <button type="button" class="badge btn-canal-chat" data-canal="Corte Láser" style="cursor:pointer;">⚡ Láser</button>
+            <button type="button" class="badge btn-canal-chat" data-canal="DTF" style="cursor:pointer;">🎞️ DTF</button>
+          </div>
+        </div>
+        <div id="chatFeedContainer"></div>
+      </div>
+    </div>
+  </div>
 
   <!-- BOTÓN FLOTANTE DE CHAT RÁPIDO PARA CELULARES -->
-  <button type="button" class="vg-fab-chat" onclick="document.querySelector('.vg-tab-btn[data-tab=\'chat\']').click()">
+  <button type="button" class="fab-chat-btn" onclick="document.querySelector('.tab-btn[data-tab=\'chat\']').click()">
     <span>💬 Chat Taller</span>
-    <span id="badgeFabChat" class="vg-tab-badge" style="background:rgba(0,0,0,0.28);">0</span>
+    <span id="badgeFabChat" class="badge activo">0</span>
   </button>
 
   <!-- ========================================================================
-       MODAL 1: MONTAR ROLLO NUEVO (MODO KIOSCO COMPACTO 90dvh — Pedido #1)
+       MODAL 1: MONTAR ROLLO NUEVO / ACCIÓN DE PAPEL (90dvh Sticky Header & Footer — Pedido #1)
        ======================================================================== -->
-  <div id="modalMontarRollo" class="vg-modal-backdrop">
-    <div class="vg-modal-dialog">
-      <div class="vg-modal-header">
-        <div class="vg-modal-title">🧻 Montar Nuevo Rollo de Papel</div>
-        <button type="button" class="vg-modal-close">❌ Cerrar</button>
+  <div id="modalMontarRollo" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-sticky-header">
+        <h2 style="margin:0; border:none; padding:0; color:var(--vg-brand-secondary);">🧻 Montar Nuevo Rollo de Papel</h2>
+        <button type="button" class="btn-secondary vg-modal-close" style="width:auto; padding:6px 12px; border-color:var(--vg-status-alert); color:var(--vg-status-alert);">✖ Cerrar</button>
       </div>
-      <div class="vg-modal-body">
-        <label class="vg-label">Gramaje del Papel</label>
-        <select id="montarRolloGramaje" class="vg-select">
-          <option value="70">70 grs (Estándar Producción)</option>
-          <option value="60">60 grs (Ligero)</option>
-          <option value="90">90 grs (Alta Carga)</option>
-        </select>
-
-        <label class="vg-label">Metros Iniciales de la Bobina</label>
-        <input type="number" id="montarRolloMetros" class="vg-input" value="200" />
-
-        <label class="vg-label">Observaciones de Montaje</label>
-        <input type="text" id="montarRolloObs" class="vg-input" placeholder="Opcional..." />
+      <div class="modal-scroll-body">
+        <div class="grid-2">
+          <div>
+            <label>Gramaje (g)</label>
+            <input type="number" id="montarRolloGramaje" value="29" placeholder="Ej: 29 o 31" />
+          </div>
+          <div>
+            <label>Metros Iniciales de la Bobina</label>
+            <input type="number" id="montarRolloMetros" value="500" placeholder="Ej: 500" />
+          </div>
+        </div>
+        <label>Observaciones de Montaje</label>
+        <input type="text" id="montarRolloObs" placeholder="Opcional..." />
       </div>
-      <div class="vg-modal-footer">
-        <button type="button" class="vg-btn vg-btn-outline vg-modal-close">Cancelar</button>
-        <button type="button" id="btnConfirmarMontarRollo" class="vg-btn vg-btn-success">✅ Confirmar y Montar Bobina</button>
+      <div class="modal-sticky-footer">
+        <button type="button" class="btn-secondary vg-modal-close" style="width:auto; padding:8px 16px;">Cancelar</button>
+        <button type="button" id="btnConfirmarMontarRollo" class="btn-main" style="width:auto; margin:0; padding:8px 18px;">✅ Confirmar y Montar</button>
       </div>
     </div>
   </div>
 
   <!-- ========================================================================
-       MODAL 2: MODO KIOSCO OPERATIVO 90dvh (Sticky Header & Footer — Nunca se tapa)
+       MODAL 2: MODO KIOSKO OPERATIVO 90dvh (Sticky Header & Footer — Nunca se tapan los botones)
        ======================================================================== -->
-  <div id="modalKioscoOperativo" class="vg-modal-backdrop">
-    <div class="vg-modal-dialog kiosk-lg">
-      <div class="vg-modal-header">
-        <div id="kioscoTitulo" class="vg-modal-title">🔥 Modo Kiosco Operativo</div>
-        <button type="button" class="vg-modal-close">❌ Cerrar Kiosco</button>
+  <div id="modalKioscoOperativo" class="modal-overlay">
+    <div class="modal-content kiosk-lg">
+      <div class="modal-sticky-header">
+        <h2 id="kioscoTitulo" style="margin:0; border:none; padding:0; color:var(--vg-brand-secondary);">▶️ MODO KIOSKO OPERATIVO</h2>
+        <button type="button" class="btn-secondary vg-modal-close" style="width:auto; padding:6px 14px; border-color:var(--vg-status-alert); color:var(--vg-status-alert);">✖ CERRAR</button>
       </div>
-      <div class="vg-modal-body" style="text-align:center;">
-        <div id="kioscoSubtitulo" style="text-align:left;margin-bottom:16px;"></div>
-        <div style="background:var(--vg-bg-elevated);border:2px solid var(--vg-primary);border-radius:16px;padding:18px;margin:10px auto;max-width:340px;">
-          <div style="font-size:12px;font-weight:800;color:var(--vg-text-muted);text-transform:uppercase;">Tiempo de Procesamiento</div>
-          <div id="kioscoCronometro" style="font-size:44px;font-weight:900;font-family:var(--vg-font-mono);color:var(--vg-primary);">00:00</div>
+      <div class="modal-scroll-body">
+        <div id="kioscoSubtitulo" style="margin-bottom:14px;"></div>
+        <div style="background:var(--vg-surface-dark); border:1px solid var(--vg-brand-secondary); border-radius:8px; padding:16px; text-align:center;">
+          <div class="stat-title" style="color:var(--vg-brand-secondary);">CRONÓMETRO EN VIVO</div>
+          <div id="kioscoCronometro" class="font-mono" style="font-size:38px; font-weight:900; margin-top:4px;">00:00</div>
         </div>
       </div>
-      <div class="vg-modal-footer">
-        <button type="button" class="vg-btn vg-btn-outline vg-modal-close">Minimizar / Salir</button>
-        <button type="button" id="btnKioscoFinalizar" class="vg-btn vg-btn-success" style="font-size:15px;padding:10px 20px;">
-          ✅ FINALIZAR TRABAJO AHORA
-        </button>
+      <div class="modal-sticky-footer">
+        <button type="button" class="btn-secondary vg-modal-close" style="width:auto; padding:10px 18px;">⏸️ Minimizar / Salir</button>
+        <button type="button" id="btnKioscoFinalizar" class="btn-main" style="width:auto; margin:0; padding:10px 22px; background:var(--vg-status-ready); color:var(--vg-bg-app);">✔️ TERMINAR TRABAJO</button>
       </div>
     </div>
   </div>
 
   <!-- ========================================================================
-       MODAL 3: EDITOR CRUD UNIVERSAL (Editar o Agregar en Cualquier Tabla)
+       MODAL 3: EDITOR CRUD UNIVERSAL (Editar o Agregar en Cualquier Tabla en Cualquier Momento)
        ======================================================================== -->
-  <div id="modalCrudUniversal" class="vg-modal-backdrop">
-    <div class="vg-modal-dialog">
-      <div class="vg-modal-header">
-        <div id="modalCrudTitle" class="vg-modal-title">✏️ Editar Registro</div>
-        <button type="button" class="vg-modal-close">❌ Cerrar</button>
+  <div id="modalCrudUniversal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-sticky-header">
+        <h2 id="modalCrudTitle" style="margin:0; border:none; padding:0; color:var(--vg-brand-secondary);">✏️ Editar Registro</h2>
+        <button type="button" class="btn-secondary vg-modal-close" style="width:auto; padding:6px 12px; border-color:var(--vg-status-alert); color:var(--vg-status-alert);">✖ Cerrar</button>
       </div>
-      <div id="modalCrudBody" class="vg-modal-body"></div>
-      <div class="vg-modal-footer">
-        <button type="button" class="vg-btn vg-btn-outline vg-modal-close">Cancelar</button>
-        <button type="button" id="btnGuardarModalCrud" class="vg-btn vg-btn-primary">💾 Guardar Cambios</button>
+      <div id="modalCrudBody" class="modal-scroll-body"></div>
+      <div class="modal-sticky-footer">
+        <button type="button" class="btn-secondary vg-modal-close" style="width:auto; padding:8px 16px;">Cancelar</button>
+        <button type="button" id="btnGuardarModalCrud" class="btn-main" style="width:auto; margin:0; padding:8px 18px;">💾 Guardar Cambios</button>
       </div>
     </div>
   </div>
 
-  <!-- CONTENEDOR DE NOTIFICACIONES TOAST -->
-  <div id="vgToastContainer" style="position:fixed;top:42px;right:16px;z-index:3000;max-width:360px;"></div>
+  <div id="vgToastContainer" style="position:fixed; top:16px; right:16px; z-index:3000; max-width:360px;"></div>
 
   <script type="module" src="./src/app.js"></script>
 </body>

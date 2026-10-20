@@ -13,41 +13,64 @@ export function parsearNombreArchivoInteligente(nombreArchivo = "", nombreCarpet
   const perfiles = (catalogos.perfiles || []).map(p => typeof p === "string" ? p : p.nombre).filter(Boolean);
   const colores = (catalogos.colores || []).map(c => typeof c === "string" ? c : c.nombre).filter(Boolean);
 
-  // 1. Extraer Medida Unitaria y Repeticiones
-  let medida = 0;
-  let repeticiones = 1;
   const parseNum = (v) => {
     const n = parseFloat(String(v).replace(",", "."));
     return isNaN(n) ? 0 : n;
   };
 
-  const match3 = nombre.match(/(\d+[\.,]?\d*)\s*[xX]\s*(\d+[\.,]?\d*)\s*[xX]\s*(\d+)/i);
-  if (match3) {
+  // Quitamos corchetes iniciales tipo "[1050 MTS]" para medir el archivo real
+  const nombreSinCorcheteInicial = nombre.replace(/^\[[^\]]+\]\s*[-–]?\s*/, "");
+
+  // 1. Extraer Medida Unitaria y Repeticiones
+  let medida = 0;
+  let repeticiones = 1;
+
+  // Formato "1 X 103 (103 MTS)" o "1.50x18.40x1"
+  const match3 = nombreSinCorcheteInicial.match(/(\d+[\.,]?\d*)\s*[xX]\s*(\d+[\.,]?\d*)\s*[xX]\s*(\d+)/i);
+  const matchParMts = nombreSinCorcheteInicial.match(/\(\s*([\d,.]+)\s*(?:MTS?|MT|M)\s*\)/i);
+  if (matchParMts) {
+    medida = parseNum(matchParMts[1]);
+    repeticiones = 1;
+  } else if (match3) {
     const h = parseNum(match3[2]);
     medida = h > 10 ? h / 100.0 : h;
     repeticiones = parseInt(match3[3], 10) || 1;
   } else {
-    const xMatch = nombre.match(/([\d,.]+)\s*(?:MTS?|MT|M)?\s*[xX]\s*(\d+)/i);
-    if (xMatch) {
-      const m = parseNum(xMatch[1]);
-      medida = m > 50 ? m / 100.0 : m;
-      repeticiones = parseInt(xMatch[2], 10) || 1;
+    const match1xN = nombreSinCorcheteInicial.match(/\b1\s*[xX]\s*([\d,.]+)\b/i);
+    if (match1xN) {
+      medida = parseNum(match1xN[1]);
+      repeticiones = 1;
     } else {
-      const mtsMatch = nombre.match(/([\d,.]+)\s*(?:MTS?|MT|M\b)/i);
-      if (mtsMatch) {
-        const m = parseNum(mtsMatch[1]);
-        medida = m > 80 ? m / 100.0 : m;
+      const xMatch = nombreSinCorcheteInicial.match(/([\d,.]+)\s*(?:MTS?|MT|M)?\s*[xX]\s*(\d+)/i);
+      if (xMatch) {
+        const m = parseNum(xMatch[1]);
+        medida = m > 50 ? m / 100.0 : m;
+        repeticiones = parseInt(xMatch[2], 10) || 1;
+      } else {
+        const mtsMatch = nombreSinCorcheteInicial.match(/([\d,.]+)\s*(?:MTS?|MT|M\b)/i);
+        if (mtsMatch) {
+          medida = parseNum(mtsMatch[1]);
+        }
       }
     }
   }
 
-  // 2. Detectar Perfil (primero contra catálogo en todo el nombre/carpeta, luego paréntesis)
+  // 2. Detectar Perfil FlexiPRINT (Soporta alias reales como "(V-V 3P)" -> "POLYJET V-V 3P (CONTINUO) (BANDA COLOR)")
   let perfilDetectado = "";
   const perfilesOrdenados = [...perfiles].sort((a, b) => b.length - a.length);
   for (const p of perfilesOrdenados) {
     if (textoUpper.includes(p.toUpperCase())) {
       perfilDetectado = p;
       break;
+    }
+  }
+  if (!perfilDetectado) {
+    if (/\bV-V\s*3P\b/i.test(textoCompleto)) {
+      const match3p = perfiles.find(p => p.toUpperCase().includes("3P"));
+      perfilDetectado = match3p || "POLYJET V-V 3P (CONTINUO) (BANDA COLOR)";
+    } else if (/\bV-V\s*4P\b/i.test(textoCompleto)) {
+      const match4p = perfiles.find(p => p.toUpperCase().includes("4P"));
+      perfilDetectado = match4p || "POLYJET V-V 4P (CONTINUO) (BANDA COLOR)";
     }
   }
   if (!perfilDetectado) {
@@ -58,8 +81,10 @@ export function parsearNombreArchivoInteligente(nombreArchivo = "", nombreCarpet
         if (
           contenido &&
           !/^\d{2}-\d{2}-\d{2}$/.test(contenido) &&
-          !/^\d+[\.,]?\d*\s*[mM][tT]?$/i.test(contenido) &&
-          !/^(repo|reposicion|reposición|muestra)$/i.test(contenido)
+          !/^\d+[\.,]?\d*\s*(?:MTS?|MT|M)?$/i.test(contenido) &&
+          !/^ROLLOS?\b/i.test(contenido) &&
+          !/^(repo|reposicion|reposición|muestra)$/i.test(contenido) &&
+          !colores.some(c => c.toUpperCase() === contenido.toUpperCase())
         ) {
           perfilDetectado = contenido;
           break;
@@ -68,7 +93,7 @@ export function parsearNombreArchivoInteligente(nombreArchivo = "", nombreCarpet
     }
   }
 
-  // 3. Detectar Tela Destino (en cualquier lugar del nombre o carpeta)
+  // 3. Detectar Tela Destino
   let telaDetectada = "";
   const telasOrdenadas = [...telas].sort((a, b) => b.length - a.length);
   for (const t of telasOrdenadas) {
@@ -78,14 +103,14 @@ export function parsearNombreArchivoInteligente(nombreArchivo = "", nombreCarpet
     }
   }
 
-  // 4. Detectar Nº de Rollo / Bobina de Tela (ej: "Rollo 42", "R-42", "R42", "Bobina 15", "#42")
+  // 4. Detectar Nº de Rollo / Rollos Físicos (ej: "(ROLLOS 17-18)", "ROLLO 42", "R-15")
   let rolloDetectado = "";
-  const rolloMatch = textoCompleto.match(/(?:ROLLO|BOBINA|R-|\bR|#)\s*#?(\d{1,5})\b/i);
-  if (rolloMatch) {
-    rolloDetectado = rolloMatch[1];
+  const rollosRangoMatch = textoCompleto.match(/ROLLOS?\s*#?-?\s*([0-9]+(?:\s*[-,yY]\s*[0-9]+)*|[a-zA-Z]+)/i);
+  if (rollosRangoMatch) {
+    rolloDetectado = "ROLLO " + rollosRangoMatch[1].trim();
   }
 
-  // 5. Detectar Color de la Tela
+  // 5. Detectar Color de la Tela (ej: "(AMARILLO)", "ROSA", "BLANCO")
   let colorDetectado = "";
   const coloresOrdenados = [...colores].sort((a, b) => b.length - a.length);
   for (const c of coloresOrdenados) {
@@ -105,7 +130,7 @@ export function parsearNombreArchivoInteligente(nombreArchivo = "", nombreCarpet
     rutaDetectada = "Solo Calandrado";
   }
 
-  // 7. Detectar si es Reposición o Muestra (para DTF a $0 o prioridad)
+  // 7. Detectar si es Reposición o Muestra (DTF $0)
   let tipoCargo = "VENTA";
   if (/\(\s*REPO(?:SICION|SICIÓN)?\s*\)|\bREPO(?:SICION|SICIÓN)?\b/i.test(textoCompleto)) {
     tipoCargo = "REPOSICION";
@@ -117,17 +142,15 @@ export function parsearNombreArchivoInteligente(nombreArchivo = "", nombreCarpet
     medidaUnitaria: Number(medida.toFixed(2)),
     repeticiones,
     metrosTotales: Number((medida * repeticiones).toFixed(2)),
-    perfil: perfilDetectado,   // Vacío "" si no está en el archivo
-    tela: telaDetectada,       // Vacío "" si no está en el archivo
-    rollo: rolloDetectado,     // Vacío "" si no está en el archivo
-    color: colorDetectado,     // Vacío "" si no está en el archivo
-    ruta: rutaDetectada,       // Vacío "" si no está en el archivo
+    perfil: perfilDetectado,   // "" si no está en el nombre
+    tela: telaDetectada,       // "" si no está en el nombre
+    rollo: rolloDetectado,     // "" si no está en el nombre
+    color: colorDetectado,     // "" si no está en el nombre
+    ruta: rutaDetectada,       // "" si no está en el nombre
     tipoCargo
   };
 }
 
-// Consolida la detección cuando el operario tilda 1 o MÚLTIPLES archivos (Anidados)
-// REGLA DE ORO: Si un dato no está en los nombres seleccionados, devuelve "" (en blanco).
 export function consolidarAutodeteccionLote(archivosSeleccionados = [], catalogos = {}) {
   if (!archivosSeleccionados || archivosSeleccionados.length === 0) {
     return { perfil: "", tela: "", rollo: "", color: "", ruta: "", conflictos: [] };
@@ -151,9 +174,9 @@ export function consolidarAutodeteccionLote(archivosSeleccionados = [], catalogo
   const ru = unicoValor("ruta");
 
   const conflictos = [];
-  if (p.conflicto) conflictos.push(`Perfiles distintos en selección: ${p.conflicto.join(" vs ")}`);
-  if (t.conflicto) conflictos.push(`Telas distintas en selección: ${t.conflicto.join(" vs ")}`);
-  if (c.conflicto) conflictos.push(`Colores distintos en selección: ${c.conflicto.join(" vs ")}`);
+  if (p.conflicto) conflictos.push(`Perfiles: ${p.conflicto.join(" / ")}`);
+  if (t.conflicto) conflictos.push(`Telas: ${t.conflicto.join(" / ")}`);
+  if (c.conflicto) conflictos.push(`Colores: ${c.conflicto.join(" / ")}`);
 
   return {
     perfil: p.valor,
@@ -165,7 +188,6 @@ export function consolidarAutodeteccionLote(archivosSeleccionados = [], catalogo
   };
 }
 
-// Escala Automática de Precios DTF por Tramo (Regla de Negocio V&V Grafic)
 export function calcularPrecioMetroDTF(metrosFacturados, tipoCargo = "VENTA") {
   if (tipoCargo === "REPOSICION" || tipoCargo === "MUESTRA") return 0;
   const m = Number(metrosFacturados) || 0;
@@ -177,19 +199,14 @@ export function calcularPrecioMetroDTF(metrosFacturados, tipoCargo = "VENTA") {
   return 6500;
 }
 
-// Lector Binario Real de Dimensiones y DPI en Navegador (PNG / JPEG / TIFF)
 export async function leerGeometriaRealArchivo(file) {
   try {
     const slice = file.slice(0, 65536);
     const buf = await slice.arrayBuffer();
     const view = new DataView(buf);
     const len = view.byteLength;
+    let widthPx = 0, heightPx = 0, dpiY = 0;
 
-    let widthPx = 0;
-    let heightPx = 0;
-    let dpiY = 0;
-
-    // 1. PNG (89 50 4E 47)
     if (len > 32 && view.getUint32(0) === 0x89504e47) {
       widthPx = view.getUint32(16);
       heightPx = view.getUint32(20);
@@ -197,33 +214,26 @@ export async function leerGeometriaRealArchivo(file) {
       while (offset + 12 <= len) {
         const chunkLen = view.getUint32(offset);
         const chunkType = view.getUint32(offset + 4);
-        // pHYs = 0x70485973
         if (chunkType === 0x70485973 && offset + 21 <= len) {
           const ppuY = view.getUint32(offset + 12);
           const unit = view.getUint8(offset + 16);
-          if (unit === 1 && ppuY > 0) {
-            dpiY = Math.round(ppuY * 0.0254);
-          }
+          if (unit === 1 && ppuY > 0) dpiY = Math.round(ppuY * 0.0254);
           break;
         }
         offset += 12 + chunkLen;
       }
-    }
-    // 2. JPEG (FF D8)
-    else if (len > 16 && view.getUint16(0) === 0xffd8) {
+    } else if (len > 16 && view.getUint16(0) === 0xffd8) {
       let offset = 2;
       while (offset + 4 < len) {
         if (view.getUint8(offset) !== 0xff) { offset++; continue; }
         const marker = view.getUint8(offset + 1);
         const segLen = view.getUint16(offset + 2);
-        // JFIF APP0
         if (marker === 0xe0 && offset + 16 < len) {
           const units = view.getUint8(offset + 11);
           const yDens = view.getUint16(offset + 14);
           if (units === 1) dpiY = yDens;
           else if (units === 2) dpiY = Math.round(yDens * 2.54);
         }
-        // SOF0 / SOF1 / SOF2
         if ((marker === 0xc0 || marker === 0xc1 || marker === 0xc2) && offset + 9 < len) {
           heightPx = view.getUint16(offset + 5);
           widthPx = view.getUint16(offset + 7);
@@ -231,15 +241,12 @@ export async function leerGeometriaRealArchivo(file) {
         }
         offset += 2 + segLen;
       }
-    }
-    // 3. TIFF (II 0x4949 o MM 0x4d4d)
-    else if (len > 16 && (view.getUint16(0) === 0x4949 || view.getUint16(0) === 0x4d4d)) {
+    } else if (len > 16 && (view.getUint16(0) === 0x4949 || view.getUint16(0) === 0x4d4d)) {
       const little = view.getUint16(0) === 0x4949;
       const ifdOffset = view.getUint32(4, little);
       if (ifdOffset + 2 < len) {
         const numEntries = view.getUint16(ifdOffset, little);
-        let resUnit = 2; // 2 = inch, 3 = cm
-        let yResRaw = 0;
+        let resUnit = 2, yResRaw = 0;
         for (let i = 0; i < numEntries; i++) {
           const entryPos = ifdOffset + 2 + i * 12;
           if (entryPos + 12 > len) break;
@@ -256,38 +263,26 @@ export async function leerGeometriaRealArchivo(file) {
           }
           if (tag === 296) resUnit = shortVal;
         }
-        if (yResRaw > 0) {
-          dpiY = resUnit === 3 ? Math.round(yResRaw * 2.54) : Math.round(yResRaw);
-        }
+        if (yResRaw > 0) dpiY = resUnit === 3 ? Math.round(yResRaw * 2.54) : Math.round(yResRaw);
       }
     }
 
     if (!dpiY || dpiY < 30 || dpiY > 2400) dpiY = 150;
     const metrosReales = heightPx > 0 ? Number(((heightPx / dpiY) * 0.0254).toFixed(2)) : 0;
     const anchoCmReal = widthPx > 0 ? Number(((widthPx / dpiY) * 2.54).toFixed(1)) : 0;
-
-    return {
-      ok: heightPx > 0,
-      widthPx,
-      heightPx,
-      dpiDetectado: dpiY,
-      anchoCmReal,
-      metrosDpiReal: metrosReales
-    };
+    return { ok: heightPx > 0, widthPx, heightPx, dpiDetectado: dpiY, anchoCmReal, metrosDpiReal: metrosReales };
   } catch (e) {
     return { ok: false, widthPx: 0, heightPx: 0, dpiDetectado: 150, anchoCmReal: 0, metrosDpiReal: 0 };
   }
 }
 
-// Compresor de Fotos de Cámara de Celular a WebP liviano para el Chat Interno
 export function comprimirFotoCamaraWebP(file, maxDim = 960, quality = 0.76) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const img = new Image();
       img.onload = () => {
-        let w = img.width;
-        let h = img.height;
+        let w = img.width, h = img.height;
         if (w > maxDim || h > maxDim) {
           if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
           else { w = Math.round((w * maxDim) / h); h = maxDim; }
@@ -295,10 +290,8 @@ export function comprimirFotoCamaraWebP(file, maxDim = 960, quality = 0.76) {
         const canvas = document.createElement("canvas");
         canvas.width = w;
         canvas.height = h;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, w, h);
-        const dataUrl = canvas.toDataURL("image/webp", quality);
-        resolve(dataUrl);
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/webp", quality));
       };
       img.onerror = reject;
       img.src = ev.target.result;
