@@ -237,14 +237,14 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
   }
   /* Header Kiosco compacto en celular */
   #kioscoHeaderBar {
-    padding: 4px 8px !important;
-    min-height: 32px !important;
-    gap: 4px !important;
+    padding: 6px 12px !important;
+    min-height: 36px !important;
+    gap: 6px !important;
     flex-wrap: nowrap !important;
     flex-shrink: 0 !important;
   }
   #kioscoTitulo {
-    font-size: 12px !important;
+    font-size: 13px !important;
     line-height: 1.2 !important;
     white-space: nowrap !important;
     overflow: hidden !important;
@@ -252,121 +252,125 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
     max-width: calc(100vw - 180px) !important;
   }
   #btnKioscoMinimizar, #btnKioscoCancelarDefinitivo {
-    padding: 3px 6px !important;
-    font-size: 10px !important;
-    min-height: 24px !important;
+    padding: 4px 8px !important;
+    font-size: 11px !important;
+    min-height: 26px !important;
     white-space: nowrap !important;
   }
   #kioscoScrollArea {
-    padding: 4px 8px !important;
+    padding: 8px 12px !important;
     flex: 1 1 auto !important;
     overflow-y: auto !important;
   }
   #kioscoTopHeader {
-    padding: 4px 8px !important;
-    margin-bottom: 4px !important;
-    font-size: 12px !important;
+    padding: 6px 10px !important;
+    margin-bottom: 8px !important;
+    font-size: 13px !important;
   }
   #kioscoTopHeader > div:first-child {
-    font-size: 12px !important;
+    font-size: 13px !important;
   }
   #kioscoTopHeader > div:last-child {
-    font-size: 11px !important;
+    font-size: 12px !important;
   }
   #kioscoTopHeader strong {
-    font-size: 13px !important;
+    font-size: 14px !important;
   }
   .kiosk-player-grid {
     grid-template-columns: 1fr !important;
-    gap: 4px !important;
-    padding: 4px 6px !important;
-    margin-bottom: 4px !important;
+    gap: 8px !important;
+    padding: 6px 8px !important;
+    margin-bottom: 6px !important;
   }
   .kiosk-preview-img {
-    height: 70px !important;
-    margin-bottom: 4px !important;
+    height: 175px !important;
+    max-height: 26vh !important;
+    margin-bottom: 8px !important;
   }
   .kiosk-preview-ph {
-    height: 40px !important;
-    margin-bottom: 4px !important;
-    font-size: 11px !important;
+    height: 60px !important;
+    margin-bottom: 6px !important;
+    font-size: 12px !important;
   }
   .kiosk-metros-val {
-    font-size: 30px !important;
+    font-size: 34px !important;
     line-height: 1 !important;
   }
   .kiosk-metros-lbl {
-    font-size: 10px !important;
+    font-size: 11px !important;
     margin-top: 2px !important;
   }
   .kiosk-info-tela {
-    padding: 6px 10px !important;
+    padding: 8px 12px !important;
   }
   .kiosk-info-tela span:last-child {
-    font-size: 15px !important;
+    font-size: 17px !important;
   }
   .kiosk-info-cliente-rollo {
-    padding: 6px 10px !important;
-    gap: 4px !important;
+    padding: 8px 12px !important;
+    gap: 6px !important;
   }
   #kioscoParametrosBox {
-    padding: 6px 8px !important;
-    margin-top: 6px !important;
-    margin-bottom: 4px !important;
-    gap: 6px !important;
+    padding: 10px 12px !important;
+    margin-top: 8px !important;
+    margin-bottom: 6px !important;
+    gap: 8px !important;
   }
   #kioscoParametrosBox label {
-    font-size: 10px !important;
-    margin-bottom: 2px !important;
+    font-size: 11px !important;
+    margin-bottom: 4px !important;
+    font-weight: bold !important;
   }
   #kioscoParametrosBox input {
-    width: 78px !important;
-    font-size: 18px !important;
-    padding: 3px 6px !important;
-    height: 30px !important;
+    width: 95px !important;
+    font-size: 24px !important;
+    padding: 6px !important;
+    height: 42px !important;
+    border-radius: 8px !important;
   }
   #kioscoFallaBtns {
-    gap: 6px !important;
+    gap: 8px !important;
   }
   button.btn-kiosco-reportar-falla {
-    padding: 5px 8px !important;
-    font-size: 11px !important;
-    height: 30px !important;
+    padding: 8px 12px !important;
+    font-size: 12px !important;
+    height: 42px !important;
+    border-radius: 8px !important;
   }
-  /* Footer del Kiosco en celular: Cronómetro y Botones compactos en altura */
+  /* Footer del Kiosco en celular: Cronómetro y Botones grandes y ergonómicos */
   #kioscoFooterAcciones {
-    padding: 6px 10px !important;
-    gap: 6px !important;
+    padding: 8px 12px !important;
+    gap: 8px !important;
     flex-shrink: 0 !important;
     background: #0e1118 !important;
     border-top: 1px solid #2a324b !important;
   }
   #kioscoCronometroBox {
-    padding: 4px 10px !important;
-    min-height: 34px !important;
+    padding: 6px 12px !important;
+    min-height: 40px !important;
     flex-wrap: nowrap !important;
     justify-content: space-between !important;
   }
   #kioscoCronometro {
-    font-size: 20px !important;
+    font-size: 24px !important;
   }
   #kioscoCronometroBox span:first-child {
-    font-size: 11px !important;
+    font-size: 12px !important;
   }
   #btnKioscoPausarReanudar {
-    padding: 4px 12px !important;
-    font-size: 12px !important;
-    min-height: 28px !important;
+    padding: 6px 16px !important;
+    font-size: 13px !important;
+    min-height: 34px !important;
   }
   #kioscoBotonesAccion {
     display: flex !important;
     flex-direction: column !important;
-    gap: 6px !important;
+    gap: 8px !important;
   }
   #btnKioscoSiguienteTrabajo {
-    padding: 11px 10px !important;
-    font-size: 14px !important;
-    min-height: 40px !important;
+    padding: 15px 12px !important;
+    font-size: 16px !important;
+    min-height: 50px !important;
     font-weight: 900 !important;
     border-radius: 8px !important;
     margin: 0 !important;
@@ -375,12 +379,12 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
   #kioscoBotonesSecundarios {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
-    gap: 6px !important;
+    gap: 8px !important;
   }
   #btnKioscoDescartarSiguiente, #btnKioscoFinalizar {
-    padding: 6px 4px !important;
-    font-size: 11px !important;
-    min-height: 30px !important;
+    padding: 8px 6px !important;
+    font-size: 12px !important;
+    min-height: 36px !important;
     white-space: nowrap !important;
     font-weight: bold !important;
     margin: 0 !important;
