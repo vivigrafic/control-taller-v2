@@ -327,6 +327,33 @@ async function registrarUsoMRU(tipo, nombre) {
 }
 
 // ============================================================================
+// PUENTE ASÍNCRONO SEGUNDO PLANO GOOGLE SHEET VIEJA (0ms impacto en velocidad)
+// ============================================================================
+export function notificarSincronizacionSheetViejaEnSegundoPlano(modulo, accion, payload = {}) {
+  const bridgeUrl = window.VG_CONEXION?.sandboxBridgeUrl;
+  if (!bridgeUrl) return;
+
+  setTimeout(() => {
+    try {
+      const dataParam = encodeURIComponent(JSON.stringify({
+        modulo,
+        accion,
+        fecha: new Date().toISOString(),
+        ...payload
+      }));
+      fetch(`${bridgeUrl}?action=sync_sheet_evento&data=${dataParam}`, {
+        mode: "no-cors",
+        keepalive: true
+      }).catch((err) => {
+        console.warn("Aviso silencioso sync sheet:", err);
+      });
+    } catch (e) {
+      console.warn("Aviso en background sync:", e);
+    }
+  }, 20);
+}
+
+// ============================================================================
 // RENDERIZADO GENERAL
 // ============================================================================
 function renderTodoRespetandoFormulario() {
@@ -2192,6 +2219,21 @@ async function procesarImpresionLote() {
     console.warn("Aviso en aprendizaje de anchos:", errLearn);
   }
 
+  // SINCRONIZACIÓN ASÍNCRONA EN SEGUNDO PLANO CON GOOGLE SHEET VIEJA (0ms de espera para el operario)
+  notificarSincronizacionSheetViejaEnSegundoPlano("IMPRESION", "NUEVA_IMPRESION", {
+    batch_id: batchId,
+    rollo_papel: infoRollo.bloqueActual,
+    cliente_archivo: nombresUnidos,
+    diseno: disenoInput || nombresUnidos.slice(0, 30),
+    tela,
+    num_rollo_tela: rolloTela,
+    color,
+    metros: metrosTotales,
+    perfil,
+    ruta,
+    observaciones: obs
+  });
+
   await Promise.all([
     registrarUsoMRU("TELA", tela),
     registrarUsoMRU("PERFIL", perfil),
@@ -2272,6 +2314,22 @@ async function finalizarTrabajoCalandrado(idCal, minutosExtra = 0, skipReload = 
 
   await sb().from("prod_cola_calandrado").update(updatePayload).eq("id", idCal);
 
+  // Sincronización asíncrona en segundo plano con Sheet vieja (0ms de espera)
+  notificarSincronizacionSheetViejaEnSegundoPlano("CALANDRADO", "TERMINADO", {
+    id: reg.id,
+    batch_id: reg.batch_id,
+    rollo: reg.id_rollo_papel,
+    cliente_archivo: reg.cliente_archivo,
+    tela: reg.tela_destino,
+    metros: reg.metros,
+    ruta: reg.ruta,
+    velocidad: updatePayload.velocidad || reg.velocidad || 50,
+    temperatura: updatePayload.temperatura || reg.temperatura || 205,
+    minutos: updatePayload.minutos_trabajados || 0,
+    estado: "Terminado",
+    observaciones: reg.observaciones || ""
+  });
+
   const rLower = String(reg.ruta || "").toLowerCase();
   if (rLower.includes("laser") || rLower.includes("láser") || rLower.includes("corte")) {
     await sb().from("prod_cola_laser").insert({
@@ -2330,6 +2388,22 @@ async function cortarLoteLaser(idsCsv) {
       estado: "Terminado",
       fecha_terminado: fechaFinIso
     }).eq("id", id);
+  }
+
+  // Sincronización asíncrona en segundo plano con Sheet vieja (0ms de espera)
+  const primerTrabLaser = (STATE.colaLaser || []).find(l => ids.includes(l.id));
+  if (primerTrabLaser) {
+    notificarSincronizacionSheetViejaEnSegundoPlano("LASER", "TERMINADO", {
+      batch_id: primerTrabLaser.batch_id,
+      rollo: primerTrabLaser.id_rollo_papel,
+      cliente_archivo: primerTrabLaser.cliente_archivo,
+      tela: primerTrabLaser.tela_rollo_color,
+      metros: primerTrabLaser.metros,
+      ruta: primerTrabLaser.ruta,
+      velocidad: primerTrabLaser.velocidad,
+      poder: primerTrabLaser.poder,
+      estado: "Terminado"
+    });
   }
   toast(`⚡ Lote cortado en Láser.`);
   await cargarDatosTodo();
@@ -3437,6 +3511,15 @@ async function reportarFallaConReposicion(reg, estacion) {
     prioridad_maxima: true,
     estado_impreso: "NO",
     file_id: `REPO-${Date.now()}`
+  });
+
+  // Sincronización asíncrona en segundo plano con Sheet vieja (0ms de espera)
+  notificarSincronizacionSheetViejaEnSegundoPlano("FALLA", "NUEVA_FALLA", {
+    estacion,
+    rollo: reg.id_rollo_papel || "",
+    cliente_archivo: nombreArch,
+    metros_merma: metrosFalla,
+    motivo
   });
 
   toast(`⚠️ Falla registrada y reposición enviada a Cola Pendiente.`, "warn");
