@@ -1,15 +1,16 @@
 // ============================================================================
 // SERVICE WORKER: Control de Taller — V&V Grafic (PWA)
-// Versión: 20261021_05 (clave publicable y sin mover archivos desde la app)
+// Versión: 20261022_01 (acceso del equipo y nada se borra)
 // ============================================================================
 
-const CACHE_NAME = "vvgrafic-taller-cache-v5";
+const CACHE_NAME = "vvgrafic-taller-cache-v6";
 const STATIC_ASSETS = [
   "./",
   "./index.html",
   "./manifest.json",
   "./src/app.js",
   "./src/config/conexion.js",
+  "./src/acceso.js",
   "./src/utils/smart_parser.js",
   "./src/assets/logo.js",
   "./src/styles/cobalt_enterprise.css",

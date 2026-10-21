@@ -351,18 +351,18 @@ export async function cargarDatosTodo() {
     client.from("prod_impresiones").select("*").eq("anulado", false).order("fecha_hora", { ascending: false }).limit(500),
     client.from("prod_cola_calandrado").select("*").eq("anulado", false).order("fecha_hora", { ascending: false }).limit(500),
     client.from("prod_cola_laser").select("*").eq("anulado", false).order("fecha_ingreso", { ascending: false }).limit(500),
-    client.from("prod_pendientes_drive").select("*").order("created_at", { ascending: false }),
-    client.from("prod_catalogos").select("*").eq("activo", true).order("ultimo_uso_at", { ascending: false }),
-    client.from("prod_fallas_reposiciones").select("*").order("fecha_hora", { ascending: false }).limit(200),
+    client.from("prod_pendientes_drive").select("*").eq("anulado", false).order("created_at", { ascending: false }),
+    client.from("prod_catalogos").select("*").eq("activo", true).eq("anulado", false).order("ultimo_uso_at", { ascending: false }),
+    client.from("prod_fallas_reposiciones").select("*").eq("anulado", false).order("fecha_hora", { ascending: false }).limit(200),
     client.from("v_prod_dtf_rollos_saldos").select("*").order("fecha_montaje", { ascending: false }),
     client.from("prod_dtf_tiradas").select("*").eq("anulado", false).order("fecha_hora", { ascending: false }),
     client.from("prod_dtf_pedidos").select("*").eq("anulado", false).order("fecha_hora", { ascending: false }),
     client.from("v_prod_dtf_cuentas_clientes").select("*").order("saldo_pendiente", { ascending: false }),
-    client.from("prod_chat_mensajes").select("*").order("created_at", { ascending: false }).limit(150),
-    client.from("prod_telas_ficha").select("*").eq("activo", true).order("nombre_comercial", { ascending: true }),
-    client.from("prod_telas_variantes").select("*").order("es_predeterminada", { ascending: false }),
-    client.from("prod_telas_parametros").select("*"),
-    client.from("prod_historial_anchos_tela").select("*").order("fecha", { ascending: false }).limit(200)
+    client.from("prod_chat_mensajes").select("*").eq("anulado", false).order("created_at", { ascending: false }).limit(150),
+    client.from("prod_telas_ficha").select("*").eq("activo", true).eq("anulado", false).order("nombre_comercial", { ascending: true }),
+    client.from("prod_telas_variantes").select("*").eq("anulado", false).order("es_predeterminada", { ascending: false }),
+    client.from("prod_telas_parametros").select("*").eq("anulado", false),
+    client.from("prod_historial_anchos_tela").select("*").eq("anulado", false).order("fecha", { ascending: false }).limit(200)
   ]);
 
   STATE.rollosPapelSaldos = resRollosSaldos.data || [];
@@ -389,18 +389,23 @@ export async function cargarDatosTodo() {
 function suscribirRealtime() {
   const client = sb();
   if (!client) return;
-  client
-    .channel("taller-v2-realtime")
-    .on("postgres_changes", { event: "*", schema: "public" }, (payload) => {
+  const canal = client.channel("taller-v2-realtime");
+  let recarga = null;
+  const alCambiar = (payload) => {
       if (payload.table === "prod_chat_mensajes" && payload.eventType === "INSERT") {
         const msg = payload.new;
         if (msg && Array.isArray(msg.menciones) && msg.menciones.includes(STATE.usuarioActual)) {
           toast(`🔔 @${STATE.usuarioActual}: ${msg.autor_nombre} te mencionó en el Chat`, "warn");
         }
       }
-      cargarDatosTodo();
-    })
-    .subscribe();
+      clearTimeout(recarga);
+      recarga = setTimeout(cargarDatosTodo, 400); // varios cambios juntos → una sola recarga
+  };
+  ["prod_rollos_papel", "prod_impresiones", "prod_cola_calandrado", "prod_cola_laser", "prod_pendientes_drive", "prod_fallas_reposiciones",
+   "prod_dtf_rollos", "prod_dtf_tiradas", "prod_dtf_pedidos", "prod_chat_mensajes"].forEach(t => {
+    canal.on("postgres_changes", { event: "*", schema: "public", table: t }, (payload) => alCambiar({ ...payload, table: t }));
+  });
+  canal.subscribe();
 }
 
 // ============================================================================
@@ -2947,28 +2952,33 @@ async function guardarModalCrudUniversal() {
   await cargarDatosTodo();
 }
 
+// Nada se borra: se anula, con el motivo (queda quién y cuándo). La base no deja borrar.
 async function eliminarRegistroCrudUniversal(tabla, id, batchId = null, idsCsv = null) {
-  if (!confirm("¿Confirmás eliminar este registro?")) return;
+  const motivo = prompt("¿Por qué se anula? (queda anotado; no se borra)");
+  if (!motivo || !motivo.trim()) return;
   const pkCol = tabla === "prod_dtf_rollos" ? "id_rollo_dtf" : tabla === "prod_rollos_papel" ? "id_rollo" : "id";
+  const anular = { anulado: true, anulado_motivo: motivo.trim() };
 
   if (idsCsv && (tabla === "prod_impresiones" || tabla === "prod_cola_calandrado" || tabla === "prod_cola_laser")) {
     const ids = String(idsCsv).split(",").map(s => s.trim()).filter(Boolean);
     if (ids.length > 0) {
-      await sb().from(tabla).delete().in("id", ids);
-      toast("🗑️ Registro(s) eliminado(s).");
+      const { error } = await sb().from(tabla).update(anular).in("id", ids);
+      if (error) { toast("Error: " + error.message, "error"); return; }
+      toast("🚫 Registro(s) anulado(s).");
       await cargarDatosTodo();
       return;
     }
   } else if (batchId && (tabla === "prod_impresiones" || tabla === "prod_cola_calandrado" || tabla === "prod_cola_laser")) {
-    await sb().from(tabla).delete().eq("batch_id", batchId);
-    toast("🗑️ Lote eliminado.");
+    const { error } = await sb().from(tabla).update(anular).eq("batch_id", batchId);
+    if (error) { toast("Error: " + error.message, "error"); return; }
+    toast("🚫 Lote anulado.");
     await cargarDatosTodo();
     return;
   }
 
-  const { error } = await sb().from(tabla).delete().eq(pkCol, id);
+  const { error } = await sb().from(tabla).update(anular).eq(pkCol, id);
   if (error) { toast("Error: " + error.message, "error"); return; }
-  toast("🗑️ Registro eliminado.");
+  toast("🚫 Registro anulado.");
   await cargarDatosTodo();
 }
 
@@ -4141,19 +4151,11 @@ export function inicializarEventosUI() {
       return;
     }
 
-    const { error } = await sb().from("v3_movimientos_caja").insert({
-      tipo_movimiento: "egreso",
-      metodo_pago: "Efectivo",
-      monto: costo,
-      fecha_pago: new Date().toISOString(),
-      notas: `[COMPRA INSUMOS: ${tipo}] ${detalle} (Cant: ${cant})`
-    });
-
-    if (error) {
-      toast("Error al registrar compra: " + error.message, "error");
-      return;
+    // Las compras se cargan en Compras del sistema (con proveedor, caja y stock); acá ya no se escribe en las cajas.
+    if (confirm(`Compra de ${tipo} (${detalle}, ${cant}): las compras de insumos se cargan en Compras del sistema, así entran en la caja y en el stock. ¿Abrir Compras?`)) {
+      window.open("https://erpvivigrafic.netlify.app/src/modulos/comercial/compras.html", "_blank");
     }
-
+    return;
     document.getElementById("finCompraDetalle").value = "";
     document.getElementById("finCompraCosto").value = "";
     toast(`🛒 Compra de ${tipo} registrada ($${fmtNum(costo)}).`);
@@ -4263,14 +4265,15 @@ export function inicializarEventosUI() {
           // 2. El vigía de Google ve estado_impreso = NO con en_impresos = true y devuelve el archivo a la fila
         }
 
-        // 3. Eliminar de prod_impresiones y de prod_cola_calandrado (todo el batch si es anidado)
+        // 3. Anular la impresión y su calandrado (todo el batch si es anidado). No se borra: queda quién y cuándo.
+        const anular = { anulado: true, anulado_motivo: "Impresión deshecha" };
         if (reg.batch_id) {
-          await sb().from("prod_impresiones").delete().eq("batch_id", reg.batch_id);
-          await sb().from("prod_cola_calandrado").delete().eq("batch_id", reg.batch_id);
+          await sb().from("prod_impresiones").update(anular).eq("batch_id", reg.batch_id);
+          await sb().from("prod_cola_calandrado").update(anular).eq("batch_id", reg.batch_id);
         } else {
-          await sb().from("prod_impresiones").delete().eq("id", reg.id);
+          await sb().from("prod_impresiones").update(anular).eq("id", reg.id);
           if (reg.file_id) {
-            await sb().from("prod_cola_calandrado").delete().eq("file_id", reg.file_id);
+            await sb().from("prod_cola_calandrado").update(anular).eq("file_id", reg.file_id);
           }
         }
 
@@ -4420,6 +4423,7 @@ export function inicializarEventosUI() {
     selOp.addEventListener("change", () => {
       STATE.usuarioActual = selOp.value;
       localStorage.setItem("vg_operador_actual", STATE.usuarioActual);
+      window.VG_ACCESO?.operario(STATE.usuarioActual);
       renderTodoRespetandoFormulario();
     });
   }
@@ -4433,7 +4437,8 @@ export function inicializarEventosUI() {
   });
 }
 
-window.addEventListener("DOMContentLoaded", () => {
+window.addEventListener("DOMContentLoaded", async () => {
+  if (window.VG_ACCESO) await window.VG_ACCESO.listo; // sin usuario del equipo no se carga nada
   inicializarEventosUI();
   cargarDatosTodo();
   suscribirRealtime();
