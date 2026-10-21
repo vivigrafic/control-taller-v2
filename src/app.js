@@ -816,6 +816,62 @@ function formatearAnidadosHTML(clienteArchivoTexto) {
   return `<div style="max-height:80px; overflow-y:auto; font-size:11px; padding:2px;">${partes.map((p, i) => (i === 0 ? escHtml(p) : `• ${escHtml(p)}`)).join("<br>")}</div>`;
 }
 
+// Agrupa impresiones del mismo batch_id para que los anidados se vean consolidados
+function agruparImpresionesPorBatch(filas) {
+  const mapa = new Map();
+  const resultado = [];
+
+  filas.forEach(row => {
+    const esEspecial = row.accion && (row.accion.includes("Corte") || row.accion.includes("Avance") || row.accion.includes("Calibración"));
+    if (esEspecial || !row.batch_id) {
+      resultado.push({ ...row, ids: [row.id], archivos: String(row.cliente_archivo || "").split(" | ").filter(Boolean), es_anidado: false });
+      return;
+    }
+
+    const key = row.batch_id;
+    if (!mapa.has(key)) {
+      const item = {
+        ...row,
+        ids: [row.id],
+        archivos: String(row.cliente_archivo || "").split(" | ").filter(Boolean),
+        file_ids: String(row.file_id || "").split(",").filter(Boolean),
+        metros_totales: Number(row.metros_impresos) || 0,
+        metros_impresos: Number(row.metros_impresos) || 0,
+        observaciones: row.observaciones || ""
+      };
+      mapa.set(key, item);
+      resultado.push(item);
+    } else {
+      const g = mapa.get(key);
+      g.ids.push(row.id);
+      const nuevosArch = String(row.cliente_archivo || "").split(" | ").filter(Boolean);
+      nuevosArch.forEach(a => { if (!g.archivos.includes(a)) g.archivos.push(a); });
+      const nuevosFids = String(row.file_id || "").split(",").filter(Boolean);
+      nuevosFids.forEach(fid => { if (!g.file_ids.includes(fid)) g.file_ids.push(fid); });
+      g.metros_totales = Number((g.metros_totales + (Number(row.metros_impresos) || 0)).toFixed(2));
+      g.metros_impresos = g.metros_totales;
+      if (row.observaciones && !g.observaciones.includes(row.observaciones)) {
+        g.observaciones = g.observaciones ? `${g.observaciones} | ${row.observaciones}` : row.observaciones;
+      }
+      if (!g.file_id && row.file_id) g.file_id = row.file_id;
+      if (!g.diseno && row.diseno) g.diseno = row.diseno;
+      if ((!g.tela_destino || g.tela_destino === "-") && row.tela_destino) g.tela_destino = row.tela_destino;
+      if (!g.num_rollo_tela && row.num_rollo_tela) g.num_rollo_tela = row.num_rollo_tela;
+      if (!g.color_tela && row.color_tela) g.color_tela = row.color_tela;
+    }
+  });
+
+  resultado.forEach(item => {
+    if (item.archivos && item.archivos.length > 0) {
+      item.cliente_archivo = item.archivos.join(" | ");
+      item.file_id = item.file_ids ? item.file_ids.join(",") : item.file_id;
+      item.es_anidado = item.ids.length > 1 || item.archivos.length > 1;
+    }
+  });
+
+  return resultado;
+}
+
 // Renderiza Historial Impresión idéntico a JS_Impresion.html líneas 206-244 (Captura 2)
 function renderTablaImpresionesConBloques() {
   const tbody = document.getElementById("tbodyHistorialImpresion");
@@ -861,7 +917,9 @@ function renderTablaImpresionesConBloques() {
       return da - db;
     });
 
-    filasOrdenadas.forEach(row => {
+    const filasAgrupadas = agruparImpresionesPorBatch(filasOrdenadas);
+
+    filasAgrupadas.forEach(row => {
       if (row.accion && row.accion.includes("Corte de Papel")) {
         html += `<tr class="row-corte" style="background:var(--accent-magenta) !important; color:#fff !important;"><td colspan="11">✂️ --- CORTE DE PAPEL (-${fmtNum(row.metros_desperdicio)}m) ---</td></tr>`;
         return;
@@ -875,15 +933,16 @@ function renderTablaImpresionesConBloques() {
         return;
       }
 
-      const m = fmtNum(row.metros_impresos || row.metros_desperdicio || 0);
+      const m = fmtNum(row.metros_impresos || row.metros_totales || row.metros_desperdicio || 0);
+      const idsCsv = row.ids ? row.ids.join(",") : row.id;
       const actionBtn = `
         <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; max-width:90px;">
           <button type="button" class="btn-imp-falla" data-id="${row.id}" style="background:transparent; border:1px solid var(--danger); border-radius:4px; cursor:pointer; color:var(--danger); padding:3px;" title="Reportar Falla">⚠️</button>
-          <button type="button" class="btn-imp-deshacer" data-id="${row.id}" style="background:transparent; border:1px solid #aaa; color:#aaa; border-radius:4px; cursor:pointer; padding:3px;" title="Revertir">🔙</button>
+          <button type="button" class="btn-imp-deshacer" data-id="${row.id}" data-ids="${idsCsv}" data-batch="${escHtml(row.batch_id)}" style="background:transparent; border:1px solid #aaa; color:#aaa; border-radius:4px; cursor:pointer; padding:3px;" title="Revertir">🔙</button>
           <button type="button" class="btn-nota-rapida" data-table="prod_impresiones" data-id="${row.id}" data-batch="${escHtml(row.batch_id)}" style="background:transparent; border:1px solid var(--accent-orange); color:var(--accent-orange); border-radius:4px; cursor:pointer; padding:3px;" title="Añadir/Editar Nota">📝</button>
           <button type="button" class="btn-imp-etiqueta" data-rollo="${escHtml(bloqueId)}" data-metros="${m}" style="background:var(--accent-blue); border:1px solid var(--accent-blue); border-radius:4px; cursor:pointer; color:#fff; padding:3px;" title="Etiqueta Lote">🖨️</button>
           <button type="button" class="btn-crud-edit" data-table="prod_impresiones" data-id="${row.id}" style="background:transparent; border:1px solid var(--accent-blue); color:var(--accent-blue); border-radius:4px; cursor:pointer; padding:3px;" title="Editar">✏️</button>
-          <button type="button" class="btn-crud-del" data-table="prod_impresiones" data-id="${row.id}" style="background:transparent; border:1px solid var(--danger); color:var(--danger); border-radius:4px; cursor:pointer; padding:3px;" title="Eliminar">🗑️</button>
+          <button type="button" class="btn-crud-del" data-table="prod_impresiones" data-id="${row.id}" data-batch="${escHtml(row.batch_id)}" data-ids="${idsCsv}" style="background:transparent; border:1px solid var(--danger); color:var(--danger); border-radius:4px; cursor:pointer; padding:3px;" title="Eliminar">🗑️</button>
         </div>
       `;
 
@@ -891,7 +950,10 @@ function renderTablaImpresionesConBloques() {
         <tr>
           <td data-label="Acción">${actionBtn}</td>
           <td data-label="Fecha">${fmtDateHora(row.fecha_hora)}</td>
-          <td data-label="Cliente/Archivo">${formatearAnidadosHTML(row.cliente_archivo)}</td>
+          <td data-label="Cliente/Archivo">
+            ${row.es_anidado ? `<span class="badge activo" style="font-size:10px; margin-bottom:4px; display:inline-block;">📦 ANIDADO (${row.archivos.length} archivos)</span><br>` : ""}
+            ${formatearAnidadosHTML(row.cliente_archivo)}
+          </td>
           <td data-label="Diseño" style="text-align:center;">${renderMiniaturaDiseno60(row.file_id, row.diseno, row.cliente_archivo)}</td>
           <td data-label="Tela">${escHtml(row.tela_destino || "")}</td>
           <td data-label="Nº Rollo">${escHtml(row.num_rollo_tela || "")}</td>
@@ -911,6 +973,50 @@ function renderTablaImpresionesConBloques() {
 // ============================================================================
 // MÓDULO 2: CALANDRADO — Idéntico a JS_Calandrado.html (Captura 3)
 // ============================================================================
+function agruparCalandradoPorBatch(filas) {
+  const mapa = new Map();
+  filas.forEach(r => {
+    const key = r.batch_id || r.id;
+    if (!mapa.has(key)) {
+      mapa.set(key, {
+        ...r,
+        ids: [r.id],
+        archivos: String(r.cliente_archivo || "").split(" | ").filter(Boolean),
+        file_ids: String(r.file_id || "").split(",").filter(Boolean),
+        metros_totales: Number(r.metros) || 0,
+        metros: Number(r.metros) || 0,
+        observaciones: r.observaciones || ""
+      });
+    } else {
+      const g = mapa.get(key);
+      g.ids.push(r.id);
+      const nuevosArch = String(r.cliente_archivo || "").split(" | ").filter(Boolean);
+      nuevosArch.forEach(a => { if (!g.archivos.includes(a)) g.archivos.push(a); });
+      const nuevosFileIds = String(r.file_id || "").split(",").filter(Boolean);
+      nuevosFileIds.forEach(fid => { if (!g.file_ids.includes(fid)) g.file_ids.push(fid); });
+      g.metros_totales = Number((g.metros_totales + (Number(r.metros) || 0)).toFixed(2));
+      g.metros = g.metros_totales;
+      if (r.observaciones && !g.observaciones.includes(r.observaciones)) {
+        g.observaciones = g.observaciones ? `${g.observaciones} | ${r.observaciones}` : r.observaciones;
+      }
+      if (!g.file_id && r.file_id) g.file_id = r.file_id;
+      if (!g.diseno && r.diseno) g.diseno = r.diseno;
+      if ((!g.tela_destino || g.tela_destino === "-") && r.tela_destino) g.tela_destino = r.tela_destino;
+      if (!g.num_rollo_tela && r.num_rollo_tela) g.num_rollo_tela = r.num_rollo_tela;
+      if (!g.color_tela && r.color_tela) g.color_tela = r.color_tela;
+    }
+  });
+
+  const res = [];
+  for (const item of mapa.values()) {
+    item.cliente_archivo = item.archivos.join(" | ");
+    item.file_id = item.file_ids.join(",");
+    item.es_anidado = item.ids.length > 1 || item.archivos.length > 1;
+    res.push(item);
+  }
+  return res;
+}
+
 function renderModuloCalandrado() {
   const contRollos = document.getElementById("contenedorRollosCalandrado");
   const tbodyHist = document.getElementById("tbodyHistorialCalandrado");
@@ -948,9 +1054,11 @@ function renderModuloCalandrado() {
       const isImprimiendo = lote === rolloActivoImp;
       const isAbierto = STATE.rollosCalandraAbiertos.has(lote) || isActivo;
 
+      const itemsAgrupados = agruparCalandradoPorBatch(items);
+
       let badgeHTML = isActivo ? '<span class="badge activo" style="margin-left:5px;">🔥 MÁQUINA</span>' : '';
       if (isImprimiendo && !isActivo) badgeHTML += '<span class="badge" style="background:#ff9800; color:#fff; margin-left:5px;">🖨️ EN IMPRESORA</span>';
-      const countBadge = `<span class="badge" style="background:#444; color:#fff; margin-left:5px;">${items.length} Trabajos</span>`;
+      const countBadge = `<span class="badge" style="background:#444; color:#fff; margin-left:5px;">${itemsAgrupados.length} ${itemsAgrupados.length === 1 ? "Trabajo" : "Trabajos"}</span>`;
 
       const headerStyle = isActivo
         ? 'class="rollo-header activo"'
@@ -1000,20 +1108,25 @@ function renderModuloCalandrado() {
                 </tr>
               </thead>
               <tbody>
-                ${items.map(c => `
+                ${itemsAgrupados.map(c => {
+                  const idsCsv = c.ids ? c.ids.join(",") : c.id;
+                  return `
                   <tr>
                     <td data-label="Acción" style="width:1%; white-space:nowrap;">
                       <div class="cal-actions-grid">
-                        <button type="button" class="btn-secondary btn-cal-terminar" data-id="${c.id}" style="width:auto; padding:5px 8px; border-color:var(--accent); color:var(--accent); cursor:pointer;">✅ Hecho</button>
-                        <button type="button" class="btn-secondary btn-cal-kiosco" data-id="${c.id}" style="width:auto; padding:5px 8px; cursor:pointer;" title="Modo Enfoque Individual (Este trabajo)">▶️</button>
+                        <button type="button" class="btn-secondary btn-cal-terminar" data-id="${c.id}" data-ids="${idsCsv}" style="width:auto; padding:5px 8px; border-color:var(--accent); color:var(--accent); cursor:pointer;">✅ Hecho</button>
+                        <button type="button" class="btn-secondary btn-cal-kiosco" data-id="${c.id}" data-ids="${idsCsv}" data-batch="${escHtml(c.batch_id)}" style="width:auto; padding:5px 8px; cursor:pointer;" title="Modo Enfoque / Kiosko">▶️</button>
                         <button type="button" class="btn-secondary btn-cal-falla" data-id="${c.id}" style="width:auto; padding:5px 8px; border-color:var(--danger); color:var(--danger); cursor:pointer;" title="Reportar Falla">⚠️</button>
                         <button type="button" class="btn-secondary btn-nota-rapida" data-table="prod_cola_calandrado" data-id="${c.id}" data-batch="${escHtml(c.batch_id)}" style="width:auto; padding:5px 8px; cursor:pointer;" title="Nota">📝</button>
                         <button type="button" class="btn-secondary btn-crud-edit" data-table="prod_cola_calandrado" data-id="${c.id}" style="width:auto; padding:5px 8px; cursor:pointer;" title="Editar">✏️</button>
-                        <button type="button" class="btn-secondary btn-crud-del" data-table="prod_cola_calandrado" data-id="${c.id}" style="width:auto; padding:5px 8px; cursor:pointer;" title="Eliminar">🗑️</button>
+                        <button type="button" class="btn-secondary btn-crud-del" data-table="prod_cola_calandrado" data-id="${c.id}" data-batch="${escHtml(c.batch_id)}" data-ids="${idsCsv}" style="width:auto; padding:5px 8px; cursor:pointer;" title="Eliminar">🗑️</button>
                       </div>
                     </td>
                     <td data-label="Fecha">${fmtDateHora(c.fecha_hora)}</td>
-                    <td data-label="Cliente/Archivo">${formatearAnidadosHTML(c.cliente_archivo)}</td>
+                    <td data-label="Cliente/Archivo">
+                      ${c.es_anidado ? `<span class="badge activo" style="font-size:10px; margin-bottom:4px; display:inline-block;">📦 ANIDADO (${c.archivos.length} archivos)</span><br>` : ""}
+                      ${formatearAnidadosHTML(c.cliente_archivo)}
+                    </td>
                     <td data-label="Diseño" style="text-align:center;">${renderMiniaturaDiseno60(c.file_id, c.diseno, c.cliente_archivo)}</td>
                     <td data-label="Tela">${escHtml(c.tela_destino || "")}</td>
                     <td data-label="Nº Rollo">${escHtml(c.num_rollo_tela || "")}</td>
@@ -1022,7 +1135,7 @@ function renderModuloCalandrado() {
                     <td data-label="Perfil">${escHtml(c.perfil || "")}</td>
                     <td data-label="Notas">${c.observaciones ? `<span style="color:var(--accent-orange); font-weight:bold;">📝 ${escHtml(c.observaciones)}</span>` : "-"}</td>
                   </tr>
-                `).join("")}
+                `;}).join("")}
               </tbody>
             </table>
           </div>
@@ -1072,32 +1185,37 @@ function renderModuloCalandrado() {
     let htmlHist = "";
     for (const [rId, listaRollo] of gruposHist.entries()) {
       const totRollo = listaRollo.reduce((a, b) => a + (Number(b.metros) || 0), 0);
+      const listaAgrupada = agruparCalandradoPorBatch(listaRollo);
       const estaCerrado = STATE.rollosHistCalCerrados.has(rId);
       const icono = estaCerrado ? "▶" : "▼";
 
       htmlHist += `
         <tr class="tr-toggle-hist-cal" data-rollo-hist="${escHtml(rId)}" style="cursor:pointer; background:#111;">
           <td colspan="11" style="border-top:1px solid #00E676; border-bottom:1px solid #00E676; color:#00E676; text-align:center; font-weight:bold; padding:8px;">
-            ${icono} ROLLO CERRADO: ${escHtml(rId)} (${listaRollo.length} trab.) | TOTAL DEL ROLLO: ${fmtNum(totRollo)}m <span style="font-size:10px; color:#888; margin-left:6px;">(clic para mostrar/ocultar)</span>
+            ${icono} ROLLO CERRADO: ${escHtml(rId)} (${listaAgrupada.length} trab.) | TOTAL DEL ROLLO: ${fmtNum(totRollo)}m <span style="font-size:10px; color:#888; margin-left:6px;">(clic para mostrar/ocultar)</span>
           </td>
         </tr>
       `;
 
       if (!estaCerrado) {
-        listaRollo.forEach(c => {
+        listaAgrupada.forEach(c => {
+          const idsCsv = c.ids ? c.ids.join(",") : c.id;
           htmlHist += `
             <tr>
               <td data-label="Acción" style="width:1%; white-space:nowrap;">
                 <div class="cal-actions-grid">
-                  <button type="button" class="btn-cal-reabrir" data-id="${c.id}" style="background:transparent; border:1px solid #aaa; color:#aaa; border-radius:4px; cursor:pointer; padding:4px 6px;" title="Deshacer">🔙</button>
+                  <button type="button" class="btn-cal-reabrir" data-id="${c.id}" data-ids="${idsCsv}" style="background:transparent; border:1px solid #aaa; color:#aaa; border-radius:4px; cursor:pointer; padding:4px 6px;" title="Deshacer">🔙</button>
                   <button type="button" class="btn-nota-rapida" data-table="prod_cola_calandrado" data-id="${c.id}" data-batch="${escHtml(c.batch_id)}" style="background:transparent; border:1px solid var(--accent-orange); color:var(--accent-orange); border-radius:4px; cursor:pointer; padding:4px 6px;" title="Nota">📝</button>
                   <button type="button" class="btn-imp-etiqueta" data-rollo="${escHtml(rId)}" data-metros="${fmtNum(c.metros)}" style="background:var(--accent-blue); border:1px solid var(--accent-blue); color:#fff; border-radius:4px; cursor:pointer; padding:4px 6px;" title="Etiqueta">🖨️</button>
                   <button type="button" class="btn-crud-edit" data-table="prod_cola_calandrado" data-id="${c.id}" style="background:transparent; border:1px solid var(--accent-blue); color:var(--accent-blue); border-radius:4px; cursor:pointer; padding:4px 6px;" title="Editar">✏️</button>
-                  <button type="button" class="btn-crud-del" data-table="prod_cola_calandrado" data-id="${c.id}" style="background:transparent; border:1px solid var(--danger); color:var(--danger); border-radius:4px; cursor:pointer; padding:4px 6px;" title="Eliminar">🗑️</button>
+                  <button type="button" class="btn-crud-del" data-table="prod_cola_calandrado" data-id="${c.id}" data-batch="${escHtml(c.batch_id)}" data-ids="${idsCsv}" style="background:transparent; border:1px solid var(--danger); color:var(--danger); border-radius:4px; cursor:pointer; padding:4px 6px;" title="Eliminar">🗑️</button>
                 </div>
               </td>
               <td data-label="Fecha">${fmtDateHora(c.fecha_terminado || c.fecha_hora)}</td>
-              <td data-label="Cliente/Archivo">${formatearAnidadosHTML(c.cliente_archivo)}</td>
+              <td data-label="Cliente/Archivo">
+                ${c.es_anidado ? `<span class="badge activo" style="font-size:10px; margin-bottom:4px; display:inline-block;">📦 ANIDADO (${c.archivos.length} archivos)</span><br>` : ""}
+                ${formatearAnidadosHTML(c.cliente_archivo)}
+              </td>
               <td data-label="Diseño" style="text-align:center;">${renderMiniaturaDiseno60(c.file_id, c.diseno, c.cliente_archivo)}</td>
               <td data-label="Tela">${escHtml(c.tela_destino || "")}</td>
               <td data-label="Nº Rollo">${escHtml(c.num_rollo_tela || "")}</td>
@@ -2297,56 +2415,80 @@ async function registrarAvanceOCalibracion(tipoAccion) {
   await cargarDatosTodo();
 }
 
-async function finalizarTrabajoCalandrado(idCal, minutosExtra = 0, skipReload = false, velocidad = null, temperatura = null) {
-  const reg = STATE.colaCalandrado.find(c => c.id === idCal);
-  if (!reg) return;
+async function finalizarTrabajoCalandrado(idCalOrCsv, minutosExtra = 0, skipReload = false, velocidad = null, temperatura = null) {
+  let ids = String(idCalOrCsv || "").split(",").map(s => s.trim()).filter(Boolean);
+  if (ids.length === 0) return;
+
+  const primerReg = STATE.colaCalandrado.find(c => ids.includes(c.id));
+  if (!primerReg) return;
+
+  // Si tiene batch_id, buscar todos los registros de la cola que pertenezcan a ese batch para terminarlos juntos
+  if (primerReg.batch_id) {
+    const hermanos = STATE.colaCalandrado.filter(c => c.batch_id === primerReg.batch_id && !String(c.estado).toLowerCase().includes("terminado"));
+    hermanos.forEach(h => {
+      if (!ids.includes(h.id)) ids.push(h.id);
+    });
+  }
+
+  const regs = STATE.colaCalandrado.filter(c => ids.includes(c.id));
+  const reg = regs[0] || primerReg;
 
   const inputFechaManual = document.getElementById("calInputFechaManual")?.value;
   const fechaFinIso = inputFechaManual ? new Date(inputFechaManual).toISOString() : new Date().toISOString();
 
+  const totalMetros = regs.reduce((a, b) => a + (Number(b.metros) || 0), 0);
+  const minTrabajados = minutosExtra || reg.minutos_trabajados || Math.max(5, Math.round(totalMetros * 1.2));
+
   const updatePayload = {
     estado: "Terminado",
     fecha_terminado: fechaFinIso,
-    minutos_trabajados: minutosExtra || reg.minutos_trabajados || Math.max(5, Math.round((Number(reg.metros) || 10) * 1.2))
+    minutos_trabajados: minTrabajados
   };
   if (velocidad !== null && !isNaN(velocidad)) updatePayload.velocidad = velocidad;
   if (temperatura !== null && !isNaN(temperatura)) updatePayload.temperatura = temperatura;
 
-  await sb().from("prod_cola_calandrado").update(updatePayload).eq("id", idCal);
+  // Actualizar todos los registros del anidado en prod_cola_calandrado
+  for (const id of ids) {
+    await sb().from("prod_cola_calandrado").update(updatePayload).eq("id", id);
+  }
 
   // Sincronización asíncrona en segundo plano con Sheet vieja (0ms de espera)
+  const nombresUnidos = regs.map(r => r.cliente_archivo).filter(Boolean).join(" | ");
   notificarSincronizacionSheetViejaEnSegundoPlano("CALANDRADO", "TERMINADO", {
     id: reg.id,
     batch_id: reg.batch_id,
     rollo: reg.id_rollo_papel,
-    cliente_archivo: reg.cliente_archivo,
+    cliente_archivo: nombresUnidos || reg.cliente_archivo,
     tela: reg.tela_destino,
-    metros: reg.metros,
+    metros: totalMetros,
     ruta: reg.ruta,
     velocidad: updatePayload.velocidad || reg.velocidad || 50,
     temperatura: updatePayload.temperatura || reg.temperatura || 205,
-    minutos: updatePayload.minutos_trabajados || 0,
+    minutos: minTrabajados,
     estado: "Terminado",
     observaciones: reg.observaciones || ""
   });
 
+  // Enrutar a Láser si la ruta lo indica
   const rLower = String(reg.ruta || "").toLowerCase();
   if (rLower.includes("laser") || rLower.includes("láser") || rLower.includes("corte")) {
-    await sb().from("prod_cola_laser").insert({
-      empresa_id: "vvgrafic-principal",
-      batch_id: reg.batch_id || `BATCH-${Date.now()}`,
-      fecha_ingreso: fechaFinIso,
-      id_rollo_papel: reg.id_rollo_papel,
-      cliente_archivo: reg.cliente_archivo,
-      tela_rollo_color: `${reg.tela_destino || "-"} | ${reg.num_rollo_tela || "-"} | ${reg.color_tela || "Blanco"}`,
-      metros: reg.metros,
-      ruta: reg.ruta,
-      velocidad: 35,
-      poder: 90,
-      estado: "Pendiente",
-      observaciones: reg.observaciones || "",
-      file_id: reg.file_id || ""
-    });
+    for (const rItem of regs) {
+      await sb().from("prod_cola_laser").insert({
+        empresa_id: "vvgrafic-principal",
+        batch_id: rItem.batch_id || reg.batch_id || `BATCH-${Date.now()}`,
+        fecha_ingreso: fechaFinIso,
+        id_rollo_papel: rItem.id_rollo_papel || reg.id_rollo_papel,
+        cliente_archivo: rItem.cliente_archivo,
+        tela_rollo_color: `${rItem.tela_destino || reg.tela_destino || "-"} | ${rItem.num_rollo_tela || reg.num_rollo_tela || "-"} | ${rItem.color_tela || reg.color_tela || "Blanco"}`,
+        metros: rItem.metros,
+        ruta: rItem.ruta || reg.ruta,
+        velocidad: 35,
+        poder: 90,
+        estado: "Pendiente",
+        observaciones: rItem.observaciones || reg.observaciones || "",
+        file_id: rItem.file_id || ""
+      });
+    }
   }
 
   if (!skipReload) {
@@ -2356,22 +2498,25 @@ async function finalizarTrabajoCalandrado(idCal, minutosExtra = 0, skipReload = 
 }
 
 async function procesarRolloCompletoCalandrado(rolloId) {
-  const trabajos = STATE.colaCalandrado.filter(c => c.id_rollo_papel === rolloId && !String(c.estado).toLowerCase().includes("terminado"));
-  if (trabajos.length === 0) {
+  const pendientesRollo = STATE.colaCalandrado.filter(c => c.id_rollo_papel === rolloId && !String(c.estado).toLowerCase().includes("terminado"));
+  if (pendientesRollo.length === 0) {
     toast(`No hay trabajos pendientes en el rollo ${rolloId}.`, "error");
     return;
   }
+
+  const lotesAgrupados = agruparCalandradoPorBatch(pendientesRollo);
 
   const inputFechaManual = document.getElementById("calInputFechaManual")?.value;
   const msgFecha = inputFechaManual
     ? `con la fecha seleccionada (${fmtDateHoraLineal(new Date(inputFechaManual).toISOString())})`
     : `con fecha actual`;
 
-  if (!confirm(`¿Procesar los ${trabajos.length} trabajos del rollo ${rolloId} ${msgFecha}?`)) return;
+  if (!confirm(`¿Procesar los ${lotesAgrupados.length} lote(s)/trabajo(s) del rollo ${rolloId} ${msgFecha}?`)) return;
 
-  toast(`Procesando ${trabajos.length} trabajos...`);
-  for (const t of trabajos) {
-    await finalizarTrabajoCalandrado(t.id, 0, true);
+  toast(`Procesando ${lotesAgrupados.length} lote(s)...`);
+  for (const lote of lotesAgrupados) {
+    const idsCsv = lote.ids ? lote.ids.join(",") : lote.id;
+    await finalizarTrabajoCalandrado(idsCsv, 0, true);
   }
   toast(`✅ Rollo ${rolloId} procesado completo.`);
   await cargarDatosTodo();
@@ -2445,7 +2590,8 @@ function emitirPDFCalandrado(rolloId) {
     toast(`No hay trabajos registrados para el rollo ${rolloId}.`, "error");
     return;
   }
-  const totalMts = items.reduce((a, b) => a + (Number(b.metros) || 0), 0);
+  const itemsAgrupados = agruparCalandradoPorBatch(items);
+  const totalMts = itemsAgrupados.reduce((a, b) => a + (Number(b.metros) || 0), 0);
   const win = window.open("", "_blank");
   if (!win) { alert("Habilitá las ventanas emergentes del navegador para imprimir la Hoja de Ruta."); return; }
 
@@ -2501,11 +2647,14 @@ function emitirPDFCalandrado(rolloId) {
             <th style="width:22%;">OBSERVACIONES</th>
           </tr>
         </thead>
-        ${items.map(c => `
+        ${itemsAgrupados.map(c => `
           <tbody class="job-group">
             <tr class="row-top">
               <td>${escHtml(c.id_rollo_papel || rolloId)}</td>
-              <td colspan="8">${escHtml(c.cliente_archivo || "-")}</td>
+              <td colspan="8">
+                ${c.es_anidado ? `[📦 ANIDADO ${c.archivos.length} ARCHIVOS] ` : ""}
+                ${escHtml(c.cliente_archivo || "-")}
+              </td>
             </tr>
             <tr class="row-data">
               <td>${renderCeldaDisenoPDF(c)}</td>
@@ -2686,9 +2835,25 @@ async function guardarModalCrudUniversal() {
   await cargarDatosTodo();
 }
 
-async function eliminarRegistroCrudUniversal(tabla, id) {
+async function eliminarRegistroCrudUniversal(tabla, id, batchId = null, idsCsv = null) {
   if (!confirm("¿Confirmás eliminar este registro?")) return;
   const pkCol = tabla === "prod_dtf_rollos" ? "id_rollo_dtf" : tabla === "prod_rollos_papel" ? "id_rollo" : "id";
+
+  if (idsCsv && (tabla === "prod_impresiones" || tabla === "prod_cola_calandrado" || tabla === "prod_cola_laser")) {
+    const ids = String(idsCsv).split(",").map(s => s.trim()).filter(Boolean);
+    if (ids.length > 0) {
+      await sb().from(tabla).delete().in("id", ids);
+      toast("🗑️ Registro(s) eliminado(s).");
+      await cargarDatosTodo();
+      return;
+    }
+  } else if (batchId && (tabla === "prod_impresiones" || tabla === "prod_cola_calandrado" || tabla === "prod_cola_laser")) {
+    await sb().from(tabla).delete().eq("batch_id", batchId);
+    toast("🗑️ Lote eliminado.");
+    await cargarDatosTodo();
+    return;
+  }
+
   const { error } = await sb().from(tabla).delete().eq(pkCol, id);
   if (error) { toast("Error: " + error.message, "error"); return; }
   toast("🗑️ Registro eliminado.");
@@ -3059,6 +3224,7 @@ function renderContenidoModalKiosco() {
 
         <!-- Nombre del trabajo en máximo 2 líneas sin prefijo -->
         <div class="kiosk-info-cliente-rollo" style="background:#0f1117; padding:6px 12px; border-radius:6px; border:1px solid #2a324b;">
+          ${(trabActual.es_anidado || (trabActual.archivos && trabActual.archivos.length > 1)) ? `<div style="margin-bottom:3px;"><span class="badge activo" style="font-size:10px; padding:2px 7px;">📦 LOTE ANIDADO (${trabActual.archivos ? trabActual.archivos.length : "Múltiple"})</span></div>` : ""}
           <div class="kiosk-job-title-clamp" style="font-size:13px; font-weight:bold; color:#fff; line-height:1.25; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; text-overflow:ellipsis;" title="${escHtml(rawNombre)}">
             ${escHtml(nombreLimpio)}
           </div>
@@ -3185,36 +3351,37 @@ function abrirKioscoCalandra(idCal, rolloId = null) {
   if (!modal) return;
 
   // Si ya estaba corriendo en segundo plano para el mismo rollo/trabajo, restauramos la ventana
-  if (STATE.kiosco.corriendoEnFondo) {
+  if (STATE.kiosco.corriendoEnFondo && STATE.kiosco.modulo === "calandrado") {
     if ((rolloId && STATE.kiosco.rolloId === rolloId) || (!rolloId && STATE.kiosco.registroIds.includes(idCal))) {
       restaurarKioscoDesdeFondo();
       return;
     }
   }
 
-  let trabajos = [];
-  let idxInicial = 0;
+  let trabajosRaw = [];
   let rolloNombre = rolloId || "Sin Rollo";
 
   if (rolloId) {
-    trabajos = STATE.colaCalandrado.filter(c => c.id_rollo_papel === rolloId && !String(c.estado).toLowerCase().includes("terminado"));
+    trabajosRaw = STATE.colaCalandrado.filter(c => c.id_rollo_papel === rolloId && !String(c.estado).toLowerCase().includes("terminado"));
   } else {
     const r = STATE.colaCalandrado.find(c => c.id === idCal);
     if (!r) return;
     rolloNombre = r.id_rollo_papel || "Sin Rollo";
     const delMismoRollo = STATE.colaCalandrado.filter(c => c.id_rollo_papel === r.id_rollo_papel && !String(c.estado).toLowerCase().includes("terminado"));
-    if (delMismoRollo.length > 0) {
-      trabajos = delMismoRollo;
-      idxInicial = Math.max(0, delMismoRollo.findIndex(t => t.id === idCal));
-    } else {
-      trabajos = [r];
-      idxInicial = 0;
-    }
+    trabajosRaw = delMismoRollo.length > 0 ? delMismoRollo : [r];
   }
+
+  const trabajos = agruparCalandradoPorBatch(trabajosRaw);
 
   if (trabajos.length === 0) {
     toast("No hay trabajos pendientes en esta bobina.", "warn");
     return;
+  }
+
+  let idxInicial = 0;
+  if (idCal) {
+    const idxEncontrado = trabajos.findIndex(t => t.ids && t.ids.includes(idCal));
+    if (idxEncontrado >= 0) idxInicial = idxEncontrado;
   }
 
   STATE.kiosco.modulo = "calandrado";
@@ -3228,7 +3395,7 @@ function abrirKioscoCalandra(idCal, rolloId = null) {
   STATE.kiosco.rolloId = rolloNombre;
   STATE.kiosco.trabajos = trabajos;
   STATE.kiosco.indiceActual = idxInicial;
-  STATE.kiosco.registroIds = trabajos.map(t => t.id);
+  STATE.kiosco.registroIds = trabajos.flatMap(t => t.ids || [t.id]);
   STATE.kiosco.completadosIds = new Set();
   STATE.kiosco.descartadosIds = new Set();
 
@@ -3337,10 +3504,13 @@ function vincularBotonesAccionesKiosco() {
           }).eq("id", id);
         }
         STATE.kiosco.completadosIds.add(trabActual.id);
+        if (trabActual.ids) trabActual.ids.forEach(id => STATE.kiosco.completadosIds.add(id));
         toast(`✅ Corte Láser finalizado (Vel: ${vel}mm/s | Poder: ${valParam2}%).`);
       } else {
-        await finalizarTrabajoCalandrado(trabActual.id, min, true, vel, valParam2);
+        const idsCsv = trabActual.ids ? trabActual.ids.join(",") : trabActual.id;
+        await finalizarTrabajoCalandrado(idsCsv, min, true, vel, valParam2);
         STATE.kiosco.completadosIds.add(trabActual.id);
+        if (trabActual.ids) trabActual.ids.forEach(id => STATE.kiosco.completadosIds.add(id));
       }
 
       const sigIdx = buscarSiguienteIndicePendienteKiosco(STATE.kiosco.indiceActual);
@@ -3395,8 +3565,8 @@ function vincularBotonesAccionesKiosco() {
         estado: "Pendiente"
       });
 
+      const idsToUpdate = trabActual.ids || [trabActual.id];
       if (esLaser) {
-        const idsToUpdate = trabActual.ids || [trabActual.id];
         for (const id of idsToUpdate) {
           await sb().from("prod_cola_laser").update({
             estado: "Terminado",
@@ -3405,14 +3575,17 @@ function vincularBotonesAccionesKiosco() {
           }).eq("id", id);
         }
       } else {
-        await sb().from("prod_cola_calandrado").update({
-          estado: "Terminado",
-          fecha_terminado: new Date().toISOString(),
-          observaciones: `[PAPEL DESECHADO: ${motivo}] ${trabActual.observaciones || ""}`.trim()
-        }).eq("id", trabActual.id);
+        for (const id of idsToUpdate) {
+          await sb().from("prod_cola_calandrado").update({
+            estado: "Terminado",
+            fecha_terminado: new Date().toISOString(),
+            observaciones: `[PAPEL DESECHADO: ${motivo}] ${trabActual.observaciones || ""}`.trim()
+          }).eq("id", id);
+        }
       }
 
       STATE.kiosco.descartadosIds.add(trabActual.id);
+      if (trabActual.ids) trabActual.ids.forEach(id => STATE.kiosco.descartadosIds.add(id));
 
       const sigIdx = buscarSiguienteIndicePendienteKiosco(STATE.kiosco.indiceActual);
       if (sigIdx === -1) {
@@ -3463,8 +3636,9 @@ function vincularBotonesAccionesKiosco() {
         }
         toast(`✅ Kiosko Láser finalizado (${pendientesIds.length} lote(s) guardados con Vel: ${vel}mm/s y Poder: ${valParam2}%).`);
       } else {
-        for (const id of pendientesIds) {
-          await finalizarTrabajoCalandrado(id, min, true, vel, valParam2);
+        for (const trab of STATE.kiosco.trabajos.filter(t => pendientesIds.includes(t.id))) {
+          const idsCsv = trab.ids ? trab.ids.join(",") : trab.id;
+          await finalizarTrabajoCalandrado(idsCsv, min, true, vel, valParam2);
         }
         toast(`✅ Kiosko Calandrado finalizado (${pendientesIds.length} trabajo(s) guardados con Vel: ${vel}m/min y Temp: ${valParam2}°C).`);
       }
@@ -3850,7 +4024,15 @@ export function inicializarEventosUI() {
     if (btnEdit) { abrirModalCrudUniversal(btnEdit.getAttribute("data-table"), btnEdit.getAttribute("data-id")); return; }
 
     const btnDel = e.target.closest(".btn-crud-del");
-    if (btnDel) { eliminarRegistroCrudUniversal(btnDel.getAttribute("data-table"), btnDel.getAttribute("data-id")); return; }
+    if (btnDel) {
+      eliminarRegistroCrudUniversal(
+        btnDel.getAttribute("data-table"),
+        btnDel.getAttribute("data-id"),
+        btnDel.getAttribute("data-batch"),
+        btnDel.getAttribute("data-ids")
+      );
+      return;
+    }
 
     const btnAddManual = e.target.closest(".btn-crud-add");
     if (btnAddManual) {
@@ -3935,12 +4117,15 @@ export function inicializarEventosUI() {
           }
         }
 
-        // 3. Eliminar de prod_impresiones y de prod_cola_calandrado
-        await sb().from("prod_impresiones").delete().eq("id", reg.id);
+        // 3. Eliminar de prod_impresiones y de prod_cola_calandrado (todo el batch si es anidado)
         if (reg.batch_id) {
+          await sb().from("prod_impresiones").delete().eq("batch_id", reg.batch_id);
           await sb().from("prod_cola_calandrado").delete().eq("batch_id", reg.batch_id);
-        } else if (reg.file_id) {
-          await sb().from("prod_cola_calandrado").delete().eq("file_id", reg.file_id);
+        } else {
+          await sb().from("prod_impresiones").delete().eq("id", reg.id);
+          if (reg.file_id) {
+            await sb().from("prod_cola_calandrado").delete().eq("file_id", reg.file_id);
+          }
         }
 
         toast("✅ Impresión deshecha: archivo disponible en cola de pendientes.");
@@ -3973,12 +4158,16 @@ export function inicializarEventosUI() {
     }
 
     const btnCalTerm = e.target.closest(".btn-cal-terminar");
-    if (btnCalTerm) { finalizarTrabajoCalandrado(btnCalTerm.getAttribute("data-id")); return; }
+    if (btnCalTerm) { finalizarTrabajoCalandrado(btnCalTerm.getAttribute("data-ids") || btnCalTerm.getAttribute("data-id")); return; }
 
     const btnCalReabrir = e.target.closest(".btn-cal-reabrir");
     if (btnCalReabrir) {
-      await sb().from("prod_cola_calandrado").update({ estado: "Pendiente", fecha_terminado: null }).eq("id", btnCalReabrir.getAttribute("data-id"));
-      await cargarDatosTodo();
+      const idsCsv = btnCalReabrir.getAttribute("data-ids") || btnCalReabrir.getAttribute("data-id") || "";
+      const ids = idsCsv.split(",").map(s => s.trim()).filter(Boolean);
+      if (ids.length > 0) {
+        await sb().from("prod_cola_calandrado").update({ estado: "Pendiente", fecha_terminado: null }).in("id", ids);
+        await cargarDatosTodo();
+      }
       return;
     }
 

@@ -1,9 +1,9 @@
 // ============================================================================
 // SERVICE WORKER: Control de Taller — V&V Grafic (PWA)
-// Versión: 20261021_01
+// Versión: 20261021_02
 // ============================================================================
 
-const CACHE_NAME = "vvgrafic-taller-cache-v1";
+const CACHE_NAME = "vvgrafic-taller-cache-v2";
 const STATIC_ASSETS = [
   "./",
   "./index.html",
