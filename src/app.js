@@ -139,14 +139,117 @@ function extraerThumbIdDrive(fileIdStr) {
   return matches && matches.length > 0 ? matches[0] : null;
 }
 
-// Renderiza la miniatura real de Google Drive (60x60px) + texto del Diseño tal cual la App en Uso
+// Renderiza una caja de miniatura fija y robusta (nunca colapsa ni desordena la tabla/tarjeta)
+function renderCajaMiniatura(thumbId, nombre, badgeTexto = "") {
+  const nombreCorto = escHtml(nombre || "").replace(/\.(jpg|jpeg|png|tif|tiff|pdf)$/i, "");
+  const driveUrl = thumbId ? `https://drive.google.com/file/d/${escHtml(thumbId)}/view` : null;
+  const clickAttr = driveUrl ? `onclick="event.stopPropagation(); window.open('${driveUrl}', '_blank');"` : "";
+  const cursorStyle = driveUrl ? "cursor:pointer;" : "";
+
+  if (thumbId) {
+    const thumbUrl = `https://drive.google.com/thumbnail?id=${escHtml(thumbId)}&sz=w140-h140`;
+    const fallbackThumbUrl = `https://lh3.googleusercontent.com/d/${escHtml(thumbId)}=s140`;
+    return `
+      <div class="caja-miniatura-wrap" style="position:relative; width:64px; height:64px; margin:0 auto; background:#111; border:1px solid #334155; border-radius:6px; overflow:hidden; display:flex; align-items:center; justify-content:center; ${cursorStyle}" ${clickAttr} title="${escHtml(nombre || "Ver archivo en Drive")}">
+        <img src="${thumbUrl}" alt="${nombreCorto}" style="width:100%; height:100%; object-fit:cover; display:block;" onerror="if(this.src!=='${fallbackThumbUrl}'){this.src='${fallbackThumbUrl}';}else{this.style.display='none'; this.nextElementSibling.style.display='flex';}" />
+        <div class="miniatura-ph" style="display:none; width:100%; height:100%; position:absolute; top:0; left:0; flex-direction:column; align-items:center; justify-content:center; background:#1e293b; color:#94a3b8; font-size:9px; text-align:center; padding:2px;">
+          <span style="font-size:16px;">🖼️</span>
+          <span style="font-size:8.5px; line-height:1; margin-top:2px; max-width:58px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${nombreCorto || "Diseño"}</span>
+        </div>
+        ${badgeTexto ? `<span style="position:absolute; bottom:2px; right:2px; background:rgba(0,0,0,0.85); color:#00E676; font-size:8px; font-weight:bold; padding:1px 4px; border-radius:3px;">${badgeTexto}</span>` : ""}
+      </div>
+    `;
+  }
+
+  return `
+    <div class="caja-miniatura-wrap" style="width:64px; height:64px; margin:0 auto; background:#1e293b; border:1px dashed #475569; border-radius:6px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#64748b; font-size:9px; padding:2px; text-align:center;">
+      <span style="font-size:16px;">🖼️</span>
+      <span style="max-width:58px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px; font-size:8.5px;">${nombreCorto || "Sin Ref"}</span>
+    </div>
+  `;
+}
+
+// 1: En impresión muestra el 1er archivo del anidado (o el archivo único)
+function renderMiniaturaImpresion(row) {
+  const fileIds = (row.file_ids && row.file_ids.length > 0)
+    ? row.file_ids
+    : String(row.file_id || "").split(",").map(s => s.trim()).filter(Boolean);
+  const firstId = fileIds.length > 0 ? extraerThumbIdDrive(fileIds[0]) : null;
+  const nombre = (row.archivos && row.archivos.length > 0)
+    ? row.archivos[0]
+    : (row.cliente_archivo ? String(row.cliente_archivo).split(" | ")[0] : "");
+  const total = (row.archivos && row.archivos.length > 0) ? row.archivos.length : fileIds.length;
+  const esAnidado = row.es_anidado || total > 1;
+
+  return renderCajaMiniatura(firstId, nombre, esAnidado ? `1 de ${total}` : "");
+}
+
+// 2: En calandrado muestra todos los archivos en carrusel deslizable con swipe / botones
+function renderCarruselCalandrado(c) {
+  const archivos = (c.archivos && c.archivos.length > 0)
+    ? c.archivos
+    : String(c.cliente_archivo || "").split(" | ").filter(Boolean);
+  const fileIds = (c.file_ids && c.file_ids.length > 0)
+    ? c.file_ids
+    : String(c.file_id || "").split(",").map(s => s.trim()).filter(Boolean);
+  const total = Math.max(archivos.length, fileIds.length);
+
+  // Si tiene un solo archivo, renderiza miniatura única sin controles de carrusel
+  if (total <= 1) {
+    const fid = fileIds[0] || "";
+    const thumbId = extraerThumbIdDrive(fid);
+    return renderCajaMiniatura(thumbId, archivos[0] || c.cliente_archivo);
+  }
+
+  // Carrusel deslizable para lote anidado
+  const carruselId = `carrusel_${String(c.batch_id || c.id).replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+  const slidesHtml = [];
+
+  for (let i = 0; i < total; i++) {
+    const archNom = archivos[i] || `Archivo ${i + 1}`;
+    const archNomCorto = escHtml(archNom).replace(/\.(jpg|jpeg|png|tif|tiff|pdf)$/i, "");
+    const fid = fileIds[i] || fileIds[0] || "";
+    const thumbId = extraerThumbIdDrive(fid);
+    const driveUrl = thumbId ? `https://drive.google.com/file/d/${escHtml(thumbId)}/view` : null;
+    const clickAttr = driveUrl ? `onclick="event.stopPropagation(); window.open('${driveUrl}', '_blank');"` : "";
+    const thumbUrl = thumbId ? `https://drive.google.com/thumbnail?id=${escHtml(thumbId)}&sz=w160-h160` : "";
+    const fallbackThumbUrl = thumbId ? `https://lh3.googleusercontent.com/d/${escHtml(thumbId)}=s160` : "";
+
+    slidesHtml.push(`
+      <div class="cal-carrusel-slide" style="flex:0 0 76px; width:76px; height:76px; scroll-snap-align:center; position:relative; display:flex; align-items:center; justify-content:center; background:#0f172a; cursor:pointer;" ${clickAttr} title="${escHtml(archNom)} (Tocar para ver en Drive)">
+        ${thumbId ? `
+          <img src="${thumbUrl}" alt="${archNomCorto}" style="width:100%; height:100%; object-fit:cover; display:block;" onerror="if(this.src!=='${fallbackThumbUrl}'){this.src='${fallbackThumbUrl}';}else{this.style.display='none'; this.nextElementSibling.style.display='flex';}" />
+          <div class="miniatura-ph" style="display:none; width:100%; height:100%; position:absolute; top:0; left:0; flex-direction:column; align-items:center; justify-content:center; background:#1e293b; color:#94a3b8; font-size:9px; text-align:center; padding:2px;">
+            <span style="font-size:15px;">🖼️</span>
+            <span style="max-width:70px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${archNomCorto}</span>
+          </div>
+        ` : `
+          <div style="width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#1e293b; color:#94a3b8; font-size:9px; text-align:center; padding:2px;">
+            <span style="font-size:15px;">🖼️</span>
+            <span style="max-width:70px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${archNomCorto}</span>
+          </div>
+        `}
+        <span style="position:absolute; bottom:2px; right:2px; background:rgba(0,0,0,0.88); color:#38BDF8; font-size:8px; font-weight:900; padding:1px 4px; border-radius:3px;">${i + 1}/${total}</span>
+      </div>
+    `);
+  }
+
+  return `
+    <div class="cal-carrusel-container" style="display:inline-flex; align-items:center; gap:3px; max-width:125px; margin:0 auto; user-select:none;">
+      <button type="button" class="btn-carrusel-nav" onclick="event.stopPropagation(); const trk=document.getElementById('${carruselId}'); if(trk){ trk.scrollBy({left:-76, behavior:'smooth'}); }" style="background:rgba(255,255,255,0.08); border:none; color:#38BDF8; width:20px; height:76px; border-radius:4px; font-size:14px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center; font-weight:bold;" title="Anterior">‹</button>
+      
+      <div id="${carruselId}" class="cal-carrusel-track" style="display:flex; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; scrollbar-width:none; width:76px; height:76px; border-radius:6px; border:1.5px solid #2563eb; background:#0f172a; box-shadow:0 2px 8px rgba(37,99,235,0.25);">
+        ${slidesHtml.join("")}
+      </div>
+
+      <button type="button" class="btn-carrusel-nav" onclick="event.stopPropagation(); const trk=document.getElementById('${carruselId}'); if(trk){ trk.scrollBy({left:76, behavior:'smooth'}); }" style="background:rgba(255,255,255,0.08); border:none; color:#38BDF8; width:20px; height:76px; border-radius:4px; font-size:14px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center; font-weight:bold;" title="Siguiente">›</button>
+    </div>
+  `;
+}
+
 function renderMiniaturaDiseno60(fileIdStr, disenoStr, nombreStr = "") {
   const thumbId = extraerThumbIdDrive(fileIdStr);
-  const textoDiseno = escHtml(disenoStr || "");
-  if (thumbId) {
-    return `<img src="https://drive.google.com/thumbnail?id=${escHtml(thumbId)}&sz=w100-h100" onerror="this.style.display='none'" style="width:60px; height:60px; margin:0 auto 4px auto; object-fit:cover; border-radius:4px; cursor:pointer; display:block;" onclick="event.stopPropagation(); window.open('https://drive.google.com/file/d/${escHtml(thumbId)}/view', '_blank')" title="${escHtml(nombreStr || disenoStr || "Ver archivo en Drive")}" />${textoDiseno}`;
-  }
-  return textoDiseno || `<span style="color:#666; font-size:10px;">-</span>`;
+  return renderCajaMiniatura(thumbId, disenoStr || nombreStr);
 }
 
 // ============================================================================
@@ -954,7 +1057,7 @@ function renderTablaImpresionesConBloques() {
             ${row.es_anidado ? `<span class="badge activo" style="font-size:10px; margin-bottom:4px; display:inline-block;">📦 ANIDADO (${row.archivos.length} archivos)</span><br>` : ""}
             ${formatearAnidadosHTML(row.cliente_archivo)}
           </td>
-          <td data-label="Diseño" style="text-align:center;">${renderMiniaturaDiseno60(row.file_id, row.diseno, row.cliente_archivo)}</td>
+          <td data-label="Diseño" style="text-align:center;">${renderMiniaturaImpresion(row)}</td>
           <td data-label="Tela">${escHtml(row.tela_destino || "")}</td>
           <td data-label="Nº Rollo">${escHtml(row.num_rollo_tela || "")}</td>
           <td data-label="Color">${escHtml(row.color_tela || "")}</td>
@@ -1127,7 +1230,7 @@ function renderModuloCalandrado() {
                       ${c.es_anidado ? `<span class="badge activo" style="font-size:10px; margin-bottom:4px; display:inline-block;">📦 ANIDADO (${c.archivos.length} archivos)</span><br>` : ""}
                       ${formatearAnidadosHTML(c.cliente_archivo)}
                     </td>
-                    <td data-label="Diseño" style="text-align:center;">${renderMiniaturaDiseno60(c.file_id, c.diseno, c.cliente_archivo)}</td>
+                    <td data-label="Diseño" style="text-align:center;">${renderCarruselCalandrado(c)}</td>
                     <td data-label="Tela">${escHtml(c.tela_destino || "")}</td>
                     <td data-label="Nº Rollo">${escHtml(c.num_rollo_tela || "")}</td>
                     <td data-label="Color">${escHtml(c.color_tela || "")}</td>
@@ -1216,7 +1319,7 @@ function renderModuloCalandrado() {
                 ${c.es_anidado ? `<span class="badge activo" style="font-size:10px; margin-bottom:4px; display:inline-block;">📦 ANIDADO (${c.archivos.length} archivos)</span><br>` : ""}
                 ${formatearAnidadosHTML(c.cliente_archivo)}
               </td>
-              <td data-label="Diseño" style="text-align:center;">${renderMiniaturaDiseno60(c.file_id, c.diseno, c.cliente_archivo)}</td>
+              <td data-label="Diseño" style="text-align:center;">${renderCarruselCalandrado(c)}</td>
               <td data-label="Tela">${escHtml(c.tela_destino || "")}</td>
               <td data-label="Nº Rollo">${escHtml(c.num_rollo_tela || "")}</td>
               <td data-label="Color">${escHtml(c.color_tela || "")}</td>
@@ -1257,6 +1360,8 @@ function agruparLaserPorBatch(filas) {
         fecha_terminado: r.fecha_terminado,
         id_rollo_papel: r.id_rollo_papel,
         archivos: String(r.cliente_archivo || "").split(" | ").filter(Boolean),
+        file_ids: String(r.file_id || "").split(",").filter(Boolean),
+        file_id: r.file_id || "",
         tela_rollo_color: r.tela_rollo_color,
         metros_totales: Number(r.metros) || 0,
         velocidad: r.velocidad || 35,
@@ -1269,6 +1374,9 @@ function agruparLaserPorBatch(filas) {
       g.ids.push(r.id);
       const nuevosArch = String(r.cliente_archivo || "").split(" | ").filter(Boolean);
       nuevosArch.forEach(a => { if (!g.archivos.includes(a)) g.archivos.push(a); });
+      const nuevosFids = String(r.file_id || "").split(",").filter(Boolean);
+      nuevosFids.forEach(fid => { if (!g.file_ids.includes(fid)) g.file_ids.push(fid); });
+      if (!g.file_id && r.file_id) g.file_id = r.file_id;
       g.metros_totales += Number(r.metros) || 0;
       if (r.observaciones && !g.observaciones.includes(r.observaciones)) {
         g.observaciones = g.observaciones ? `${g.observaciones} | ${r.observaciones}` : r.observaciones;
@@ -2415,7 +2523,7 @@ async function registrarAvanceOCalibracion(tipoAccion) {
   await cargarDatosTodo();
 }
 
-async function finalizarTrabajoCalandrado(idCalOrCsv, minutosExtra = 0, skipReload = false, velocidad = null, temperatura = null) {
+async function finalizarTrabajoCalandrado(idCalOrCsv, minutosExtra = 0, skipReload = false, velocidad = null, temperatura = null, observacionNueva = null) {
   let ids = String(idCalOrCsv || "").split(",").map(s => s.trim()).filter(Boolean);
   if (ids.length === 0) return;
 
@@ -2439,6 +2547,12 @@ async function finalizarTrabajoCalandrado(idCalOrCsv, minutosExtra = 0, skipRelo
   const totalMetros = regs.reduce((a, b) => a + (Number(b.metros) || 0), 0);
   const minTrabajados = minutosExtra || reg.minutos_trabajados || Math.max(5, Math.round(totalMetros * 1.2));
 
+  let obsFinal = reg.observaciones || "";
+  if (observacionNueva && String(observacionNueva).trim()) {
+    const nLimpia = String(observacionNueva).trim();
+    obsFinal = obsFinal && obsFinal !== "-" ? `${obsFinal} | ${nLimpia}` : nLimpia;
+  }
+
   const updatePayload = {
     estado: "Terminado",
     fecha_terminado: fechaFinIso,
@@ -2446,6 +2560,7 @@ async function finalizarTrabajoCalandrado(idCalOrCsv, minutosExtra = 0, skipRelo
   };
   if (velocidad !== null && !isNaN(velocidad)) updatePayload.velocidad = velocidad;
   if (temperatura !== null && !isNaN(temperatura)) updatePayload.temperatura = temperatura;
+  if (obsFinal) updatePayload.observaciones = obsFinal;
 
   // Actualizar todos los registros del anidado en prod_cola_calandrado
   for (const id of ids) {
@@ -2466,7 +2581,7 @@ async function finalizarTrabajoCalandrado(idCalOrCsv, minutosExtra = 0, skipRelo
     temperatura: updatePayload.temperatura || reg.temperatura || 205,
     minutos: minTrabajados,
     estado: "Terminado",
-    observaciones: reg.observaciones || ""
+    observaciones: obsFinal || reg.observaciones || ""
   });
 
   // Enrutar a Láser si la ruta lo indica
@@ -2485,7 +2600,7 @@ async function finalizarTrabajoCalandrado(idCalOrCsv, minutosExtra = 0, skipRelo
         velocidad: 35,
         poder: 90,
         estado: "Pendiente",
-        observaciones: rItem.observaciones || reg.observaciones || "",
+        observaciones: obsFinal || rItem.observaciones || reg.observaciones || "",
         file_id: rItem.file_id || ""
       });
     }
@@ -3077,20 +3192,33 @@ function renderContenidoModalKiosco() {
   const pendientesRestantes = trabajos.filter(t => !STATE.kiosco.completadosIds.has(t.id) && !STATE.kiosco.descartadosIds.has(t.id));
   const totalM = pendientesRestantes.reduce((a, b) => a + (Number(b.metros_totales || b.metros) || 0), 0);
 
-  const thumbIdActual = extraerThumbIdDrive(trabActual.file_id);
-  const imgPreviewHtml = thumbIdActual
-    ? `<img class="kiosk-preview-img" src="https://drive.google.com/thumbnail?id=${escHtml(thumbIdActual)}&sz=w600-h600" style="width:100%; height:120px; object-fit:contain; background:#000; border:2px solid var(--accent-magenta); border-radius:8px; margin-bottom:6px;" onerror="this.style.display='none';" />`
-    : `<div class="kiosk-preview-ph" style="width:100%; height:50px; background:#000; border:2px dashed #444; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#888; font-weight:bold; margin-bottom:6px;">${escHtml(trabActual.diseno || trabActual.cliente_archivo || "SIN VISTA PREVIA")}</div>`;
-
-  document.getElementById("kioscoTitulo").textContent = esLaser
-    ? `⚡ MODO KIOSKO LÁSER (LOTE: ${rolloNombre})`
-    : `🔥 MODO KIOSKO ACTIVO (BOBINA: ${rolloNombre})`;
-
   // Limpieza de extensiones y sufijos técnicos redundantes para máxima legibilidad del operario
   const rawNombre = trabActual.cliente_archivo || trabActual.diseno || (trabActual.archivos ? trabActual.archivos.join(" | ") : "-");
   const nombreLimpio = String(rawNombre)
     .replace(/\.(jpg|jpeg|png|tif|tiff|pdf|ai|psd)$/i, "")
     .trim();
+
+  const fileIds = (trabActual.file_ids && trabActual.file_ids.length > 0)
+    ? trabActual.file_ids
+    : String(trabActual.file_id || "").split(",").map(s => s.trim()).filter(Boolean);
+  const thumbIdActual = fileIds.length > 0 ? extraerThumbIdDrive(fileIds[0]) : null;
+  const driveUrlActual = thumbIdActual ? `https://drive.google.com/file/d/${escHtml(thumbIdActual)}/view` : null;
+  const clickAttrActual = driveUrlActual ? `onclick="event.stopPropagation(); window.open('${driveUrlActual}', '_blank');" title="Tocar para ver en Drive"` : "";
+  const fallbackThumbUrl = thumbIdActual ? `https://lh3.googleusercontent.com/d/${escHtml(thumbIdActual)}=s600` : "";
+
+  const imgPreviewHtml = thumbIdActual
+    ? `<div style="position:relative; width:100%; height:115px; background:#000; border:2px solid var(--accent-magenta); border-radius:8px; overflow:hidden; margin-bottom:6px; cursor:pointer;" ${clickAttrActual}>
+        <img class="kiosk-preview-img" src="https://drive.google.com/thumbnail?id=${escHtml(thumbIdActual)}&sz=w600-h600" style="width:100%; height:100%; object-fit:contain; display:block;" onerror="if(this.src!=='${fallbackThumbUrl}'){this.src='${fallbackThumbUrl}';}else{this.style.display='none'; this.nextElementSibling.style.display='flex';}" />
+        <div class="kiosk-preview-ph" style="display:none; width:100%; height:100%; position:absolute; top:0; left:0; align-items:center; justify-content:center; flex-direction:column; background:#111; color:#aaa; font-size:11px; font-weight:bold; padding:8px; text-align:center;">
+          <span style="font-size:22px;">🖼️</span>
+          <span style="margin-top:4px; max-width:90%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(nombreLimpio || "Ver en Drive")}</span>
+        </div>
+      </div>`
+    : `<div class="kiosk-preview-ph" style="width:100%; height:55px; background:#111; border:2px dashed #444; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#888; font-weight:bold; margin-bottom:6px; font-size:11px; padding:4px; text-align:center;">🖼️ ${escHtml(nombreLimpio || "SIN VISTA PREVIA")}</div>`;
+
+  document.getElementById("kioscoTitulo").textContent = esLaser
+    ? `⚡ MODO KIOSKO LÁSER (LOTE: ${rolloNombre})`
+    : `🔥 MODO KIOSKO ACTIVO (BOBINA: ${rolloNombre})`;
 
   const labelMetros = esLaser ? "METROS A CORTAR" : "METROS A CALANDRAR";
   const metrosVal = fmtNum(trabActual.metros_totales || trabActual.metros || 0);
@@ -3229,12 +3357,6 @@ function renderContenidoModalKiosco() {
             ${escHtml(nombreLimpio)}
           </div>
         </div>
-
-        ${trabActual.observaciones && trabActual.observaciones !== "-" ? `
-          <div style="background:rgba(255,152,0,0.12); padding:6px 10px; border-radius:6px; border:1px solid #ff9800; color:#ff9800; font-weight:bold; font-size:12px;">
-            ⚠️ NOTA: ${escHtml(trabActual.observaciones)}
-          </div>
-        ` : ""}
       </div>
     </div>
 
@@ -3264,6 +3386,24 @@ function renderContenidoModalKiosco() {
         <div id="kioscoFallaBtns" style="display:flex; gap:8px;">
           <button type="button" class="btn-kiosco-reportar-falla" data-id="${trabActual.id}" data-estacion="Calandrado" style="background:rgba(216,27,96,0.18); border:1px solid var(--accent-magenta); color:#ff4081; padding:10px 14px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">⚠️ FALLA CALANDRA</button>
           <button type="button" class="btn-kiosco-reportar-falla" data-id="${trabActual.id}" data-estacion="Impresión" style="background:rgba(255,152,0,0.18); border:1px solid var(--accent-orange); color:#ff9800; padding:10px 14px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">⚠️ FALLA IMPRESIÓN</button>
+        </div>
+      `}
+    </div>
+
+    <!-- Notas de Impresión y Campo para siguiente paso (Láser o Taller) -->
+    <div id="kioscoNotasBox" style="background:#0e131f; border:1px solid #23304a; border-radius:8px; padding:7px 12px; margin-top:8px; display:flex; align-items:center; gap:8px;">
+      ${(trabActual.observaciones && trabActual.observaciones !== "-") ? `
+        <div style="flex:1; display:flex; align-items:center; gap:6px; min-width:0; background:rgba(255,152,0,0.14); border:1px solid #ff9800; border-radius:6px; padding:5px 8px;">
+          <span style="font-size:11px; font-weight:900; color:#ff9800; white-space:nowrap;">📝 NOTA IMPRESIÓN:</span>
+          <span style="font-size:11.5px; color:#fff; font-weight:bold; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escHtml(trabActual.observaciones)}">${escHtml(trabActual.observaciones)}</span>
+        </div>
+        <div style="flex:1; display:flex; align-items:center; gap:5px; min-width:0;">
+          <input type="text" id="kioscoInputNotaExtra" placeholder="+ Anotar para paso sig..." style="width:100%; background:#1a1c23; border:1px solid #334155; border-radius:5px; color:#00E676; font-size:11px; padding:5px 8px; outline:none;" />
+        </div>
+      ` : `
+        <div style="width:100%; display:flex; align-items:center; gap:8px;">
+          <span style="font-size:11px; font-weight:bold; color:#94a3b8; white-space:nowrap;">✍️ Nota paso sig:</span>
+          <input type="text" id="kioscoInputNotaExtra" placeholder="Anotar observación o detalle para Láser / Taller..." style="flex:1; width:100%; background:#1a1c23; border:1px solid #334155; border-radius:5px; color:#fff; font-size:11px; padding:5px 8px; outline:none;" />
         </div>
       `}
     </div>
@@ -3493,22 +3633,29 @@ function vincularBotonesAccionesKiosco() {
       const vel = parseFloat(document.getElementById("kioscoInputVelocidad")?.value) || (esLaser ? 300 : 50);
       const valParam2 = parseFloat(document.getElementById("kioscoInputTemperatura")?.value) || (esLaser ? 85 : 205);
 
+      const notaExtra = document.getElementById("kioscoInputNotaExtra")?.value?.trim() || "";
+
       if (esLaser) {
         const idsToUpdate = trabActual.ids || [trabActual.id];
         for (const id of idsToUpdate) {
-          await sb().from("prod_cola_laser").update({
+          const payloadLaser = {
             estado: "Terminado",
             fecha_terminado: new Date().toISOString(),
             velocidad: vel,
             poder: valParam2
-          }).eq("id", id);
+          };
+          if (notaExtra) {
+            const prevObs = trabActual.observaciones && trabActual.observaciones !== "-" ? trabActual.observaciones : "";
+            payloadLaser.observaciones = prevObs ? `${prevObs} | ${notaExtra}` : notaExtra;
+          }
+          await sb().from("prod_cola_laser").update(payloadLaser).eq("id", id);
         }
         STATE.kiosco.completadosIds.add(trabActual.id);
         if (trabActual.ids) trabActual.ids.forEach(id => STATE.kiosco.completadosIds.add(id));
         toast(`✅ Corte Láser finalizado (Vel: ${vel}mm/s | Poder: ${valParam2}%).`);
       } else {
         const idsCsv = trabActual.ids ? trabActual.ids.join(",") : trabActual.id;
-        await finalizarTrabajoCalandrado(idsCsv, min, true, vel, valParam2);
+        await finalizarTrabajoCalandrado(idsCsv, min, true, vel, valParam2, notaExtra);
         STATE.kiosco.completadosIds.add(trabActual.id);
         if (trabActual.ids) trabActual.ids.forEach(id => STATE.kiosco.completadosIds.add(id));
       }
@@ -3620,25 +3767,32 @@ function vincularBotonesAccionesKiosco() {
       const min = Math.max(1, Math.round(obtenerMsTranscurridosKiosco() / 60000));
       const vel = parseFloat(document.getElementById("kioscoInputVelocidad")?.value) || (esLaser ? 300 : 50);
       const valParam2 = parseFloat(document.getElementById("kioscoInputTemperatura")?.value) || (esLaser ? 85 : 205);
+      const notaExtra = document.getElementById("kioscoInputNotaExtra")?.value?.trim() || "";
+      const trabActual = STATE.kiosco.trabajos[STATE.kiosco.indiceActual] || {};
 
       cerrarKioscoDefinitivo();
       if (esLaser) {
         for (const trab of STATE.kiosco.trabajos.filter(t => pendientesIds.includes(t.id))) {
           const idsToUpdate = trab.ids || [trab.id];
           for (const id of idsToUpdate) {
-            await sb().from("prod_cola_laser").update({
+            const payloadLaser = {
               estado: "Terminado",
               fecha_terminado: new Date().toISOString(),
               velocidad: vel,
               poder: valParam2
-            }).eq("id", id);
+            };
+            if (trab.id === trabActual.id && notaExtra) {
+              const prevObs = trab.observaciones && trab.observaciones !== "-" ? trab.observaciones : "";
+              payloadLaser.observaciones = prevObs ? `${prevObs} | ${notaExtra}` : notaExtra;
+            }
+            await sb().from("prod_cola_laser").update(payloadLaser).eq("id", id);
           }
         }
         toast(`✅ Kiosko Láser finalizado (${pendientesIds.length} lote(s) guardados con Vel: ${vel}mm/s y Poder: ${valParam2}%).`);
       } else {
         for (const trab of STATE.kiosco.trabajos.filter(t => pendientesIds.includes(t.id))) {
           const idsCsv = trab.ids ? trab.ids.join(",") : trab.id;
-          await finalizarTrabajoCalandrado(idsCsv, min, true, vel, valParam2);
+          await finalizarTrabajoCalandrado(idsCsv, min, true, vel, valParam2, (trab.id === trabActual.id ? notaExtra : null));
         }
         toast(`✅ Kiosko Calandrado finalizado (${pendientesIds.length} trabajo(s) guardados con Vel: ${vel}m/min y Temp: ${valParam2}°C).`);
       }

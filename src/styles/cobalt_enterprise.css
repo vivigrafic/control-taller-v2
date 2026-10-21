@@ -222,6 +222,26 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
     margin-top: 5px;
   }
 
+  /* Excepción para miniaturas fijas y carrusel de anidados en tarjetas móviles */
+  .tabla-tarjetas td[data-label="Diseño"] {
+    align-items: center !important;
+  }
+  .tabla-tarjetas td .caja-miniatura-wrap,
+  .tabla-tarjetas td .cal-carrusel-container {
+    margin: 4px auto !important;
+    align-self: center !important;
+  }
+  .tabla-tarjetas td .caja-miniatura-wrap img,
+  .tabla-tarjetas td .cal-carrusel-slide img {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    object-fit: cover !important;
+    margin: 0 !important;
+    border-radius: 4px !important;
+  }
+
   /* Modo Kiosko optimizado para pantalla completa en celular sin scroll */
   #modalKioscoOperativo .modal-content {
     width: 100% !important;
