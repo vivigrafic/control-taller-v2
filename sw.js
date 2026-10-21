@@ -3,7 +3,7 @@
 // Versión: 20261022_02 (PIN optativo y DTF por Ventas del sistema)
 // ============================================================================
 
-const CACHE_NAME = "vvgrafic-taller-cache-v8";
+const CACHE_NAME = "vvgrafic-taller-cache-v9";
 const STATIC_ASSETS = [
   "./",
   "./index.html",
@@ -11,6 +11,7 @@ const STATIC_ASSETS = [
   "./src/app.js",
   "./src/config/conexion.js",
   "./src/acceso.js",
+  "./src/miniaturas.js",
   "./src/utils/smart_parser.js",
   "./src/assets/logo.js",
   "./src/styles/cobalt_enterprise.css",
