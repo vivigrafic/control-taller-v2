@@ -1,5 +1,5 @@
 const SUPABASE_URL = "https://kkvzzheccniclfwqzivu.supabase.co";
-const SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtrdnp6aGVjY25pY2xmd3F6aXZ1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjM5Mzc3NiwiZXhwIjoyMTAxOTY5Nzc2fQ.c0BOc9aO3drO5Ta8gNdURJFM5eByD2G_hu3WfOQWCZE";
+const SERVICE_KEY = process.env.SUPABASE_SECRET_KEY || '' // clave secreta: va en el archivo .env (no se sube), nunca en el código;
 
 async function main() {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/prod_cola_calandrado?batch_id=eq.BATCH-31g-1610-1-1792447399000&select=id,batch_id,cliente_archivo,diseno,file_id,metros`, {

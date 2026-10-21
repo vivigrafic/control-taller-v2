@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 
 const SUPABASE_URL = 'https://kkvzzheccniclfwqzivu.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtrdnp6aGVjY25pY2xmd3F6aXZ1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NjM5Mzc3NiwiZXhwIjoyMTAxOTY5Nzc2fQ.c0BOc9aO3drO5Ta8gNdURJFM5eByD2G_hu3WfOQWCZE';
+const SUPABASE_KEY = process.env.SUPABASE_SECRET_KEY || '' // clave secreta: va en el archivo .env (no se sube), nunca en el código;
 
 const DIR_SUBLIMACION = 'G:/Mi unidad/VIVI GRAFIC/fila_impresión/sublimacion';
 const DIR_IMPRESOS = 'G:/Mi unidad/VIVI GRAFIC/fila_impresión/sublimacion/0001 IMPRESOS';

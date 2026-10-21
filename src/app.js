@@ -2404,13 +2404,8 @@ async function procesarImpresionLote() {
     await sb().from("prod_pendientes_drive").update({ estado_impreso: "SI" }).eq("id", s.id);
   }
 
-  // Notificar al puente de Google Drive para mover físicamente los archivos a la subcarpeta IMPRESOS
-  const bridgeUrl = window.VG_CONEXION?.sandboxBridgeUrl;
-  if (bridgeUrl && fileIdsUnidos) {
-    try {
-      fetch(`${bridgeUrl}?action=mover_a_impresos&file_ids=${encodeURIComponent(fileIdsUnidos)}`, { mode: "no-cors" }).catch(() => {});
-    } catch (_) {}
-  }
+  // Los archivos los mueve a IMPRESOS el vigía de Google (cada minuto) al ver estado_impreso = SI. No hay dirección
+  // pública para mover archivos ni se cambian sus permisos.
 
   // APRENDIZAJE AUTOMÁTICO DE ANCHO DE TELA (Regla de 2cm)
   try {
@@ -4256,7 +4251,8 @@ export function inicializarEventosUI() {
                   metros_totales: Number(reg.metros_impresos) || 1,
                   perfil_detectado: reg.perfil || "CALANDRADO",
                   file_id: fId,
-                  estado_impreso: "NO"
+                  estado_impreso: "NO",
+                  en_impresos: true // está en IMPRESOS: el vigía lo devuelve a la fila
                 });
               }
             }
@@ -4264,15 +4260,7 @@ export function inicializarEventosUI() {
             console.error("Error restaurando estado en prod_pendientes_drive:", err);
           }
 
-          // 2. Invocar puente GAS para mover físicamente el archivo fuera de IMPRESOS en Drive
-          const bridgeUrl = window.VG_CONEXION?.sandboxBridgeUrl;
-          if (bridgeUrl) {
-            try {
-              fetch(`${bridgeUrl}?action=revertir_impresos&file_ids=${encodeURIComponent(fileIds.join(","))}`, { mode: "no-cors" }).catch(() => {});
-            } catch(err) {
-              console.error("Error llamando GAS revertir_impresos:", err);
-            }
-          }
+          // 2. El vigía de Google ve estado_impreso = NO con en_impresos = true y devuelve el archivo a la fila
         }
 
         // 3. Eliminar de prod_impresiones y de prod_cola_calandrado (todo el batch si es anidado)
