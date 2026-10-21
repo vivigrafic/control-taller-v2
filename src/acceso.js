@@ -2,7 +2,10 @@
 // ACCESO AL CONTROL DE TALLER
 // El equipo (la PC o la tablet del taller, o un celular) entra UNA sola vez con un usuario del sistema que tenga el
 // permiso "taller" (por ejemplo el usuario "taller", rol Producción). La sesión queda guardada en ese equipo.
-// Después, cada persona elige su nombre arriba (sin PIN) y lo que hace queda con su nombre (cabecera x-operario).
+// Después, cada persona elige su nombre arriba y lo que hace queda con su nombre:
+// - sin PIN (como viene): el nombre elegido viaja en la cabecera x-operario;
+// - con PIN (se prende desde el botón "PIN" de abajo, con el permiso de configuración): la lista trae a las personas
+//   de Empleados, cada una pone su PIN y la base le da una sesión de 12 horas (cabecera x-operario-token).
 // Sin usuario no se puede leer ni tocar nada: lo exige la base (permisos de las tablas prod_*).
 // Se carga después de supabase-js y de src/config/conexion.js, y antes de src/app.js.
 // ============================================================================
@@ -11,6 +14,7 @@
   if (!sb) { console.warn("acceso.js: falta la conexión (src/config/conexion.js)"); return; }
 
   const esc = (t) => String(t ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const CLAVE_SESION = "vg_taller_sesion_operario";
 
   const estilo = document.createElement("style");
   estilo.textContent = `
@@ -23,8 +27,10 @@
     .vg-acceso label { display: block; font-size: 13px; color: var(--vg-text-secondary); margin: 12px 0 6px; }
     .vg-acceso input { width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 10px; font-size: 16px;
       border: 1px solid var(--vg-surface-border); background: var(--vg-bg-app); color: var(--vg-text-primary); }
+    .vg-acceso input.pin { font-size: 28px; letter-spacing: 0.4em; text-align: center; }
     .vg-acceso button { width: 100%; margin-top: 18px; padding: 14px; border-radius: 10px; border: none; font-size: 16px; font-weight: 700;
       cursor: pointer; background: var(--vg-brand-primary); color: var(--vg-text-primary); }
+    .vg-acceso button.secundario { margin-top: 10px; background: transparent; border: 1px solid var(--vg-surface-border); color: var(--vg-text-secondary); }
     .vg-acceso .mensaje { color: var(--vg-status-alert); font-size: 14px; margin-top: 12px; }
     .vg-equipo { position: fixed; right: 10px; bottom: 8px; z-index: 50; font: 12px var(--vg-font-sans); color: var(--vg-text-secondary);
       background: var(--vg-bg-app); border: 1px solid var(--vg-surface-border); border-radius: 999px; padding: 4px 10px; opacity: 0.85; }
@@ -32,12 +38,13 @@
   `;
   document.head.appendChild(estilo);
 
+  const alListo = (fn) => { if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", fn); else fn(); };
+
   function capa(html) {
     const d = document.createElement("div");
     d.className = "vg-acceso";
     d.innerHTML = html;
-    const poner = () => document.body.appendChild(d);
-    if (document.body) poner(); else document.addEventListener("DOMContentLoaded", poner);
+    alListo(() => document.body.appendChild(d));
     return d;
   }
 
@@ -71,6 +78,9 @@
 
   async function salir() {
     if (!confirm("¿Cerrar la sesión de este equipo? Para volver a usar el taller va a hacer falta el usuario y la contraseña.")) return;
+    const s = leerSesion();
+    if (s) { try { await sb.rpc("taller_operario_salir", { p_token: s.token }); } catch (e) { /* nada */ } }
+    localStorage.removeItem(CLAVE_SESION);
     await sb.auth.signOut().catch(() => null);
     window.location.reload();
   }
@@ -81,21 +91,36 @@
     prompt("Clave del ayudante de Drive (se ve una sola vez). Copiala y pegala en la terminal de Google → Propiedades del script → CLAVE_TALLER:", data.clave);
   }
 
+  async function cambiarPin() {
+    const prender = !ACCESO.pin;
+    const texto = prender
+      ? "¿Prender el PIN del taller?\n\nCada persona va a elegir su nombre (las de Empleados) y poner su PIN, el mismo de la app de empleados. Quien no tenga PIN lo crea con el QR."
+      : "¿Apagar el PIN del taller?\n\nSe vuelve a elegir el nombre de la lista, sin PIN.";
+    if (!confirm(texto)) return;
+    const { error } = await sb.rpc("taller_ajustes_guardar", { p: { pin: prender } });
+    if (error) { alert(error.message); return; }
+    localStorage.removeItem(CLAVE_SESION);
+    window.location.reload();
+  }
+
   function pintarEquipo(perfil) {
-    const ok = () => {
+    alListo(() => {
       const b = document.createElement("div");
+      const config = perfil.total || (perfil.permisos || []).includes("configuracion");
       b.className = "vg-equipo";
       b.innerHTML = `Equipo: ${esc(perfil.usuario || perfil.nombre)}`
-        + (perfil.total || (perfil.permisos || []).includes("configuracion") ? `<a data-x="clave" title="Clave del ayudante de Google (Drive)">🔑</a>` : "")
+        + (config ? `<a data-x="pin" title="Prender o apagar el PIN de las personas del taller">PIN: ${ACCESO.pin ? "sí" : "no"}</a>` : "")
+        + (config ? `<a data-x="clave" title="Clave del ayudante de Google (Drive)">🔑</a>` : "")
         + `<a data-x="salir">Salir</a>`;
       b.addEventListener("click", (e) => {
         const x = e.target.closest("[data-x]");
         if (!x) return;
-        if (x.dataset.x === "salir") salir(); else generarClave();
+        if (x.dataset.x === "salir") salir();
+        else if (x.dataset.x === "pin") cambiarPin();
+        else generarClave();
       });
       document.body.appendChild(b);
-    };
-    if (document.body) ok(); else document.addEventListener("DOMContentLoaded", ok);
+    });
   }
 
   // Quién hace cada cosa: el nombre elegido en la app viaja en cada pedido a la base
@@ -105,16 +130,89 @@
     try { sb.rest.headers["x-operario"] = limpio; } catch (e) { /* nada */ }
   }
 
-  const listo = (async () => {
+  // ===== PIN optativo =====
+  function leerSesion() {
+    try {
+      const s = JSON.parse(localStorage.getItem(CLAVE_SESION) || "null");
+      return s && s.token && new Date(s.vence) > new Date() ? s : null;
+    } catch (e) { return null; }
+  }
+
+  function ponerToken(token) {
+    try {
+      if (token) sb.rest.headers["x-operario-token"] = token;
+      else delete sb.rest.headers["x-operario-token"];
+    } catch (e) { /* nada */ }
+  }
+
+  function prepararPin(personas) {
+    alListo(() => {
+      const sel = document.getElementById("vgSelectOperadorActual");
+      if (!sel) return;
+      sel.innerHTML = `<option value="">👤 Elegí tu nombre</option>`
+        + personas.map(p => `<option value="${esc(p.nombre)}" data-id="${esc(p.id)}">👤 ${esc(p.nombre)}${p.tiene_pin ? "" : " (sin PIN)"}</option>`).join("");
+    });
+    const s = leerSesion();
+    if (s) { ponerToken(s.token); operario(s.nombre); }
+  }
+
+  function pedirPin(nombre) {
+    return new Promise((resolve) => {
+      const d = capa(`<form autocomplete="off">
+          <h2>${esc(nombre)}</h2>
+          <p>Poné tu PIN (el mismo de la app de empleados).</p>
+          <input class="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="12" required>
+          <button type="submit">Entrar</button>
+          <button type="button" class="secundario" data-x="cancelar">Cancelar</button>
+        </form>`);
+      const inp = d.querySelector("input");
+      setTimeout(() => inp.focus(), 50);
+      d.querySelector("form").addEventListener("submit", (e) => { e.preventDefault(); d.remove(); resolve(inp.value); });
+      d.querySelector("[data-x='cancelar']").addEventListener("click", () => { d.remove(); resolve(null); });
+    });
+  }
+
+  // Lo llama la app al cambiar el nombre de arriba. Devuelve el nombre, o null si no se pudo (y la app deja el anterior).
+  async function elegirOperario(sel) {
+    const valor = sel.value;
+    if (!ACCESO.pin) { operario(valor); return valor; }
+    const opt = sel.selectedOptions && sel.selectedOptions[0];
+    const id = opt && opt.dataset.id;
+    if (!id) return null;
+    const pin = await pedirPin(valor);
+    if (pin === null) return null;
+    const { data, error } = await sb.rpc("taller_operario_entrar", { p_persona: id, p_pin: pin });
+    if (error || !data || !data.ok) { alert((data && data.error) || (error && error.message) || "No se pudo entrar."); return null; }
+    const anterior = leerSesion();
+    if (anterior) { try { await sb.rpc("taller_operario_salir", { p_token: anterior.token }); } catch (e) { /* nada */ } }
+    localStorage.setItem(CLAVE_SESION, JSON.stringify({ token: data.token, nombre: data.nombre, vence: data.vence_at }));
+    ponerToken(data.token);
+    operario(data.nombre);
+    return data.nombre;
+  }
+
+  const ACCESO = {
+    pin: false,
+    operario,
+    salir,
+    elegirOperario,
+    nombreOperario: () => (leerSesion() || {}).nombre || ""
+  };
+
+  ACCESO.listo = (async () => {
     const { data } = await sb.auth.getSession();
     if (!data || !data.session) { await mostrarEntrada(); return new Promise(() => {}); }
     const { data: perfil } = await sb.rpc("mi_perfil");
     if (!perfil || !perfil.activo) { await mostrarEntrada("Ese usuario está desactivado."); return new Promise(() => {}); }
     if (!(perfil.total || (perfil.permisos || []).includes("taller"))) { mostrarSinPermiso(perfil); return new Promise(() => {}); }
+    let cfg = null;
+    try { cfg = (await sb.rpc("taller_operarios")).data; } catch (e) { /* sin PIN */ }
+    ACCESO.pin = !!(cfg && cfg.pin);
+    if (ACCESO.pin) prepararPin(cfg.personas || []);
+    else operario(localStorage.getItem("vg_operador_actual") || "");
     pintarEquipo(perfil);
-    operario(localStorage.getItem("vg_operador_actual") || "");
     return perfil;
   })();
 
-  window.VG_ACCESO = { listo, operario, salir };
+  window.VG_ACCESO = ACCESO;
 })();

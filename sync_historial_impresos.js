@@ -1,3 +1,9 @@
+// ⚠️ Desde el 22/10/2026 este script NO se usa: borraba y volvía a cargar las tablas del taller, y la base ya no deja
+// borrar (en el taller nada se borra, se anula). La fila de Drive la pasa la terminal de Google (taller_drive_sincronizar)
+// y la importación a la base real se hace una sola vez, el día del cambio.
+console.error("Este script ya no se usa (la base no deja borrar). Ver el aviso al principio del archivo.");
+process.exit(1);
+
 /**
  * Sincronizador Completo de Archivos Pendientes + Historial Real de Impresos y Calandrados
  * Desde las carpetas reales de Google Drive del Taller a Supabase (Clon de Pruebas)

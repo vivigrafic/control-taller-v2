@@ -415,7 +415,6 @@ async function seed() {
         Prefer: "return=representation"
       },
       body: JSON.stringify({
-        empresa_id: "vvgrafic-principal",
         codigo_tela: t.codigo_tela,
         nombre_comercial: t.nombre_comercial,
         alias_busqueda: t.alias_busqueda,
@@ -456,7 +455,6 @@ async function seed() {
         },
         body: JSON.stringify({
           tela_id: telaId,
-          empresa_id: "vvgrafic-principal",
           codigo_partida: v.codigo_partida,
           ancho_real_m: v.ancho_real_m,
           ancho_impresion_sugerido_m: v.ancho_impresion_sugerido_m,
@@ -483,7 +481,6 @@ async function seed() {
             },
             body: JSON.stringify({
               variante_id: varId,
-              empresa_id: "vvgrafic-principal",
               calandra_temp_c: v.parametros.calandra_temp_c,
               calandra_vel_m_min: v.parametros.calandra_vel_m_min,
               calandra_presion_bar: v.parametros.calandra_presion_bar,
@@ -505,7 +502,6 @@ async function seed() {
         },
         body: JSON.stringify({
           tela_id: telaId,
-          empresa_id: "vvgrafic-principal",
           nombre_tela_raw: t.nombre_comercial,
           ancho_archivo_impreso: v.ancho_impresion_sugerido_m,
           metros_trabajo: 100.0

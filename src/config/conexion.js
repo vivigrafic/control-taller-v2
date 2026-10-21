@@ -10,7 +10,7 @@
     projectRef: 'kkvzzheccniclfwqzivu',
     url: 'https://kkvzzheccniclfwqzivu.supabase.co',
     key: 'sb_publishable_d5502ZSvf9nA_d3AVYWt2Q_9jajS8-r', // clave publicable (las claves viejas anon/service_role están desactivadas)
-    empresaId: 'vvgrafic-principal',
+    erpUrl: 'http://localhost:8000', // el sistema con la base de pruebas (servidor local de la PC)
     sandboxBridgeUrl: 'https://script.google.com/macros/s/AKfycbwyqBeRS80Q2mg7CCFSt2736LQlnRcc73eXxaADOJk1PSkGcTcioYw2n__dnLBNWoc-AA/exec'
   };
 
@@ -19,7 +19,7 @@
     projectRef: 'rqgzirimgpyvfhzbfoig',
     url: 'https://rqgzirimgpyvfhzbfoig.supabase.co',
     key: 'sb_publishable_wPnEZ16KdHDHX3xyw7PyQw_-iNnrTCn',
-    empresaId: 'vvgrafic-principal'
+    erpUrl: 'https://erpvivigrafic.netlify.app' // el sistema publicado (base real)
   };
 
   window.VG_CONEXION = ES_PRODUCCION_AUTORIZADA ? CONFIG_REAL : CONFIG_PRUEBAS;

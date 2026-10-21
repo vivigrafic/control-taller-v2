@@ -16,8 +16,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261021_03" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./src/config/conexion.js?v=20261022_01"></script>
-  <script src="./src/acceso.js?v=20261022_01"></script>
+  <script src="./src/config/conexion.js?v=20261022_02"></script>
+  <script src="./src/acceso.js?v=20261022_02"></script>
   <script src="./src/assets/logo.js?v=20261020_02"></script>
 </head>
 <body>
@@ -379,7 +379,8 @@
         <label>Rollo DTF Activo (60cm x 100m)</label>
         <select id="dtfInputRollo"></select>
         <label>Cliente DTF</label>
-        <input type="text" id="dtfInputCliente" placeholder="Nombre del cliente..." />
+        <input type="text" id="dtfInputCliente" list="dtfListaClientes" autocomplete="off" placeholder="Buscá el cliente del sistema..." />
+        <datalist id="dtfListaClientes"></datalist>
         <label>Nombre de Archivo</label>
         <input type="text" id="dtfInputArchivo" placeholder="Ej: LOGOS 12m.png o (repo)..." />
         <div class="grid-2">
@@ -388,23 +389,12 @@
         </div>
         <label>Tipo de Cargo</label>
         <select id="dtfInputTipoCargo">
-          <option value="VENTA">💲 VENTA (Escala Automática)</option>
-          <option value="REPOSICION">🔄 REPOSICIÓN ($0)</option>
-          <option value="MUESTRA">🧪 MUESTRA ($0)</option>
+          <option value="VENTA">💲 VENTA (se cobra por Ventas del sistema)</option>
+          <option value="REPOSICION">🔄 REPOSICIÓN (sin cargo)</option>
+          <option value="MUESTRA">🧪 MUESTRA (sin cargo)</option>
         </select>
-        <div id="dtfPrecioPreviewBox" style="background:#111; border:1px solid #333; padding:10px; border-radius:6px; margin-top:10px; font-size:12px;">
-          Escala: 1-9m $9.000 | 10-49m $8.500 | 50-99m $8.000 | 100-499m $7.500 | +500m $6.500
-        </div>
-        <div class="grid-2">
-          <div><label>Monto Abonado ($)</label><input type="number" step="100" id="dtfInputMontoPagado" value="0" /></div>
-          <div>
-            <label>Modalidad de Pago</label>
-            <select id="dtfInputModalidadPago">
-              <option value="Paga al retirar">Paga al retirar</option>
-              <option value="Seña">Dejó Seña</option>
-              <option value="Pagado adelantado">Pagado adelantado</option>
-            </select>
-          </div>
+        <div style="background:#111; border:1px solid #333; padding:10px; border-radius:6px; margin-top:10px; font-size:12px; color:#aaa;">
+          El precio y los pagos van por Ventas del sistema (lista de precios con escala por metros), así el cliente tiene un solo saldo.
         </div>
         <label>Observaciones DTF</label>
         <input type="text" id="dtfInputObs" placeholder="Opcional..." />
@@ -413,15 +403,15 @@
       <div>
         <div class="card" style="border-top: 3px solid var(--accent-blue);">
           <h2>Cola DTF Pendiente en Drive</h2>
-          <div style="overflow-x:auto;"><table><thead><tr><th>Cliente</th><th>Archivo</th><th>Metros</th><th>Cargo</th><th>Subtotal</th><th>Acción</th></tr></thead><tbody id="tbodyPendientesDTF"></tbody></table></div>
+          <div style="overflow-x:auto;"><table><thead><tr><th>Cliente</th><th>Archivo</th><th>Metros</th><th>Cargo</th><th>Acción</th></tr></thead><tbody id="tbodyPendientesDTF"></tbody></table></div>
         </div>
         <div class="card" style="border-top: 3px solid var(--accent);">
-          <h2>Cuentas Corrientes por Cliente DTF</h2>
-          <div style="overflow-x:auto;"><table><thead><tr><th>Cliente</th><th>Mts Venta</th><th>Mts Repo</th><th>Mts Muestra</th><th>Facturado</th><th>Abonado</th><th>Saldo</th></tr></thead><tbody id="tbodyCuentasClientesDTF"></tbody></table></div>
+          <h2>DTF para vender (por cliente)</h2>
+          <div style="overflow-x:auto;"><table><thead><tr><th>Cliente</th><th>Archivos</th><th>Metros</th><th>Venta</th></tr></thead><tbody id="tbodyCuentasClientesDTF"></tbody></table></div>
         </div>
         <div class="card">
           <h2>Historial de Pedidos DTF</h2>
-          <div style="overflow-x:auto;"><table><thead><tr><th>Acción</th><th>Fecha</th><th>Cliente</th><th>Archivo</th><th>Cargo</th><th>Metros</th><th>Tarifa</th><th>Total</th><th>Pago</th></tr></thead><tbody id="tbodyPedidosDTF"></tbody></table></div>
+          <div style="overflow-x:auto;"><table><thead><tr><th>Acción</th><th>Fecha</th><th>Cliente</th><th>Archivo</th><th>Cargo</th><th>Metros</th><th>Venta</th></tr></thead><tbody id="tbodyPedidosDTF"></tbody></table></div>
         </div>
       </div>
     </div>
@@ -492,7 +482,7 @@
     <div class="stats-grid">
       <div class="stat-box" style="border-color:var(--accent-orange); background:rgba(255,152,0,0.05);"><div class="stat-title" style="color:var(--accent-orange);">Rinde Tinta Teórico</div><div class="stat-value">400 m/Set</div></div>
       <div class="stat-box" style="border-color:var(--accent-blue); background:rgba(33,150,243,0.05);"><div class="stat-title" style="color:var(--accent-blue);">Total Metros Impresos</div><div class="stat-value" id="finTotalImpMts">0.00m</div></div>
-      <div class="stat-box" style="border-color:var(--accent); background:rgba(0,230,118,0.05);"><div class="stat-title" style="color:var(--accent);">Facturación DTF</div><div class="stat-value" id="finTotalDtfFacturado">$0</div></div>
+      <div class="stat-box" style="border-color:var(--accent); background:rgba(0,230,118,0.05);"><div class="stat-title" style="color:var(--accent);">DTF sin vender</div><div class="stat-value" id="finTotalDtfFacturado">$0</div></div>
     </div>
     <div class="card">
       <h2>🛒 Registrar Compra Insumos</h2>
@@ -942,7 +932,7 @@
   <datalist id="listColores"></datalist>
   <div id="vgToastContainer" style="position:fixed; top:16px; right:16px; z-index:3000; max-width:360px;"></div>
 
-  <script type="module" src="./src/app.js?v=20261022_01"></script>
+  <script type="module" src="./src/app.js?v=20261022_02"></script>
   <script>
     // Registro del Service Worker PWA
     if ('serviceWorker' in navigator) {

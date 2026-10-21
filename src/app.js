@@ -27,6 +27,8 @@ const STATE = {
   carpetasPendientesAbiertas: new Set(),
   rolloMontadoCalandra: localStorage.getItem("vg_rollo_calandra_montado") || "",
   usuarioActual: localStorage.getItem("vg_operador_actual") || "Roberto",
+  perfil: null,
+  dtfClientesVistos: new Map(),
   areaActual: localStorage.getItem("vg_area_actual") || "General",
   canalChatActivo: "Todos",
 
@@ -339,7 +341,6 @@ export async function cargarDatosTodo() {
     resDtfRollos,
     resDtfTiradas,
     resDtfPedidos,
-    resDtfCuentas,
     resChat,
     resTelasFicha,
     resTelasVariantes,
@@ -356,8 +357,7 @@ export async function cargarDatosTodo() {
     client.from("prod_fallas_reposiciones").select("*").eq("anulado", false).order("fecha_hora", { ascending: false }).limit(200),
     client.from("v_prod_dtf_rollos_saldos").select("*").order("fecha_montaje", { ascending: false }),
     client.from("prod_dtf_tiradas").select("*").eq("anulado", false).order("fecha_hora", { ascending: false }),
-    client.from("prod_dtf_pedidos").select("*").eq("anulado", false).order("fecha_hora", { ascending: false }),
-    client.from("v_prod_dtf_cuentas_clientes").select("*").order("saldo_pendiente", { ascending: false }),
+    client.rpc("taller_dtf_pedidos"),
     client.from("prod_chat_mensajes").select("*").eq("anulado", false).order("created_at", { ascending: false }).limit(150),
     client.from("prod_telas_ficha").select("*").eq("activo", true).eq("anulado", false).order("nombre_comercial", { ascending: true }),
     client.from("prod_telas_variantes").select("*").eq("anulado", false).order("es_predeterminada", { ascending: false }),
@@ -376,7 +376,6 @@ export async function cargarDatosTodo() {
   STATE.dtfRollosSaldos = resDtfRollos.data || [];
   STATE.dtfTiradas = resDtfTiradas.data || [];
   STATE.dtfPedidos = resDtfPedidos.data || [];
-  STATE.dtfCuentasClientes = resDtfCuentas.data || [];
   STATE.chatMensajes = resChat.data || [];
   STATE.telasFicha = resTelasFicha.data || [];
   STATE.telasVariantes = resTelasVariantes.data || [];
@@ -427,7 +426,6 @@ async function registrarUsoMRU(tipo, nombre) {
   const existente = STATE.catalogos.find(c => c.tipo === tipo && c.nombre.toLowerCase() === limpio.toLowerCase());
   const nuevoContador = ((existente?.contador_uso_reciente || 0) % 25) + 1;
   await sb().from("prod_catalogos").upsert({
-    empresa_id: "vvgrafic-principal",
     tipo,
     nombre: existente ? existente.nombre : limpio,
     ultimo_uso_at: new Date().toISOString(),
@@ -1479,17 +1477,15 @@ function renderModuloDTF() {
   const pendDtf = STATE.pendientesDrive.filter(p => p.modulo === "DTF" && p.estado_impreso !== "SI" && cumpleBusquedaUniversal(p));
   if (tbodyPend) {
     tbodyPend.innerHTML = pendDtf.length === 0
-      ? `<tr><td colspan="6" style="text-align:center;color:#888;">Sin archivos DTF pendientes.</td></tr>`
+      ? `<tr><td colspan="5" style="text-align:center;color:#888;">Sin archivos DTF pendientes.</td></tr>`
       : pendDtf.map(p => {
         const cargo = p.es_repo_muestra || "VENTA";
-        const precioUnit = calcularPrecioMetroDTF(p.metros_totales, cargo);
         return `
           <tr>
             <td><strong>${escHtml(p.cliente)}</strong></td>
             <td>${escHtml(p.nombre_archivo)}</td>
             <td>${fmtNum(p.metros_totales)}m</td>
             <td><span class="badge ${cargo === "VENTA" ? "activo" : "danger"}">${escHtml(cargo)}</span></td>
-            <td>${fmtMoney(precioUnit * (Number(p.metros_totales) || 0))}</td>
             <td><button type="button" class="btn-secondary btn-dtf-cargar-pend" data-id="${p.id}" style="width:auto;padding:4px 8px;">Cargar</button></td>
           </tr>
         `;
@@ -1498,40 +1494,119 @@ function renderModuloDTF() {
 
   const pedidosFilt = STATE.dtfPedidos.filter(d => cumpleFiltroFecha(d.fecha_hora) && cumpleBusquedaUniversal(d));
   if (tbodyPedidos) {
-    tbodyPedidos.innerHTML = pedidosFilt.map(d => {
-      const saldo = (Number(d.subtotal_cobrar) || 0) - (Number(d.monto_pagado) || 0);
-      return `
+    tbodyPedidos.innerHTML = pedidosFilt.map(d => `
         <tr>
           <td style="white-space:nowrap;">
-            ${saldo > 0 ? `<button type="button" class="btn-secondary btn-dtf-saldar" data-id="${d.id}" data-total="${d.subtotal_cobrar}" style="width:auto;padding:3px 6px;border-color:var(--accent);color:var(--accent);">💵</button>` : ""}
             <button type="button" class="btn-crud-edit" data-table="prod_dtf_pedidos" data-id="${d.id}" style="background:transparent;border:1px solid var(--accent-blue);color:var(--accent-blue);border-radius:4px;padding:3px;">✏️</button>
             <button type="button" class="btn-crud-del" data-table="prod_dtf_pedidos" data-id="${d.id}" style="background:transparent;border:1px solid var(--danger);color:var(--danger);border-radius:4px;padding:3px;">🗑️</button>
           </td>
           <td>${fmtDateHora(d.fecha_hora)}</td>
-          <td><strong>${escHtml(d.cliente)}</strong></td>
+          <td><strong>${escHtml(d.cliente_sistema || d.cliente)}</strong></td>
           <td>${escHtml(d.nombre_archivo)}</td>
           <td><span class="badge ${d.tipo_cargo === "VENTA" ? "activo" : "danger"}">${escHtml(d.tipo_cargo)}</span></td>
           <td style="color:var(--accent);font-weight:bold;">${fmtNum(d.metros_archivo)}m</td>
-          <td>${fmtMoney(d.precio_metro)}</td>
-          <td><strong>${fmtMoney(d.subtotal_cobrar)}</strong></td>
-          <td><span class="badge ${saldo <= 0 ? "activo" : "danger"}">${saldo <= 0 ? "Pagado" : `Debe ${fmtMoney(saldo)}`}</span></td>
+          <td>${d.tipo_cargo !== "VENTA" ? "—" : d.vendido ? `<span class="badge activo">🧾 ${escHtml(d.venta_numero)}</span>` : `<span class="badge danger">Sin vender</span>`}</td>
         </tr>
-      `;
-    }).join("");
+      `).join("");
   }
 
   if (tbodyCuentas) {
-    tbodyCuentas.innerHTML = STATE.dtfCuentasClientes.map(c => `
-      <tr>
-        <td><strong>${escHtml(c.cliente_nombre)}</strong></td>
-        <td>${fmtNum(c.metros_comprados)}m</td>
-        <td>${fmtNum(c.metros_reposicion)}m</td>
-        <td>${fmtNum(c.metros_muestras)}m</td>
-        <td>${fmtMoney(c.total_facturado)}</td>
-        <td style="color:#4CAF50;">${fmtMoney(c.total_abonado)}</td>
-        <td style="color:${Number(c.saldo_pendiente) > 0 ? "var(--danger)" : "#4CAF50"};font-weight:bold;">${fmtMoney(c.saldo_pendiente)}</td>
-      </tr>
-    `).join("");
+    const grupos = gruposDtfPorVender();
+    tbodyCuentas.innerHTML = grupos.length === 0
+      ? `<tr><td colspan="4" style="text-align:center;color:#888;">Todo el DTF de venta ya está vendido.</td></tr>`
+      : grupos.map(g => `
+        <tr>
+          <td><strong>${escHtml(g.nombre)}</strong>${g.cliente_id ? "" : ` <span class="badge danger" title="Al hacer la venta se elige el cliente del sistema">sin cliente</span>`}</td>
+          <td>${g.pedidos.length}</td>
+          <td style="color:var(--accent);font-weight:bold;">${fmtNum(g.metros)}m</td>
+          <td>${puedeVender() ? `<button type="button" class="btn-secondary btn-dtf-vender" data-clave="${escHtml(g.clave)}" style="width:auto;padding:4px 8px;">🧾 Hacer venta</button>` : `<span style="color:#888;font-size:11px;">La hace el mostrador</span>`}</td>
+        </tr>
+      `).join("");
+  }
+}
+
+// ===== DTF: la plata va por Ventas del sistema (precio de la lista, cobros y saldo del cliente en un solo lugar) =====
+function puedeVender() {
+  const p = STATE.perfil;
+  return !!(p && (p.total || (p.permisos || []).includes("ventas")));
+}
+
+// Lo de VENTA que todavía no tiene venta en el sistema, agrupado por cliente
+function gruposDtfPorVender() {
+  const grupos = new Map();
+  STATE.dtfPedidos.filter(d => d.tipo_cargo === "VENTA" && !d.vendido).forEach(d => {
+    const clave = d.cliente_id ? `ID:${d.cliente_id}` : `TXT:${String(d.cliente || "").trim().toUpperCase()}`;
+    if (!grupos.has(clave)) {
+      grupos.set(clave, { clave, cliente_id: d.cliente_id, nombre: d.cliente_sistema || d.cliente || "Sin nombre", texto: d.cliente || "", pedidos: [], metros: 0 });
+    }
+    const g = grupos.get(clave);
+    g.pedidos.push(d.id);
+    g.metros += Number(d.metros_a_vender) || 0;
+  });
+  return [...grupos.values()].sort((a, b) => b.metros - a.metros);
+}
+
+// Clientes del sistema (solo nombre y código)
+async function buscarClientesSistema(texto) {
+  if (!texto || texto.trim().length < 2) return [];
+  const { data, error } = await sb().rpc("taller_buscar_clientes", { p_texto: texto.trim() });
+  if (error) { toast("Error: " + error.message, "error"); return []; }
+  return data || [];
+}
+
+function etiquetaCliente(c) {
+  return `${c.nombre}${c.negocio ? ` (${c.negocio})` : ""} · ${c.id}`;
+}
+
+// Cuadro para elegir el cliente del sistema. Devuelve { id, nombre } o null.
+function elegirClienteSistema(textoInicial = "") {
+  return new Promise((resolve) => {
+    const capa = document.createElement("div");
+    capa.className = "modal-overlay open";
+    capa.innerHTML = `
+      <div class="modal-content" style="border-color:var(--accent-blue); max-width:460px; width:100%;">
+        <h2 style="margin-top:0;">¿Qué cliente del sistema es?</h2>
+        <p style="font-size:12px;color:#888;margin:0 0 8px;">El pedido dice: <strong>${escHtml(textoInicial || "sin nombre")}</strong>. Buscalo por nombre o código.</p>
+        <input type="text" autocomplete="off" value="${escHtml(textoInicial)}" />
+        <div data-x="resultados" style="max-height:260px;overflow-y:auto;margin-top:8px;"></div>
+        <button type="button" class="btn-secondary" data-x="cancelar" style="margin-top:10px;">Cancelar</button>
+      </div>`;
+    document.body.appendChild(capa);
+    const inp = capa.querySelector("input");
+    const res = capa.querySelector("[data-x='resultados']");
+    let lista = [];
+    let espera = null;
+    const cerrar = (valor) => { capa.remove(); resolve(valor); };
+    const buscar = async () => {
+      lista = await buscarClientesSistema(inp.value);
+      res.innerHTML = lista.length === 0
+        ? `<div style="color:#888;font-size:12px;padding:6px;">${inp.value.trim().length < 2 ? "Escribí al menos 2 letras." : "No hay clientes con ese nombre. Si es nuevo, cargalo en Contactos del sistema."}</div>`
+        : lista.map((c, i) => `<button type="button" class="btn-secondary" data-i="${i}" style="display:block;width:100%;text-align:left;margin:4px 0;">${escHtml(etiquetaCliente(c))}</button>`).join("");
+    };
+    inp.addEventListener("input", () => { clearTimeout(espera); espera = setTimeout(buscar, 250); });
+    capa.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-i]");
+      if (b) { const c = lista[Number(b.dataset.i)]; cerrar({ id: c.id, nombre: c.nombre }); return; }
+      if (e.target.closest("[data-x='cancelar']") || e.target === capa) cerrar(null);
+    });
+    inp.focus();
+    buscar();
+  });
+}
+
+async function venderDtf(clave) {
+  const g = gruposDtfPorVender().find(x => x.clave === clave);
+  if (!g) return;
+  const cli = g.cliente_id ? { id: g.cliente_id, nombre: g.nombre } : await elegirClienteSistema(g.texto);
+  if (!cli) return;
+  if (!confirm(`¿Hacer la venta de ${fmtNum(g.metros)} m de DTF (${g.pedidos.length} archivo/s) a ${cli.nombre}?\nEl precio sale de la lista de precios: escala por metros y lo que viene pagando ese cliente.`)) return;
+  const { data, error } = await sb().rpc("taller_dtf_vender", { p: { cliente_id: cli.id, pedidos: g.pedidos } });
+  if (error) { toast("Error: " + error.message, "error"); return; }
+  toast(`🧾 Venta ${data.numero_comprobante}: ${fmtNum(data.metros)} m a ${fmtMoney(data.precio_metro)} = ${fmtMoney(data.total)}.`);
+  await cargarDatosTodo();
+  const erp = window.VG_CONEXION?.erpUrl;
+  if (erp && confirm(`Venta ${data.numero_comprobante} por ${fmtMoney(data.total)}.\n¿Abrirla en el sistema para cobrarla?`)) {
+    window.open(`${erp}/src/modulos/pos_ventas/ver_venta.html?id=${encodeURIComponent(data.id)}`, "_blank");
   }
 }
 
@@ -1961,7 +2036,6 @@ export async function guardarTelaCrud() {
   try {
     if (modo === "crear") {
       const { data: nuevaTela, error: errTela } = await sb().from("prod_telas_ficha").insert({
-        empresa_id: "vvgrafic-principal",
         codigo_tela: codigo || `TEL-${Date.now().toString().slice(-6)}`,
         nombre_comercial: nombre,
         alias_busqueda: [nombre.toUpperCase(), codigo ? codigo.toUpperCase() : ""].filter(Boolean),
@@ -1974,7 +2048,6 @@ export async function guardarTelaCrud() {
 
       const { data: nuevaVar, error: errVar } = await sb().from("prod_telas_variantes").insert({
         tela_id: nuevaTela.id,
-        empresa_id: "vvgrafic-principal",
         codigo_partida: partida,
         ancho_real_m: anchoReal,
         ancho_impresion_sugerido_m: anchoImp,
@@ -1990,7 +2063,6 @@ export async function guardarTelaCrud() {
 
       const { error: errParam } = await sb().from("prod_telas_parametros").insert({
         variante_id: nuevaVar.id,
-        empresa_id: "vvgrafic-principal",
         calandra_temp_c: tempCal,
         calandra_vel_m_min: velCal,
         calandra_presion_bar: 4.0,
@@ -2005,7 +2077,6 @@ export async function guardarTelaCrud() {
     } else if (modo === "nueva_partida") {
       const { data: nuevaVar, error: errVar } = await sb().from("prod_telas_variantes").insert({
         tela_id: inpId,
-        empresa_id: "vvgrafic-principal",
         codigo_partida: partida,
         ancho_real_m: anchoReal,
         ancho_impresion_sugerido_m: anchoImp,
@@ -2021,7 +2092,6 @@ export async function guardarTelaCrud() {
 
       await sb().from("prod_telas_parametros").insert({
         variante_id: nuevaVar.id,
-        empresa_id: "vvgrafic-principal",
         calandra_temp_c: tempCal,
         calandra_vel_m_min: velCal,
         calandra_presion_bar: 4.0,
@@ -2063,7 +2133,6 @@ export async function guardarTelaCrud() {
         } else {
           await sb().from("prod_telas_parametros").insert({
             variante_id: variante.id,
-            empresa_id: "vvgrafic-principal",
             calandra_temp_c: tempCal,
             calandra_vel_m_min: velCal,
             calandra_presion_bar: 4.0,
@@ -2109,10 +2178,10 @@ function renderModuloFinanzasYMantenimiento() {
   const totalImp = STATE.impresiones
     .filter(i => i.accion === "Impresion Normal")
     .reduce((a, b) => a + (Number(b.metros_impresos) || 0), 0);
-  const totalDtfMoney = STATE.dtfPedidos.reduce((a, b) => a + (Number(b.subtotal_cobrar) || 0), 0);
+  const dtfSinVender = gruposDtfPorVender().reduce((a, g) => a + g.metros, 0);
 
   setTxt("finTotalImpMts", `${fmtNum(totalImp)}m`);
-  setTxt("finTotalDtfFacturado", fmtMoney(totalDtfMoney));
+  setTxt("finTotalDtfFacturado", `${fmtNum(dtfSinVender)}m`);
 
   const tbodyFallas = document.getElementById("tbodyBitacoraFallas");
   if (tbodyFallas) {
@@ -2360,7 +2429,6 @@ async function procesarImpresionLote() {
   const ruta = STATE.impForm.ruta || "Solo Calandrado";
 
   const { error: errImp } = await sb().from("prod_impresiones").insert({
-    empresa_id: "vvgrafic-principal",
     batch_id: batchId,
     fecha_hora: fechaIso,
     id_rollo_papel: infoRollo.bloqueActual,
@@ -2387,7 +2455,6 @@ async function procesarImpresionLote() {
 
   if (ruta.includes("Calandrado")) {
     await sb().from("prod_cola_calandrado").insert({
-      empresa_id: "vvgrafic-principal",
       batch_id: batchId,
       fecha_hora: fechaIso,
       id_rollo_papel: infoRollo.bloqueActual,
@@ -2435,7 +2502,6 @@ async function procesarImpresionLote() {
       }
       if (anchoImpM > 0) {
         await sb().from("prod_historial_anchos_tela").insert({
-          empresa_id: "vvgrafic-principal",
           tela_id: telaFicha.id,
           nombre_tela_raw: tela || telaFicha.nombre_comercial,
           ancho_archivo_impreso: anchoImpM,
@@ -2483,7 +2549,6 @@ async function procesarImpresionLote() {
 async function cortarBloquePapel4m() {
   const info = obtenerRolloPapelActivo();
   await sb().from("prod_impresiones").insert({
-    empresa_id: "vvgrafic-principal",
     batch_id: `CORTE-${Date.now()}`,
     fecha_hora: new Date().toISOString(),
     id_rollo_papel: info.bloqueActual,
@@ -2508,7 +2573,6 @@ async function registrarAvanceOCalibracion(tipoAccion) {
   const obs = prompt("Motivo / Obs:", tipoAccion) || tipoAccion;
 
   await sb().from("prod_impresiones").insert({
-    empresa_id: "vvgrafic-principal",
     batch_id: `MERMA-${Date.now()}`,
     fecha_hora: new Date().toISOString(),
     id_rollo_papel: info.bloqueActual,
@@ -2591,7 +2655,6 @@ async function finalizarTrabajoCalandrado(idCalOrCsv, minutosExtra = 0, skipRelo
   if (rLower.includes("laser") || rLower.includes("láser") || rLower.includes("corte")) {
     for (const rItem of regs) {
       await sb().from("prod_cola_laser").insert({
-        empresa_id: "vvgrafic-principal",
         batch_id: rItem.batch_id || reg.batch_id || `BATCH-${Date.now()}`,
         fecha_ingreso: fechaFinIso,
         id_rollo_papel: rItem.id_rollo_papel || reg.id_rollo_papel,
@@ -2865,9 +2928,6 @@ const ESQUEMA_CAMPOS_CRUD = {
     { key: "nombre_archivo", label: "Archivo", type: "text" },
     { key: "tipo_cargo", label: "Tipo Cargo (VENTA / REPOSICION / MUESTRA)", type: "text" },
     { key: "metros_archivo", label: "Metros", type: "number" },
-    { key: "precio_metro", label: "Precio / m ($)", type: "number" },
-    { key: "subtotal_cobrar", label: "Total ($)", type: "number" },
-    { key: "monto_pagado", label: "Abonado ($)", type: "number" },
     { key: "observaciones", label: "Notas", type: "textarea" }
   ],
   prod_dtf_rollos: [
@@ -2939,7 +2999,6 @@ async function guardarModalCrudUniversal() {
     if (error) { toast("Error: " + error.message, "error"); return; }
     toast("✅ Registro actualizado.");
   } else {
-    payload.empresa_id = "vvgrafic-principal";
     if (tabla === "prod_impresiones" || tabla === "prod_cola_calandrado" || tabla === "prod_cola_laser") {
       if (!payload.batch_id) payload.batch_id = `MANUAL-${Date.now()}`;
     }
@@ -3708,7 +3767,6 @@ function vincularBotonesAccionesKiosco() {
       if (motivo === null) return;
 
       await sb().from("prod_fallas_reposiciones").insert({
-        empresa_id: "vvgrafic-principal",
         tipo_registro: "ALERTA_REPOSICION",
         estacion: esLaser ? "Láser" : "Calandrado",
         id_rollo: trabActual.id_rollo_papel,
@@ -3819,7 +3877,6 @@ async function reportarFallaConReposicion(reg, estacion) {
   const motivo = prompt("Motivo de la falla:", `Falla en ${estacion}`) || `Falla en ${estacion}`;
 
   await sb().from("prod_fallas_reposiciones").insert({
-    empresa_id: "vvgrafic-principal",
     tipo_registro: "ALERTA_REPOSICION",
     estacion,
     id_rollo: reg.id_rollo_papel || null,
@@ -3833,7 +3890,6 @@ async function reportarFallaConReposicion(reg, estacion) {
   });
 
   await sb().from("prod_pendientes_drive").insert({
-    empresa_id: "vvgrafic-principal",
     modulo: "SUBLIMACION",
     cliente: `REPOSICIÓN ${estacion.toUpperCase()}`,
     nombre_archivo: `[REPO URGENTE] ${nombreArch}`,
@@ -3972,7 +4028,6 @@ export function inicializarEventosUI() {
     await sb().from("prod_rollos_papel").update({ estado: "Sobrante" }).eq("estado", "Activo");
     await sb().from("prod_rollos_papel").insert({
       id_rollo: nuevoId,
-      empresa_id: "vvgrafic-principal",
       gramaje,
       metros_iniciales: metros,
       estado: "Activo",
@@ -4028,7 +4083,6 @@ export function inicializarEventosUI() {
       const metrosFinal = parsed.metrosTotales > 0 ? parsed.metrosTotales : geo.metrosDpiReal || 1.0;
 
       await sb().from("prod_pendientes_drive").upsert({
-        empresa_id: "vvgrafic-principal",
         modulo: STATE.tabActiva === "dtf" ? "DTF" : "SUBLIMACION",
         cliente: f.name.split(/[-–(]/)[0]?.trim() || "CLIENTE LOCAL",
         nombre_archivo: f.name,
@@ -4050,6 +4104,20 @@ export function inicializarEventosUI() {
     await cargarDatosTodo();
   });
 
+  const inpCliDtf = document.getElementById("dtfInputCliente");
+  let esperaCliDtf = null;
+  inpCliDtf?.addEventListener("input", () => {
+    clearTimeout(esperaCliDtf);
+    esperaCliDtf = setTimeout(async () => {
+      const v = inpCliDtf.value.trim();
+      if (STATE.dtfClientesVistos.has(v)) return;
+      const lista = await buscarClientesSistema(v);
+      lista.forEach(c => STATE.dtfClientesVistos.set(etiquetaCliente(c), c));
+      const dl = document.getElementById("dtfListaClientes");
+      if (dl) dl.innerHTML = lista.map(c => `<option value="${escHtml(etiquetaCliente(c))}"></option>`).join("");
+    }, 250);
+  });
+
   document.getElementById("btnRegistrarPedidoDTF")?.addEventListener("click", async () => {
     const cliente = document.getElementById("dtfInputCliente")?.value.trim() || "CLIENTE DTF";
     const archivo = document.getElementById("dtfInputArchivo")?.value.trim() || "Archivo DTF.png";
@@ -4057,38 +4125,36 @@ export function inicializarEventosUI() {
     const metrosRollo = parseFloat(document.getElementById("dtfInputMetrosRolloFisico")?.value) || metrosArch;
     const idRollo = document.getElementById("dtfInputRollo")?.value || "DTF-60-001";
     const cargo = document.getElementById("dtfInputTipoCargo")?.value || "VENTA";
-    const pagado = parseFloat(document.getElementById("dtfInputMontoPagado")?.value) || 0;
-    const modalidad = document.getElementById("dtfInputModalidadPago")?.value || "Paga al retirar";
     const obs = document.getElementById("dtfInputObs")?.value.trim() || "";
+    const cliSel = STATE.dtfClientesVistos.get(document.getElementById("dtfInputCliente")?.value.trim() || "");
 
-    const precioM = calcularPrecioMetroDTF(metrosArch, cargo);
-    const subtotal = cargo === "VENTA" ? metrosArch * precioM : 0;
-
-    const { data: tiradaData } = await sb().from("prod_dtf_tiradas").insert({
-      empresa_id: "vvgrafic-principal",
+    const { data: tiradaData, error: errTirada } = await sb().from("prod_dtf_tiradas").insert({
       codigo_tirada: `DTF-${Date.now().toString().slice(-5)}`,
       id_rollo_dtf: idRollo,
       es_anidado: metrosRollo !== metrosArch,
       metros_consumidos_rollo: metrosRollo,
       observaciones: obs
     }).select();
+    if (errTirada) { toast("Error: " + errTirada.message, "error"); return; }
 
-    await sb().from("prod_dtf_pedidos").insert({
-      empresa_id: "vvgrafic-principal",
+    const { error: errPedido } = await sb().from("prod_dtf_pedidos").insert({
       tirada_id: tiradaData?.[0]?.id || null,
-      cliente,
+      cliente: cliSel ? cliSel.nombre : cliente,
+      cliente_id: cliSel ? cliSel.id : null,
       nombre_archivo: archivo,
       tipo_cargo: cargo,
       metros_archivo: metrosArch,
       metros_facturados: cargo === "VENTA" ? metrosArch : 0,
-      precio_metro: precioM,
-      subtotal_cobrar: subtotal,
-      monto_pagado: pagado,
-      modalidad_pago: modalidad,
       estado_entrega: "Impreso",
       observaciones: obs
     });
+    if (errPedido) { toast("Error: " + errPedido.message, "error"); return; }
 
+    if (cargo === "VENTA" && !cliSel) {
+      toast("✅ Trabajo DTF registrado. El cliente del sistema se elige al hacer la venta.");
+      await cargarDatosTodo();
+      return;
+    }
     toast(`✅ Trabajo DTF registrado.`);
     await cargarDatosTodo();
   });
@@ -4120,7 +4186,6 @@ export function inicializarEventosUI() {
     const menciones = miembros.filter(m => texto.toLowerCase().includes(`@${m.toLowerCase()}`));
 
     await sb().from("prod_chat_mensajes").insert({
-      empresa_id: "vvgrafic-principal",
       autor_nombre: STATE.usuarioActual,
       autor_area: STATE.areaActual,
       canal_area: canal,
@@ -4245,7 +4310,6 @@ export function inicializarEventosUI() {
             if (!updatedPendientes || updatedPendientes.length === 0) {
               for (const fId of fileIds) {
                 await sb().from("prod_pendientes_drive").insert({
-                  empresa_id: "vvgrafic-principal",
                   modulo: "SUBLIMACION",
                   cliente: reg.cliente || (reg.cliente_archivo ? reg.cliente_archivo.split(" | ")[0] : "CLIENTE"),
                   nombre_archivo: reg.diseno || reg.cliente_archivo || "ARCHIVO RESTAURADO",
@@ -4339,20 +4403,15 @@ export function inicializarEventosUI() {
     const btnLasCorte = e.target.closest(".btn-laser-cortar-lote");
     if (btnLasCorte) { cortarLoteLaser(btnLasCorte.getAttribute("data-ids")); return; }
 
-    const btnDtfSaldar = e.target.closest(".btn-dtf-saldar");
-    if (btnDtfSaldar) {
-      const id = btnDtfSaldar.getAttribute("data-id");
-      const tot = parseFloat(btnDtfSaldar.getAttribute("data-total")) || 0;
-      await sb().from("prod_dtf_pedidos").update({ monto_pagado: tot, estado_entrega: "Entregado" }).eq("id", id);
-      await cargarDatosTodo();
-      return;
-    }
+    const btnDtfVender = e.target.closest(".btn-dtf-vender");
+    if (btnDtfVender) { venderDtf(btnDtfVender.getAttribute("data-clave")); return; }
 
     const btnDtfPend = e.target.closest(".btn-dtf-cargar-pend");
     if (btnDtfPend) {
       const p = STATE.pendientesDrive.find(x => x.id === btnDtfPend.getAttribute("data-id"));
       if (p) {
         document.getElementById("dtfInputCliente").value = p.cliente;
+        document.getElementById("dtfInputCliente").dispatchEvent(new Event("input"));
         document.getElementById("dtfInputArchivo").value = p.nombre_archivo;
         document.getElementById("dtfInputMetrosArchivo").value = p.metros_totales;
       }
@@ -4420,10 +4479,12 @@ export function inicializarEventosUI() {
   const selOp = document.getElementById("vgSelectOperadorActual");
   if (selOp) {
     selOp.value = STATE.usuarioActual;
-    selOp.addEventListener("change", () => {
-      STATE.usuarioActual = selOp.value;
+    selOp.addEventListener("change", async () => {
+      // Sin PIN: el nombre elegido. Con PIN: la persona pone su PIN (si no, vuelve al nombre anterior).
+      const elegido = window.VG_ACCESO ? await window.VG_ACCESO.elegirOperario(selOp) : selOp.value;
+      if (!elegido) { selOp.value = STATE.usuarioActual; return; }
+      STATE.usuarioActual = elegido;
       localStorage.setItem("vg_operador_actual", STATE.usuarioActual);
-      window.VG_ACCESO?.operario(STATE.usuarioActual);
       renderTodoRespetandoFormulario();
     });
   }
@@ -4438,7 +4499,8 @@ export function inicializarEventosUI() {
 }
 
 window.addEventListener("DOMContentLoaded", async () => {
-  if (window.VG_ACCESO) await window.VG_ACCESO.listo; // sin usuario del equipo no se carga nada
+  STATE.perfil = window.VG_ACCESO ? await window.VG_ACCESO.listo : null; // sin usuario del equipo no se carga nada
+  if (window.VG_ACCESO?.pin) STATE.usuarioActual = window.VG_ACCESO.nombreOperario();
   inicializarEventosUI();
   cargarDatosTodo();
   suscribirRealtime();

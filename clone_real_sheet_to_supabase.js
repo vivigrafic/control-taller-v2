@@ -1,3 +1,9 @@
+// ⚠️ Desde el 22/10/2026 este script NO se usa: borraba y volvía a cargar las tablas del taller, y la base ya no deja
+// borrar (en el taller nada se borra, se anula). La fila de Drive la pasa la terminal de Google (taller_drive_sincronizar)
+// y la importación a la base real se hace una sola vez, el día del cambio.
+console.error("Este script ya no se usa (la base no deja borrar). Ver el aviso al principio del archivo.");
+process.exit(1);
+
 /**
  * Clonador 100% Fiel (Solo Lectura) desde la Hoja de Cálculo Real de Producción
  * (1D7z5ugTzJZAaw3CAlMiciyswmQxubT9t6x_K_oLIJ_I) + Carpeta DTF Drive
