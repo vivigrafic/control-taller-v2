@@ -2210,15 +2210,15 @@ function renderContenidoModalKiosco() {
 
   const thumbIdActual = extraerThumbIdDrive(trabActual.file_id);
   const imgPreviewHtml = thumbIdActual
-    ? `<img src="https://drive.google.com/thumbnail?id=${escHtml(thumbIdActual)}&sz=w600-h600" style="width:100%; height:240px; object-fit:contain; background:#000; border:2px solid var(--accent-magenta); border-radius:8px; margin-bottom:10px;" onerror="this.style.display='none';" />`
-    : `<div style="width:100%; height:140px; background:#000; border:2px dashed #444; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#888; font-weight:bold; margin-bottom:10px;">${escHtml(trabActual.diseno || "SIN VISTA PREVIA")}</div>`;
+    ? `<img class="kiosk-preview-img" src="https://drive.google.com/thumbnail?id=${escHtml(thumbIdActual)}&sz=w600-h600" style="width:100%; height:240px; object-fit:contain; background:#000; border:2px solid var(--accent-magenta); border-radius:8px; margin-bottom:10px;" onerror="this.style.display='none';" />`
+    : `<div class="kiosk-preview-ph" style="width:100%; height:140px; background:#000; border:2px dashed #444; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#888; font-weight:bold; margin-bottom:10px;">${escHtml(trabActual.diseno || "SIN VISTA PREVIA")}</div>`;
 
   document.getElementById("kioscoTitulo").textContent = `🔥 MODO KIOSKO ACTIVO (BOBINA: ${rolloNombre})`;
   const proximoTrab = trabajos[STATE.kiosco.indiceActual + 1];
 
   document.getElementById("kioscoSubtitulo").innerHTML = `
     <!-- Encabezado Kiosko General igual al original -->
-    <div style="display:flex; justify-content:space-between; align-items:center; background:#151821; border:1px solid #2a324b; padding:8px 14px; border-radius:8px; margin-bottom:12px;">
+    <div id="kioscoTopHeader" style="display:flex; justify-content:space-between; align-items:center; background:#151821; border:1px solid #2a324b; padding:8px 14px; border-radius:8px; margin-bottom:12px;">
       <div style="font-size:15px; font-weight:bold; color:#00E676;">
         TRABAJO ${STATE.kiosco.indiceActual + 1} DE ${trabajos.length}
       </div>
@@ -2229,21 +2229,21 @@ function renderContenidoModalKiosco() {
 
     <!-- Reproductor Principal de 2 Columnas (igual a panelReproductorCalandra original) -->
     <div class="kiosk-player-grid">
-      <div style="text-align:center;">
+      <div class="kiosk-player-left" style="text-align:center;">
         ${imgPreviewHtml}
-        <div style="font-size:34px; font-weight:bold; color:var(--accent-magenta); line-height:1;">${fmtNum(trabActual.metros)} m</div>
-        <div style="color:#aaa; font-size:11px; margin-top:2px;">METROS A CALANDRAR</div>
+        <div class="kiosk-metros-val" style="font-size:34px; font-weight:bold; color:var(--accent-magenta); line-height:1;">${fmtNum(trabActual.metros)} m</div>
+        <div class="kiosk-metros-lbl" style="color:#aaa; font-size:11px; margin-top:2px;">METROS A CALANDRAR</div>
       </div>
 
-      <div style="display:flex; flex-direction:column; gap:8px;">
+      <div class="kiosk-player-right" style="display:flex; flex-direction:column; gap:8px;">
         <!-- B: Nombre de la tela en una sola línea que ocupe la mitad de la altura -->
-        <div style="background:#0f1117; padding:6px 12px; border-radius:6px; border-left:4px solid #2196F3; display:flex; align-items:center; gap:8px; overflow:hidden;">
+        <div class="kiosk-info-tela" style="background:#0f1117; padding:6px 12px; border-radius:6px; border-left:4px solid #2196F3; display:flex; align-items:center; gap:8px; overflow:hidden;">
           <span style="color:#888; font-size:11px; font-weight:bold; white-space:nowrap;">TELA:</span>
           <span style="font-size:16px; font-weight:bold; color:#2196F3; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escHtml(trabActual.tela_destino || "-")}">${escHtml(trabActual.tela_destino || "-")}</span>
         </div>
 
         <!-- C & D: Cliente/Diseño máx 2 líneas, y abajo Rollo + Color en burbujas separadas en 1 sola línea -->
-        <div style="background:#0f1117; padding:8px 10px; border-radius:6px; border:1px solid #2a324b; display:flex; flex-direction:column; gap:6px;">
+        <div class="kiosk-info-cliente-rollo" style="background:#0f1117; padding:8px 10px; border-radius:6px; border:1px solid #2a324b; display:flex; flex-direction:column; gap:6px;">
           <!-- C: Cliente/Diseño en 1 linea (máximo 2) -->
           <div style="font-size:13px; font-weight:bold; color:#fff; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.25;" title="${escHtml(trabActual.cliente_archivo)}">
             <span style="color:#888; font-size:11px; font-weight:normal; margin-right:4px;">CLIENTE / DISEÑO:</span>${escHtml(trabActual.cliente_archivo)}
@@ -2265,7 +2265,7 @@ function renderContenidoModalKiosco() {
           </div>
         ` : ""}
 
-        <div style="background:rgba(255, 152, 0, 0.08); padding:6px 10px; border-radius:6px; border:1px dashed #ff9800; font-size:11px;">
+        <div class="kiosk-info-proximo" style="background:rgba(255, 152, 0, 0.08); padding:6px 10px; border-radius:6px; border:1px dashed #ff9800; font-size:11px;">
           <span style="color:#ff9800; font-weight:bold;">⏭️ PRÓXIMO:</span>
           <span style="color:#ccc; margin-left:6px;">${proximoTrab ? `${escHtml(proximoTrab.tela_destino)} — ${fmtNum(proximoTrab.metros)}m (${escHtml(proximoTrab.cliente_archivo)})` : "🏁 Fin de la Bobina"}</span>
         </div>
@@ -2273,7 +2273,7 @@ function renderContenidoModalKiosco() {
     </div>
 
     <!-- Parámetros operativos (Velocidad y Temperatura) -->
-    <div style="background:#111; border:1px solid #333; padding:10px; border-radius:8px; margin-bottom:12px; display:flex; justify-content:space-around; align-items:center; flex-wrap:wrap; gap:10px;">
+    <div id="kioscoParametrosBox" style="background:#111; border:1px solid #333; padding:10px; border-radius:8px; margin-bottom:12px; display:flex; justify-content:space-around; align-items:center; flex-wrap:wrap; gap:10px;">
       <div style="text-align:center;">
         <label style="font-size:11px; color:#aaa; display:block; margin-bottom:4px; font-weight:bold;">⚙️ VELOCIDAD (m/min)</label>
         <input type="number" id="kioscoInputVelocidad" value="${velActual}" step="1" style="width:110px; font-size:20px; text-align:center; padding:6px; background:#1a1c23; color:#00E676; border:1px solid #4CAF50; border-radius:6px; font-weight:bold;" />
@@ -2282,7 +2282,7 @@ function renderContenidoModalKiosco() {
         <label style="font-size:11px; color:#aaa; display:block; margin-bottom:4px; font-weight:bold;">🔥 TEMPERATURA (°C)</label>
         <input type="number" id="kioscoInputTemperatura" value="${tempActual}" step="1" style="width:110px; font-size:20px; text-align:center; padding:6px; background:#1a1c23; color:#ff9800; border:1px solid #ff9800; border-radius:6px; font-weight:bold;" />
       </div>
-      <div style="display:flex; gap:8px;">
+      <div id="kioscoFallaBtns" style="display:flex; gap:8px;">
         <button type="button" class="btn-kiosco-reportar-falla" data-id="${trabActual.id}" data-estacion="Calandrado" style="background:rgba(216,27,96,0.18); border:1px solid var(--accent-magenta); color:#ff4081; padding:10px 14px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">⚠️ FALLA CALANDRA</button>
         <button type="button" class="btn-kiosco-reportar-falla" data-id="${trabActual.id}" data-estacion="Impresión" style="background:rgba(255,152,0,0.18); border:1px solid var(--accent-orange); color:#ff9800; padding:10px 14px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">⚠️ FALLA IMPRESIÓN</button>
       </div>
@@ -2949,9 +2949,58 @@ export function inicializarEventosUI() {
     const btnImpDeshacer = e.target.closest(".btn-imp-deshacer");
     if (btnImpDeshacer) {
       const reg = STATE.impresiones.find(i => i.id === btnImpDeshacer.getAttribute("data-id"));
-      if (reg && confirm("¿Deshacer impresión?")) {
+      if (reg && confirm("¿Deshacer impresión de este trabajo? Se devolverá el archivo a la cola de pendientes y fuera de IMPRESOS en Drive.")) {
+        toast("⏳ Revertiendo impresión en base de datos y Google Drive...", "info");
+
+        // 1. Revertir estado_impreso en prod_pendientes_drive
+        const fileIds = String(reg.file_id || "").split(",").map(s => s.trim()).filter(Boolean);
+        if (fileIds.length > 0) {
+          try {
+            const { data: updatedPendientes } = await sb().from("prod_pendientes_drive")
+              .update({ estado_impreso: "NO" })
+              .in("file_id", fileIds)
+              .select();
+
+            // Si no existía en prod_pendientes_drive, insertarlo para asegurar disponibilidad inmediata
+            if (!updatedPendientes || updatedPendientes.length === 0) {
+              for (const fId of fileIds) {
+                await sb().from("prod_pendientes_drive").insert({
+                  empresa_id: "vvgrafic-principal",
+                  modulo: "SUBLIMACION",
+                  cliente: reg.cliente || (reg.cliente_archivo ? reg.cliente_archivo.split(" | ")[0] : "CLIENTE"),
+                  nombre_archivo: reg.diseno || reg.cliente_archivo || "ARCHIVO RESTAURADO",
+                  medida_unitaria: Number(reg.metros_impresos) || 1,
+                  metros_totales: Number(reg.metros_impresos) || 1,
+                  perfil_detectado: reg.perfil || "CALANDRADO",
+                  file_id: fId,
+                  estado_impreso: "NO"
+                });
+              }
+            }
+          } catch(err) {
+            console.error("Error restaurando estado en prod_pendientes_drive:", err);
+          }
+
+          // 2. Invocar puente GAS para mover físicamente el archivo fuera de IMPRESOS en Drive
+          const bridgeUrl = window.VG_CONEXION?.sandboxBridgeUrl;
+          if (bridgeUrl) {
+            try {
+              fetch(`${bridgeUrl}?action=revertir_impresos&file_ids=${encodeURIComponent(fileIds.join(","))}`, { mode: "no-cors" }).catch(() => {});
+            } catch(err) {
+              console.error("Error llamando GAS revertir_impresos:", err);
+            }
+          }
+        }
+
+        // 3. Eliminar de prod_impresiones y de prod_cola_calandrado
         await sb().from("prod_impresiones").delete().eq("id", reg.id);
-        if (reg.batch_id) await sb().from("prod_cola_calandrado").delete().eq("batch_id", reg.batch_id);
+        if (reg.batch_id) {
+          await sb().from("prod_cola_calandrado").delete().eq("batch_id", reg.batch_id);
+        } else if (reg.file_id) {
+          await sb().from("prod_cola_calandrado").delete().eq("file_id", reg.file_id);
+        }
+
+        toast("✅ Impresión deshecha: archivo disponible en cola de pendientes.");
         await cargarDatosTodo();
       }
       return;

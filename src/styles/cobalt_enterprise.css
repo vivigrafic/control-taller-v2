@@ -222,7 +222,7 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
     margin-top: 5px;
   }
 
-  /* Modo Kiosko optimizado para pantalla completa en celular */
+  /* Modo Kiosko optimizado para pantalla completa en celular sin scroll */
   #modalKioscoOperativo .modal-content {
     width: 100% !important;
     max-width: 100% !important;
@@ -230,43 +230,159 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
     max-height: 100dvh !important;
     border-radius: 0 !important;
     padding: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    overflow: hidden !important;
   }
-  /* Header Kiosco a la mitad de altura en celular */
+  /* Header Kiosco compacto en celular */
   #kioscoHeaderBar {
-    padding: 5px 10px !important;
-    min-height: 36px !important;
-    gap: 6px !important;
+    padding: 4px 8px !important;
+    min-height: 32px !important;
+    gap: 4px !important;
     flex-wrap: nowrap !important;
+    flex-shrink: 0 !important;
   }
   #kioscoTitulo {
-    font-size: 13px !important;
+    font-size: 12px !important;
     line-height: 1.2 !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
-    max-width: calc(100vw - 195px) !important;
+    max-width: calc(100vw - 180px) !important;
   }
   #btnKioscoMinimizar, #btnKioscoCancelarDefinitivo {
-    padding: 4px 8px !important;
-    font-size: 11px !important;
-    min-height: 28px !important;
+    padding: 3px 6px !important;
+    font-size: 10px !important;
+    min-height: 24px !important;
     white-space: nowrap !important;
   }
   #kioscoScrollArea {
-    padding: 10px 10px !important;
+    padding: 4px 8px !important;
+    flex: 1 1 auto !important;
+    overflow-y: auto !important;
+  }
+  #kioscoTopHeader {
+    padding: 4px 8px !important;
+    margin-bottom: 4px !important;
+    font-size: 12px !important;
+  }
+  #kioscoTopHeader > div:first-child {
+    font-size: 12px !important;
+  }
+  #kioscoTopHeader > div:last-child {
+    font-size: 11px !important;
+  }
+  #kioscoTopHeader strong {
+    font-size: 13px !important;
   }
   .kiosk-player-grid {
     grid-template-columns: 1fr !important;
-    gap: 10px !important;
-    padding: 10px !important;
+    gap: 4px !important;
+    padding: 4px 6px !important;
+    margin-bottom: 4px !important;
+  }
+  .kiosk-preview-img {
+    height: 70px !important;
+    margin-bottom: 4px !important;
+  }
+  .kiosk-preview-ph {
+    height: 40px !important;
+    margin-bottom: 4px !important;
+    font-size: 11px !important;
+  }
+  .kiosk-metros-val {
+    font-size: 24px !important;
+    line-height: 1 !important;
+  }
+  .kiosk-metros-lbl {
+    font-size: 9px !important;
+    margin-top: 1px !important;
+  }
+  .kiosk-info-tela {
+    padding: 4px 8px !important;
+  }
+  .kiosk-info-tela span:last-child {
+    font-size: 13px !important;
+  }
+  .kiosk-info-cliente-rollo {
+    padding: 4px 8px !important;
+    gap: 3px !important;
+  }
+  .kiosk-info-proximo {
+    padding: 3px 6px !important;
+    font-size: 10px !important;
+    margin-top: 2px !important;
+  }
+  #kioscoParametrosBox {
+    padding: 4px 6px !important;
+    margin-bottom: 4px !important;
+    gap: 4px !important;
+  }
+  #kioscoParametrosBox label {
+    font-size: 9px !important;
+    margin-bottom: 2px !important;
+  }
+  #kioscoParametrosBox input {
+    width: 70px !important;
+    font-size: 15px !important;
+    padding: 2px 4px !important;
+    height: 26px !important;
+  }
+  #kioscoFallaBtns {
+    gap: 4px !important;
+  }
+  button.btn-kiosco-reportar-falla {
+    padding: 4px 6px !important;
+    font-size: 10px !important;
+    height: 26px !important;
+  }
+  /* Footer del Kiosco en celular: Cronómetro y Botones compactos en altura */
+  #kioscoFooterAcciones {
+    padding: 4px 8px !important;
+    gap: 4px !important;
+    flex-shrink: 0 !important;
+    background: #0e1118 !important;
+    border-top: 1px solid #2a324b !important;
+  }
+  #kioscoCronometroBox {
+    padding: 3px 8px !important;
+    min-height: 32px !important;
+    flex-wrap: nowrap !important;
+    justify-content: space-between !important;
+  }
+  #kioscoCronometro {
+    font-size: 18px !important;
+  }
+  #kioscoCronometroBox span:first-child {
+    font-size: 10px !important;
+  }
+  #btnKioscoPausarReanudar {
+    padding: 3px 10px !important;
+    font-size: 11px !important;
+    min-height: 26px !important;
   }
   #kioscoBotonesAccion {
-    grid-template-columns: 1fr !important;
-    gap: 8px !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 4px !important;
   }
-  #kioscoBotonesAccion button {
-    padding: 11px 8px !important;
-    font-size: 13px !important;
+  #btnKioscoSiguienteTrabajo {
+    grid-column: span 2 !important;
+    padding: 7px 6px !important;
+    font-size: 12px !important;
+    min-height: 32px !important;
+    font-weight: bold !important;
+    margin: 0 !important;
+  }
+  #btnKioscoDescartarSiguiente, #btnKioscoFinalizar {
+    grid-column: span 1 !important;
+    padding: 5px 4px !important;
+    font-size: 10px !important;
+    min-height: 28px !important;
+    white-space: nowrap !important;
+    font-weight: bold !important;
+    margin: 0 !important;
   }
 
   #tabCalandrado .tabla-normal { min-width: 500px; }

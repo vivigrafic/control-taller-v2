@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261020_02" />
+  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261020_03" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./src/config/conexion.js?v=20261020_02"></script>
   <script src="./src/assets/logo.js?v=20261020_02"></script>
@@ -707,8 +707,8 @@
       </div>
 
       <!-- Barra de Cronómetro y Acciones Fijas del Reproductor -->
-      <div style="background:#11141c; padding:12px 18px; border-top:1px solid #2a324b; display:flex; flex-direction:column; gap:10px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; background:#000; padding:10px 14px; border-radius:8px; border:1px solid #4CAF50;">
+      <div id="kioscoFooterAcciones" style="background:#11141c; padding:12px 18px; border-top:1px solid #2a324b; display:flex; flex-direction:column; gap:10px;">
+        <div id="kioscoCronometroBox" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; background:#000; padding:10px 14px; border-radius:8px; border:1px solid #4CAF50;">
           <div style="display:flex; align-items:center; gap:10px;">
             <span style="font-size:11px; color:#aaa; font-weight:bold;">CRONÓMETRO:</span>
             <span id="kioscoCronometro" style="font-family:monospace; font-size:28px; font-weight:bold; color:#00E676;">00:00:00</span>
@@ -747,6 +747,6 @@
   <datalist id="listColores"></datalist>
   <div id="vgToastContainer" style="position:fixed; top:16px; right:16px; z-index:3000; max-width:360px;"></div>
 
-  <script type="module" src="./src/app.js?v=20261020_02"></script>
+  <script type="module" src="./src/app.js?v=20261020_03"></script>
 </body>
 </html>
