@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261020_05" />
+  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261020_06" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./src/config/conexion.js?v=20261020_02"></script>
   <script src="./src/assets/logo.js?v=20261020_02"></script>
@@ -213,7 +213,7 @@
       </div>
       <input type="text" id="searchHistorialImpLocal" class="search-input" placeholder="🔍 Buscar cliente, archivo o tela..." />
       <div style="overflow-x: auto;">
-        <table class="tabla-tarjetas">
+        <table class="tabla-normal">
           <thead>
             <tr>
               <th>Acción</th>
@@ -308,13 +308,14 @@
     <div class="card" style="border-top: 4px solid var(--accent-blue);">
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
         <h2 style="margin:0; border:none; padding:0;">⚡ Cola de Corte Láser (Trabajos Anidados Agrupados)</h2>
-        <div style="display:flex; gap:8px; align-items:center;">
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <button type="button" id="btnAbrirKioscoLaserGeneral" style="background:#00E676; color:#000; border:none; padding:7px 14px; border-radius:6px; font-weight:900; font-size:12px; cursor:pointer; box-shadow:0 2px 10px rgba(0,230,118,0.3);">⚡ MODO KIOSKO LÁSER</button>
           <input type="datetime-local" id="laserInputFechaManual" style="width:185px; padding:6px;" title="Fecha manual opcional" />
           <button type="button" class="btn-secondary btn-crud-add" data-table="prod_cola_laser" style="width:auto; padding:6px 12px;">+ Agregar Lote Láser</button>
         </div>
       </div>
       <div style="overflow-x: auto;">
-        <table>
+        <table class="tabla-normal">
           <thead>
             <tr>
               <th>Acción</th>
@@ -749,6 +750,6 @@
   <datalist id="listColores"></datalist>
   <div id="vgToastContainer" style="position:fixed; top:16px; right:16px; z-index:3000; max-width:360px;"></div>
 
-  <script type="module" src="./src/app.js?v=20261020_05"></script>
+  <script type="module" src="./src/app.js?v=20261020_06"></script>
 </body>
 </html>

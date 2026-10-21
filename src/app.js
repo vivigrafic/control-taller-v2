@@ -1127,8 +1127,9 @@ function renderModuloLaser() {
       return `
         <tr>
           <td style="white-space:nowrap;">
-            <button type="button" class="btn-main btn-laser-cortar-lote" data-batch="${escHtml(g.batch_id)}" data-ids="${g.ids.join(",")}" style="width:auto; padding:5px 10px; font-size:11px; margin:0;">
-              Cortar ${esAnidado ? `Lote (${g.archivos.length})` : ""}
+            <button type="button" class="btn-laser-kiosco-lote" data-batch="${escHtml(g.batch_id)}" data-ids="${g.ids.join(",")}" style="background:#00E676; color:#000; font-weight:900; border:none; padding:5px 9px; border-radius:4px; cursor:pointer; font-size:11px; margin-right:4px;" title="Iniciar en Modo Kiosko Láser">⚡ Kiosko</button>
+            <button type="button" class="btn-main btn-laser-cortar-lote" data-batch="${escHtml(g.batch_id)}" data-ids="${g.ids.join(",")}" style="width:auto; padding:5px 10px; font-size:11px; margin:0; background:#2196F3;">
+              Cortar ${esAnidado ? `(${g.archivos.length})` : ""}
             </button>
             <button type="button" class="btn-nota-rapida" data-table="prod_cola_laser" data-id="${g.ids[0]}" data-batch="${escHtml(g.batch_id)}" style="background:transparent; border:1px solid var(--accent-orange); color:var(--accent-orange); border-radius:4px; cursor:pointer; padding:4px;">📝</button>
             <button type="button" class="btn-crud-edit" data-table="prod_cola_laser" data-id="${g.ids[0]}" style="background:transparent; border:1px solid var(--accent-blue); color:var(--accent-blue); border-radius:4px; cursor:pointer; padding:4px;">✏️</button>
@@ -2199,33 +2200,62 @@ function renderContenidoModalKiosco() {
   const trabajos = STATE.kiosco.trabajos || [];
   if (trabajos.length === 0) return;
 
-  const rolloNombre = STATE.kiosco.rolloId || trabajos[0].id_rollo_papel || "Sin Rollo";
+  const esLaser = STATE.kiosco.modulo === "laser";
+  const rolloNombre = STATE.kiosco.rolloId || trabajos[0].batch_id || trabajos[0].id_rollo_papel || "Sin Identificador";
   const trabActual = trabajos[STATE.kiosco.indiceActual] || trabajos[0];
 
-  const velActual = document.getElementById("kioscoInputVelocidad")?.value || trabActual.velocidad || 50;
-  const tempActual = document.getElementById("kioscoInputTemperatura")?.value || trabActual.temperatura || 205;
+  const velDefault = esLaser ? 300 : 50;
+  const param2Default = esLaser ? 85 : 205;
+  const velActual = document.getElementById("kioscoInputVelocidad")?.value || trabActual.velocidad || velDefault;
+  const tempActual = document.getElementById("kioscoInputTemperatura")?.value || (esLaser ? trabActual.poder : trabActual.temperatura) || param2Default;
 
   const pendientesRestantes = trabajos.filter(t => !STATE.kiosco.completadosIds.has(t.id) && !STATE.kiosco.descartadosIds.has(t.id));
-  const totalM = pendientesRestantes.reduce((a, b) => a + (Number(b.metros) || 0), 0);
+  const totalM = pendientesRestantes.reduce((a, b) => a + (Number(b.metros_totales || b.metros) || 0), 0);
 
   const thumbIdActual = extraerThumbIdDrive(trabActual.file_id);
   const imgPreviewHtml = thumbIdActual
     ? `<img class="kiosk-preview-img" src="https://drive.google.com/thumbnail?id=${escHtml(thumbIdActual)}&sz=w600-h600" style="width:100%; height:200px; object-fit:contain; background:#000; border:2px solid var(--accent-magenta); border-radius:8px; margin-bottom:10px;" onerror="this.style.display='none';" />`
-    : `<div class="kiosk-preview-ph" style="width:100%; height:90px; background:#000; border:2px dashed #444; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#888; font-weight:bold; margin-bottom:10px;">${escHtml(trabActual.diseno || "SIN VISTA PREVIA")}</div>`;
+    : `<div class="kiosk-preview-ph" style="width:100%; height:90px; background:#000; border:2px dashed #444; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#888; font-weight:bold; margin-bottom:10px;">${escHtml(trabActual.diseno || trabActual.cliente_archivo || "SIN VISTA PREVIA")}</div>`;
 
-  document.getElementById("kioscoTitulo").textContent = `🔥 MODO KIOSKO ACTIVO (BOBINA: ${rolloNombre})`;
+  document.getElementById("kioscoTitulo").textContent = esLaser
+    ? `⚡ MODO KIOSKO LÁSER (LOTE: ${rolloNombre})`
+    : `🔥 MODO KIOSKO ACTIVO (BOBINA: ${rolloNombre})`;
 
   // Limpieza de extensiones y sufijos técnicos redundantes para máxima legibilidad del operario
-  const nombreLimpio = String(trabActual.cliente_archivo || "")
+  const rawNombre = trabActual.cliente_archivo || trabActual.diseno || (trabActual.archivos ? trabActual.archivos.join(" | ") : "-");
+  const nombreLimpio = String(rawNombre)
     .replace(/\.(jpg|jpeg|png|tif|tiff|pdf|ai|psd)$/i, "")
     .trim();
+
+  const labelMetros = esLaser ? "METROS A CORTAR" : "METROS A CALANDRAR";
+  const metrosVal = fmtNum(trabActual.metros_totales || trabActual.metros || 0);
+  const telaVal = trabActual.tela_destino || trabActual.tela || trabActual.tela_rollo_color || "-";
+
+  // Burbujas grandes debajo de los metros
+  const bubblesHtml = esLaser
+    ? `
+      <span class="kiosk-bubble-item" style="display:inline-flex; align-items:center; gap:5px; background:#1b2130; border:1.5px solid #ff9800; color:#ff9800; padding:5px 14px; border-radius:14px; font-size:13px; font-weight:900; white-space:nowrap; box-shadow:0 2px 8px rgba(255,152,0,0.25);">
+        🏷️ Rollo: ${escHtml(trabActual.id_rollo_papel || "N/A")}
+      </span>
+      <span class="kiosk-bubble-item" style="display:inline-flex; align-items:center; gap:5px; background:#182533; border:1.5px solid #38BDF8; color:#38BDF8; padding:5px 14px; border-radius:14px; font-size:13px; font-weight:900; white-space:nowrap; box-shadow:0 2px 8px rgba(56,189,248,0.25);">
+        📦 Lote: ${escHtml(trabActual.batch_id || "N/A")}
+      </span>
+    `
+    : `
+      <span class="kiosk-bubble-item" style="display:inline-flex; align-items:center; gap:5px; background:#1b2130; border:1.5px solid #ff9800; color:#ff9800; padding:5px 14px; border-radius:14px; font-size:13px; font-weight:900; white-space:nowrap; box-shadow:0 2px 8px rgba(255,152,0,0.25);">
+        🏷️ Rollo: ${escHtml(trabActual.num_rollo_tela || "N/A")}
+      </span>
+      <span class="kiosk-bubble-item" style="display:inline-flex; align-items:center; gap:5px; background:#182533; border:1.5px solid #38BDF8; color:#38BDF8; padding:5px 14px; border-radius:14px; font-size:13px; font-weight:900; white-space:nowrap; box-shadow:0 2px 8px rgba(56,189,248,0.25);">
+        🎨 Color: ${escHtml(trabActual.color_tela || "Blanco")}
+      </span>
+    `;
 
   document.getElementById("kioscoSubtitulo").innerHTML = `
     <!-- Encabezado Kiosko General con botón para ver cola opcional -->
     <div id="kioscoTopHeader" style="display:flex; justify-content:space-between; align-items:center; background:#151821; border:1px solid #2a324b; padding:8px 14px; border-radius:8px; margin-bottom:10px;">
       <div style="display:flex; align-items:center; gap:10px;">
-        <span style="font-size:15px; font-weight:900; color:#00E676;">TRABAJO ${STATE.kiosco.indiceActual + 1} DE ${trabajos.length}</span>
-        <button type="button" id="btnKioscoToggleCola" style="background:#1e293b; border:1px solid #475569; color:#94a3b8; font-size:11px; padding:3px 10px; border-radius:6px; cursor:pointer; font-weight:bold;" title="Ver todos los trabajos del rollo">📋 Ver cola (${pendientesRestantes.length})</button>
+        <span style="font-size:15px; font-weight:900; color:#00E676;">${esLaser ? "LOTE" : "TRABAJO"} ${STATE.kiosco.indiceActual + 1} DE ${trabajos.length}</span>
+        <button type="button" id="btnKioscoToggleCola" style="background:#1e293b; border:1px solid #475569; color:#94a3b8; font-size:11px; padding:3px 10px; border-radius:6px; cursor:pointer; font-weight:bold;" title="Ver todos los trabajos">${esLaser ? "📋 Ver cola láser" : "📋 Ver cola"} (${pendientesRestantes.length})</button>
       </div>
       <div style="text-align:right; font-size:13px; color:#aaa;">
         Restante: <strong style="color:#4CAF50; font-size:16px;">${fmtNum(totalM)} m</strong>
@@ -2235,7 +2265,7 @@ function renderContenidoModalKiosco() {
     <!-- Panel de cola colapsable (oculto por defecto para cero distracciones) -->
     <div id="kioscoPanelColaOculta" style="display:none; background:#11141c; border:1px solid #334155; border-radius:8px; padding:10px; margin-bottom:12px; max-height:240px; overflow-y:auto;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid #2a324b; padding-bottom:6px;">
-        <span style="font-size:12px; font-weight:bold; color:#00E676;">📋 SECUENCIA DEL ROLLO (${trabajos.length} trabajos) — Tocá uno para saltar a él:</span>
+        <span style="font-size:12px; font-weight:bold; color:#00E676;">📋 SECUENCIA PENDIENTE (${trabajos.length} trabajos) — Tocá uno para saltar a él:</span>
         <button type="button" id="btnCerrarColaOculta" style="background:none; border:none; color:#ff5252; font-size:14px; font-weight:bold; cursor:pointer;">✖ Cerrar</button>
       </div>
       ${trabajos.map((t, idx) => {
@@ -2250,25 +2280,29 @@ function renderContenidoModalKiosco() {
         if (esCompletado) {
           borderStyle = "1px solid #2e7d32";
           bgStyle = "rgba(46, 125, 50, 0.12)";
-          badgeEstado = `<span style="background:#2e7d32; color:#fff; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:bold;">✅ YA CALANDRADO</span>`;
+          badgeEstado = `<span style="background:#2e7d32; color:#fff; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:bold;">✅ TERMINADO</span>`;
         } else if (esDescartado) {
           borderStyle = "1px solid #b71c1c";
           bgStyle = "rgba(183, 28, 28, 0.12)";
-          badgeEstado = `<span style="background:#b71c1c; color:#fff; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:bold;">✂️ PAPEL DESECHADO</span>`;
+          badgeEstado = `<span style="background:#b71c1c; color:#fff; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:bold;">✂️ MERMA / DESCARTE</span>`;
         } else if (esActual) {
           borderStyle = "2px solid #00E676";
           bgStyle = "rgba(0, 230, 118, 0.10)";
-          badgeEstado = `<span style="background:#00E676; color:#000; padding:3px 10px; border-radius:4px; font-size:11px; font-weight:bold;">🔥 CALANDRANDO AHORA</span>`;
+          badgeEstado = `<span style="background:#00E676; color:#000; padding:3px 10px; border-radius:4px; font-size:11px; font-weight:bold;">⚡ EN PROCESO AHORA</span>`;
         }
+
+        const tNom = t.cliente_archivo || t.diseno || (t.archivos ? t.archivos.join(" | ") : "-");
+        const tTela = t.tela_destino || t.tela || t.tela_rollo_color || "-";
+        const tMetros = fmtNum(t.metros_totales || t.metros || 0);
 
         return `
           <div class="kiosco-item-card" data-kiosco-idx="${idx}" style="background:${bgStyle}; padding:8px 12px; border-radius:6px; border:${borderStyle}; margin-bottom:6px; font-size:12px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; gap:8px;">
             <div>
               ${badgeEstado}
-              <strong style="color:#fff; margin-left:6px;">${escHtml(t.cliente_archivo)}</strong>
-              <span style="color:#2196F3; font-weight:bold; margin-left:6px;">[${escHtml(t.tela_destino || "-")}]</span>
+              <strong style="color:#fff; margin-left:6px;">${escHtml(tNom)}</strong>
+              <span style="color:#2196F3; font-weight:bold; margin-left:6px;">[${escHtml(tTela)}]</span>
             </div>
-            <div style="font-size:14px; font-weight:bold; color:var(--accent); white-space:nowrap;">${fmtNum(t.metros)}m</div>
+            <div style="font-size:14px; font-weight:bold; color:var(--accent); white-space:nowrap;">${tMetros}m</div>
           </div>
         `;
       }).join("")}
@@ -2278,30 +2312,26 @@ function renderContenidoModalKiosco() {
     <div class="kiosk-player-grid">
       <div class="kiosk-player-left" style="text-align:center;">
         ${imgPreviewHtml}
-        <div class="kiosk-metros-val" style="font-size:38px; font-weight:900; color:var(--accent-magenta); line-height:1;">${fmtNum(trabActual.metros)} m</div>
-        <div class="kiosk-metros-lbl" style="color:#aaa; font-size:11px; margin-top:3px; font-weight:bold; letter-spacing:0.5px;">METROS A CALANDRAR</div>
+        <div class="kiosk-metros-val" style="font-size:38px; font-weight:900; color:var(--accent-magenta); line-height:1;">${metrosVal} m</div>
+        <div class="kiosk-metros-lbl" style="color:#aaa; font-size:11px; margin-top:3px; font-weight:bold; letter-spacing:0.5px;">${labelMetros}</div>
+
+        <!-- Burbujas Rollo y Color / Lote DEBAJO DE LOS METROS y más grandes -->
+        <div class="kiosk-bubbles-rollo-color" style="display:flex; justify-content:center; gap:10px; align-items:center; flex-wrap:wrap; margin-top:8px;">
+          ${bubblesHtml}
+        </div>
       </div>
 
       <div class="kiosk-player-right" style="display:flex; flex-direction:column; gap:8px;">
         <!-- Tela en grande y visible -->
         <div class="kiosk-info-tela" style="background:#0f1117; padding:8px 12px; border-radius:6px; border-left:4px solid #2196F3; display:flex; align-items:center; gap:8px; overflow:hidden;">
           <span style="color:#888; font-size:12px; font-weight:bold; white-space:nowrap;">TELA:</span>
-          <span style="font-size:18px; font-weight:900; color:#2196F3; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escHtml(trabActual.tela_destino || "-")}">${escHtml(trabActual.tela_destino || "-")}</span>
+          <span style="font-size:18px; font-weight:900; color:#2196F3; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escHtml(telaVal)}">${escHtml(telaVal)}</span>
         </div>
 
-        <!-- Cliente / Diseño Limpio -->
-        <div class="kiosk-info-cliente-rollo" style="background:#0f1117; padding:8px 12px; border-radius:6px; border:1px solid #2a324b; display:flex; flex-direction:column; gap:6px;">
-          <div style="font-size:13px; font-weight:bold; color:#fff; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.3;" title="${escHtml(trabActual.cliente_archivo)}">
+        <!-- Cliente / Diseño Limpio (sin las burbujas adentro) -->
+        <div class="kiosk-info-cliente-rollo" style="background:#0f1117; padding:10px 14px; border-radius:8px; border:1px solid #2a324b; display:flex; flex-direction:column; gap:4px;">
+          <div style="font-size:14px; font-weight:bold; color:#fff; line-height:1.35;" title="${escHtml(rawNombre)}">
             <span style="color:#888; font-size:11px; font-weight:normal; margin-right:4px;">CLIENTE / TRABAJO:</span>${escHtml(nombreLimpio)}
-          </div>
-          <!-- Número y color de rollo -->
-          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-            <span style="display:inline-flex; align-items:center; gap:4px; background:#1b2130; border:1px solid #ff9800; color:#ff9800; padding:2px 10px; border-radius:12px; font-size:11px; font-weight:bold; white-space:nowrap;">
-              🏷️ Rollo: ${escHtml(trabActual.num_rollo_tela || "N/A")}
-            </span>
-            <span style="display:inline-flex; align-items:center; gap:4px; background:#182533; border:1px solid #38BDF8; color:#38BDF8; padding:2px 10px; border-radius:12px; font-size:11px; font-weight:bold; white-space:nowrap;">
-              🎨 Color: ${escHtml(trabActual.color_tela || "Blanco")}
-            </span>
           </div>
         </div>
 
@@ -2313,20 +2343,34 @@ function renderContenidoModalKiosco() {
       </div>
     </div>
 
-    <!-- Parámetros operativos (Velocidad y Temperatura) -->
+    <!-- Parámetros operativos adaptados para Calandrado o Láser -->
     <div id="kioscoParametrosBox" style="background:#111; border:1px solid #333; padding:10px 14px; border-radius:8px; margin-top:8px; display:flex; justify-content:space-around; align-items:center; flex-wrap:wrap; gap:10px;">
-      <div style="text-align:center;">
-        <label style="font-size:11px; color:#aaa; display:block; margin-bottom:4px; font-weight:bold;">⚙️ VELOCIDAD (m/min)</label>
-        <input type="number" id="kioscoInputVelocidad" value="${velActual}" step="1" style="width:105px; font-size:22px; text-align:center; padding:6px; background:#1a1c23; color:#00E676; border:1px solid #4CAF50; border-radius:6px; font-weight:bold;" />
-      </div>
-      <div style="text-align:center;">
-        <label style="font-size:11px; color:#aaa; display:block; margin-bottom:4px; font-weight:bold;">🔥 TEMPERATURA (°C)</label>
-        <input type="number" id="kioscoInputTemperatura" value="${tempActual}" step="1" style="width:105px; font-size:22px; text-align:center; padding:6px; background:#1a1c23; color:#ff9800; border:1px solid #ff9800; border-radius:6px; font-weight:bold;" />
-      </div>
-      <div id="kioscoFallaBtns" style="display:flex; gap:8px;">
-        <button type="button" class="btn-kiosco-reportar-falla" data-id="${trabActual.id}" data-estacion="Calandrado" style="background:rgba(216,27,96,0.18); border:1px solid var(--accent-magenta); color:#ff4081; padding:10px 14px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">⚠️ FALLA CALANDRA</button>
-        <button type="button" class="btn-kiosco-reportar-falla" data-id="${trabActual.id}" data-estacion="Impresión" style="background:rgba(255,152,0,0.18); border:1px solid var(--accent-orange); color:#ff9800; padding:10px 14px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">⚠️ FALLA IMPRESIÓN</button>
-      </div>
+      ${esLaser ? `
+        <div style="text-align:center;">
+          <label style="font-size:11px; color:#aaa; display:block; margin-bottom:4px; font-weight:bold;">⚡ VELOCIDAD (mm/s)</label>
+          <input type="number" id="kioscoInputVelocidad" value="${velActual}" step="10" style="width:105px; font-size:22px; text-align:center; padding:6px; background:#1a1c23; color:#00E676; border:1px solid #4CAF50; border-radius:6px; font-weight:bold;" />
+        </div>
+        <div style="text-align:center;">
+          <label style="font-size:11px; color:#aaa; display:block; margin-bottom:4px; font-weight:bold;">💡 POTENCIA (%)</label>
+          <input type="number" id="kioscoInputTemperatura" value="${tempActual}" step="1" max="100" style="width:105px; font-size:22px; text-align:center; padding:6px; background:#1a1c23; color:#38BDF8; border:1px solid #38BDF8; border-radius:6px; font-weight:bold;" />
+        </div>
+        <div id="kioscoFallaBtns" style="display:flex; gap:8px;">
+          <button type="button" class="btn-kiosco-reportar-falla" data-id="${trabActual.id}" data-estacion="Láser" style="background:rgba(216,27,96,0.18); border:1px solid var(--accent-magenta); color:#ff4081; padding:10px 14px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">⚠️ FALLA LÁSER</button>
+        </div>
+      ` : `
+        <div style="text-align:center;">
+          <label style="font-size:11px; color:#aaa; display:block; margin-bottom:4px; font-weight:bold;">⚙️ VELOCIDAD (m/min)</label>
+          <input type="number" id="kioscoInputVelocidad" value="${velActual}" step="1" style="width:105px; font-size:22px; text-align:center; padding:6px; background:#1a1c23; color:#00E676; border:1px solid #4CAF50; border-radius:6px; font-weight:bold;" />
+        </div>
+        <div style="text-align:center;">
+          <label style="font-size:11px; color:#aaa; display:block; margin-bottom:4px; font-weight:bold;">🔥 TEMPERATURA (°C)</label>
+          <input type="number" id="kioscoInputTemperatura" value="${tempActual}" step="1" style="width:105px; font-size:22px; text-align:center; padding:6px; background:#1a1c23; color:#ff9800; border:1px solid #ff9800; border-radius:6px; font-weight:bold;" />
+        </div>
+        <div id="kioscoFallaBtns" style="display:flex; gap:8px;">
+          <button type="button" class="btn-kiosco-reportar-falla" data-id="${trabActual.id}" data-estacion="Calandrado" style="background:rgba(216,27,96,0.18); border:1px solid var(--accent-magenta); color:#ff4081; padding:10px 14px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">⚠️ FALLA CALANDRA</button>
+          <button type="button" class="btn-kiosco-reportar-falla" data-id="${trabActual.id}" data-estacion="Impresión" style="background:rgba(255,152,0,0.18); border:1px solid var(--accent-orange); color:#ff9800; padding:10px 14px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">⚠️ FALLA IMPRESIÓN</button>
+        </div>
+      `}
     </div>
   `;
 
@@ -2339,13 +2383,13 @@ function renderContenidoModalKiosco() {
     btnToggleCola.onclick = () => {
       const oculto = panelCola.style.display === "none";
       panelCola.style.display = oculto ? "block" : "none";
-      btnToggleCola.textContent = oculto ? "✖ Ocultar cola" : `📋 Ver cola (${pendientesRestantes.length})`;
+      btnToggleCola.textContent = oculto ? "✖ Ocultar cola" : `${esLaser ? "📋 Ver cola láser" : "📋 Ver cola"} (${pendientesRestantes.length})`;
     };
   }
   if (btnCerrarCola && panelCola && btnToggleCola) {
     btnCerrarCola.onclick = () => {
       panelCola.style.display = "none";
-      btnToggleCola.textContent = `📋 Ver cola (${pendientesRestantes.length})`;
+      btnToggleCola.textContent = `${esLaser ? "📋 Ver cola láser" : "📋 Ver cola"} (${pendientesRestantes.length})`;
     };
   }
 
@@ -2354,11 +2398,15 @@ function renderContenidoModalKiosco() {
   const btnFin = document.getElementById("btnKioscoFinalizar");
 
   if (btnSig) {
-    btnSig.innerHTML = pendientesRestantes.length > 1 ? "✔️ TERMINAR ESTE Y SIGUIENTE ➔" : "✔️ FINALIZAR TRABAJO";
+    if (esLaser) {
+      btnSig.innerHTML = pendientesRestantes.length > 1 ? "✔️ TERMINAR CORTE Y SIGUIENTE ➔" : "✔️ FINALIZAR CORTE";
+    } else {
+      btnSig.innerHTML = pendientesRestantes.length > 1 ? "✔️ TERMINAR ESTE Y SIGUIENTE ➔" : "✔️ FINALIZAR TRABAJO";
+    }
     btnSig.style.display = "block";
   }
   if (btnDesc) {
-    btnDesc.innerHTML = "✂️ DESECHAR PAPEL";
+    btnDesc.innerHTML = esLaser ? "✂️ MERMA LÁSER" : "✂️ DESECHAR PAPEL";
     btnDesc.style.display = "block";
   }
   if (btnFin) {
@@ -2381,7 +2429,10 @@ function renderContenidoModalKiosco() {
       e.stopPropagation();
       const id = btn.getAttribute("data-id");
       const est = btn.getAttribute("data-estacion");
-      const reg = STATE.colaCalandrado.find(c => c.id === id);
+      let reg = STATE.colaCalandrado.find(c => c.id === id);
+      if (!reg && STATE.kiosco.modulo === "laser") {
+        reg = STATE.kiosco.trabajos.find(c => c.id === id) || STATE.colaLaser.find(c => c.id === id);
+      }
       if (reg) await reportarFallaConReposicion(reg, est);
     };
   });
@@ -2424,6 +2475,7 @@ function abrirKioscoCalandra(idCal, rolloId = null) {
     return;
   }
 
+  STATE.kiosco.modulo = "calandrado";
   STATE.kiosco.modo = "ROLLO";
   STATE.kiosco.abierto = true;
   STATE.kiosco.corriendoEnFondo = false;
@@ -2445,6 +2497,64 @@ function abrirKioscoCalandra(idCal, rolloId = null) {
   if (STATE.kiosco.timerInterval) clearInterval(STATE.kiosco.timerInterval);
   STATE.kiosco.timerInterval = setInterval(actualizarDisplayCronometroKiosco, 1000);
 
+  vincularBotonesAccionesKiosco();
+}
+
+function abrirKioscoLaser(batchId = null, idsCsv = null) {
+  const modal = document.getElementById("modalKioscoOperativo");
+  if (!modal) return;
+
+  if (STATE.kiosco.corriendoEnFondo && STATE.kiosco.modulo === "laser") {
+    restaurarKioscoDesdeFondo();
+    return;
+  }
+
+  const pendRaw = STATE.colaLaser.filter(l => !String(l.estado).toLowerCase().includes("terminado"));
+  const lotesAgrupados = agruparLaserPorBatch(pendRaw);
+
+  let trabajos = [];
+  let nombreLote = batchId || "Cola General";
+
+  if (batchId) {
+    trabajos = lotesAgrupados.filter(l => l.batch_id === batchId);
+  } else if (idsCsv) {
+    const idArr = String(idsCsv).split(",").map(s => s.trim());
+    trabajos = lotesAgrupados.filter(l => l.ids.some(id => idArr.includes(id)));
+  } else {
+    trabajos = lotesAgrupados;
+  }
+
+  if (trabajos.length === 0) {
+    toast("No hay trabajos de corte láser pendientes.", "warn");
+    return;
+  }
+
+  STATE.kiosco.modulo = "laser";
+  STATE.kiosco.modo = "LASER";
+  STATE.kiosco.abierto = true;
+  STATE.kiosco.corriendoEnFondo = false;
+  STATE.kiosco.pausado = false;
+  STATE.kiosco.acumuladoMs = 0;
+  STATE.kiosco.ultimoInicioMs = Date.now();
+  STATE.kiosco.inicioMs = Date.now();
+  STATE.kiosco.rolloId = nombreLote;
+  STATE.kiosco.trabajos = trabajos;
+  STATE.kiosco.indiceActual = 0;
+  STATE.kiosco.registroIds = trabajos.map(t => t.id);
+  STATE.kiosco.completadosIds = new Set();
+  STATE.kiosco.descartadosIds = new Set();
+
+  renderContenidoModalKiosco();
+  modal.classList.add("open");
+  actualizarDisplayCronometroKiosco();
+
+  if (STATE.kiosco.timerInterval) clearInterval(STATE.kiosco.timerInterval);
+  STATE.kiosco.timerInterval = setInterval(actualizarDisplayCronometroKiosco, 1000);
+
+  vincularBotonesAccionesKiosco();
+}
+
+function vincularBotonesAccionesKiosco() {
   const btnPausa = document.getElementById("btnKioscoPausarReanudar");
   if (btnPausa) btnPausa.onclick = alternarPausaKiosco;
 
@@ -2454,7 +2564,10 @@ function abrirKioscoCalandra(idCal, rolloId = null) {
   const btnCerrar = document.getElementById("btnKioscoCancelarDefinitivo");
   if (btnCerrar) {
     btnCerrar.onclick = () => {
-      if (confirm("¿Cerrar el Modo Kiosko y detener el cronómetro sin guardar?")) {
+      const msg = STATE.kiosco.modulo === "laser"
+        ? "¿Cerrar el Modo Kiosko Láser y detener el cronómetro sin guardar?"
+        : "¿Cerrar el Modo Kiosko y detener el cronómetro sin guardar?";
+      if (confirm(msg)) {
         cerrarKioscoDefinitivo();
       }
     };
@@ -2466,17 +2579,32 @@ function abrirKioscoCalandra(idCal, rolloId = null) {
       const trabActual = STATE.kiosco.trabajos[STATE.kiosco.indiceActual];
       if (!trabActual) return;
 
+      const esLaser = STATE.kiosco.modulo === "laser";
       const min = Math.max(1, Math.round(obtenerMsTranscurridosKiosco() / 60000));
-      const vel = parseFloat(document.getElementById("kioscoInputVelocidad")?.value) || 50;
-      const temp = parseFloat(document.getElementById("kioscoInputTemperatura")?.value) || 205;
+      const vel = parseFloat(document.getElementById("kioscoInputVelocidad")?.value) || (esLaser ? 300 : 50);
+      const valParam2 = parseFloat(document.getElementById("kioscoInputTemperatura")?.value) || (esLaser ? 85 : 205);
 
-      await finalizarTrabajoCalandrado(trabActual.id, min, true, vel, temp);
-      STATE.kiosco.completadosIds.add(trabActual.id);
+      if (esLaser) {
+        const idsToUpdate = trabActual.ids || [trabActual.id];
+        for (const id of idsToUpdate) {
+          await sb().from("prod_cola_laser").update({
+            estado: "Terminado",
+            fecha_terminado: new Date().toISOString(),
+            velocidad: vel,
+            poder: valParam2
+          }).eq("id", id);
+        }
+        STATE.kiosco.completadosIds.add(trabActual.id);
+        toast(`✅ Corte Láser finalizado (Vel: ${vel}mm/s | Poder: ${valParam2}%).`);
+      } else {
+        await finalizarTrabajoCalandrado(trabActual.id, min, true, vel, valParam2);
+        STATE.kiosco.completadosIds.add(trabActual.id);
+      }
 
       const sigIdx = buscarSiguienteIndicePendienteKiosco(STATE.kiosco.indiceActual);
       if (sigIdx === -1) {
         cerrarKioscoDefinitivo();
-        toast(`✅ ¡Todos los trabajos del rollo fueron calandrados!`);
+        toast(esLaser ? `🏁 ¡Todos los cortes láser fueron finalizados!` : `🏁 ¡Todos los trabajos del rollo fueron calandrados!`);
         await cargarDatosTodo();
         return;
       }
@@ -2485,7 +2613,8 @@ function abrirKioscoCalandra(idCal, rolloId = null) {
       STATE.kiosco.acumuladoMs = 0;
       STATE.kiosco.ultimoInicioMs = Date.now();
       STATE.kiosco.pausado = false;
-      toast(`✅ "${trabActual.cliente_archivo}" guardado (${min} min | Vel: ${vel}m/min | Temp: ${temp}°C). Pasando al siguiente trabajo.`);
+      const tNom = trabActual.cliente_archivo || trabActual.diseno || (trabActual.archivos ? trabActual.archivos.join(" | ") : "Trabajo");
+      toast(`✅ "${tNom}" guardado. Pasando al siguiente.`);
       renderContenidoModalKiosco();
       actualizarDisplayCronometroKiosco();
       await cargarDatosTodo();
@@ -2498,35 +2627,55 @@ function abrirKioscoCalandra(idCal, rolloId = null) {
       const trabActual = STATE.kiosco.trabajos[STATE.kiosco.indiceActual];
       if (!trabActual) return;
 
-      const motivo = prompt(`Vas a desechar el papel de "${trabActual.cliente_archivo}" (${fmtNum(trabActual.metros)}m).\nMotivo del descarte / falla:`, "Papel desechado en Calandra");
+      const esLaser = STATE.kiosco.modulo === "laser";
+      const tNom = trabActual.cliente_archivo || trabActual.diseno || (trabActual.archivos ? trabActual.archivos.join(" | ") : "Trabajo");
+      const tMetros = Number(trabActual.metros_totales || trabActual.metros) || 0;
+
+      const motivo = prompt(
+        esLaser
+          ? `Vas a registrar merma/descarte en Láser para "${tNom}" (${fmtNum(tMetros)}m).\nMotivo del descarte:`
+          : `Vas a desechar el papel de "${tNom}" (${fmtNum(tMetros)}m).\nMotivo del descarte / falla:`,
+        esLaser ? "Merma en Corte Láser" : "Papel desechado en Calandra"
+      );
       if (motivo === null) return;
 
       await sb().from("prod_fallas_reposiciones").insert({
         empresa_id: "vvgrafic-principal",
         tipo_registro: "ALERTA_REPOSICION",
-        estacion: "Calandrado",
+        estacion: esLaser ? "Láser" : "Calandrado",
         id_rollo: trabActual.id_rollo_papel,
         batch_id: trabActual.batch_id,
-        archivo_afectado: trabActual.cliente_archivo,
-        tela: trabActual.tela_destino,
-        metros_merma: Number(trabActual.metros) || 0,
-        detalle_reposicion: `Papel desechado (${fmtNum(trabActual.metros)}m)`,
-        motivo: motivo || "Papel desechado en Calandra",
+        archivo_afectado: tNom,
+        tela: trabActual.tela_destino || trabActual.tela || trabActual.tela_rollo_color,
+        metros_merma: tMetros,
+        detalle_reposicion: esLaser ? `Merma en Láser (${fmtNum(tMetros)}m)` : `Papel desechado (${fmtNum(tMetros)}m)`,
+        motivo: motivo || (esLaser ? "Merma en Láser" : "Papel desechado en Calandra"),
         estado: "Pendiente"
       });
 
-      await sb().from("prod_cola_calandrado").update({
-        estado: "Terminado",
-        fecha_terminado: new Date().toISOString(),
-        observaciones: `[PAPEL DESECHADO: ${motivo}] ${trabActual.observaciones || ""}`.trim()
-      }).eq("id", trabActual.id);
+      if (esLaser) {
+        const idsToUpdate = trabActual.ids || [trabActual.id];
+        for (const id of idsToUpdate) {
+          await sb().from("prod_cola_laser").update({
+            estado: "Terminado",
+            fecha_terminado: new Date().toISOString(),
+            observaciones: `[MERMA LÁSER: ${motivo}] ${trabActual.observaciones || ""}`.trim()
+          }).eq("id", id);
+        }
+      } else {
+        await sb().from("prod_cola_calandrado").update({
+          estado: "Terminado",
+          fecha_terminado: new Date().toISOString(),
+          observaciones: `[PAPEL DESECHADO: ${motivo}] ${trabActual.observaciones || ""}`.trim()
+        }).eq("id", trabActual.id);
+      }
 
       STATE.kiosco.descartadosIds.add(trabActual.id);
 
       const sigIdx = buscarSiguienteIndicePendienteKiosco(STATE.kiosco.indiceActual);
       if (sigIdx === -1) {
         cerrarKioscoDefinitivo();
-        toast(`✂️ Papel desechado registrado. Fin del rollo.`);
+        toast(esLaser ? `✂️ Merma registrada. Fin de la cola láser.` : `✂️ Papel desechado registrado. Fin del rollo.`);
         await cargarDatosTodo();
         return;
       }
@@ -2534,7 +2683,7 @@ function abrirKioscoCalandra(idCal, rolloId = null) {
       STATE.kiosco.indiceActual = sigIdx;
       STATE.kiosco.acumuladoMs = 0;
       STATE.kiosco.ultimoInicioMs = Date.now();
-      toast(`✂️ Papel desechado registrado. Avanzando al siguiente trabajo.`);
+      toast(esLaser ? `✂️ Merma registrada. Avanzando al siguiente lote láser.` : `✂️ Papel desechado registrado. Avanzando al siguiente trabajo.`);
       renderContenidoModalKiosco();
       actualizarDisplayCronometroKiosco();
       await cargarDatosTodo();
@@ -2544,23 +2693,39 @@ function abrirKioscoCalandra(idCal, rolloId = null) {
   const btnFin = document.getElementById("btnKioscoFinalizar");
   if (btnFin) {
     btnFin.onclick = async () => {
+      const esLaser = STATE.kiosco.modulo === "laser";
       const pendientesIds = STATE.kiosco.trabajos
         .map(t => t.id)
         .filter(id => !STATE.kiosco.completadosIds.has(id) && !STATE.kiosco.descartadosIds.has(id));
 
-      if (pendientesIds.length > 0 && !confirm(`⚠️ ¿Deseas TERMINAR TODO y marcar como calandrados los ${pendientesIds.length} trabajos restantes de esta bobina?`)) {
+      if (pendientesIds.length > 0 && !confirm(esLaser ? `⚠️ ¿Deseas TERMINAR TODO y marcar como cortados los ${pendientesIds.length} lotes restantes?` : `⚠️ ¿Deseas TERMINAR TODO y marcar como calandrados los ${pendientesIds.length} trabajos restantes de esta bobina?`)) {
         return;
       }
 
       const min = Math.max(1, Math.round(obtenerMsTranscurridosKiosco() / 60000));
-      const vel = parseFloat(document.getElementById("kioscoInputVelocidad")?.value) || 50;
-      const temp = parseFloat(document.getElementById("kioscoInputTemperatura")?.value) || 205;
+      const vel = parseFloat(document.getElementById("kioscoInputVelocidad")?.value) || (esLaser ? 300 : 50);
+      const valParam2 = parseFloat(document.getElementById("kioscoInputTemperatura")?.value) || (esLaser ? 85 : 205);
 
       cerrarKioscoDefinitivo();
-      for (const id of pendientesIds) {
-        await finalizarTrabajoCalandrado(id, min, true, vel, temp);
+      if (esLaser) {
+        for (const trab of STATE.kiosco.trabajos.filter(t => pendientesIds.includes(t.id))) {
+          const idsToUpdate = trab.ids || [trab.id];
+          for (const id of idsToUpdate) {
+            await sb().from("prod_cola_laser").update({
+              estado: "Terminado",
+              fecha_terminado: new Date().toISOString(),
+              velocidad: vel,
+              poder: valParam2
+            }).eq("id", id);
+          }
+        }
+        toast(`✅ Kiosko Láser finalizado (${pendientesIds.length} lote(s) guardados con Vel: ${vel}mm/s y Poder: ${valParam2}%).`);
+      } else {
+        for (const id of pendientesIds) {
+          await finalizarTrabajoCalandrado(id, min, true, vel, valParam2);
+        }
+        toast(`✅ Kiosko Calandrado finalizado (${pendientesIds.length} trabajo(s) guardados con Vel: ${vel}m/min y Temp: ${valParam2}°C).`);
       }
-      toast(`✅ Kiosko finalizado (${pendientesIds.length} trabajo(s) guardados con Vel: ${vel}m/min y Temp: ${temp}°C).`);
       await cargarDatosTodo();
     };
   }
@@ -2568,8 +2733,9 @@ function abrirKioscoCalandra(idCal, rolloId = null) {
 
 async function reportarFallaConReposicion(reg, estacion) {
   if (!reg) return;
-  const mDefault = reg.metros || reg.metros_impresos || 10;
-  const metrosFalla = parseFloat(prompt(`¿Cuántos metros salieron con falla en "${reg.cliente_archivo}"?`, mDefault)) || 0;
+  const mDefault = reg.metros || reg.metros_impresos || reg.metros_totales || 10;
+  const nombreArch = reg.cliente_archivo || reg.diseno || (reg.archivos ? reg.archivos.join(" | ") : "Trabajo");
+  const metrosFalla = parseFloat(prompt(`¿Cuántos metros salieron con falla en "${nombreArch}"?`, mDefault)) || 0;
   if (metrosFalla <= 0) return;
   const motivo = prompt("Motivo de la falla:", `Falla en ${estacion}`) || `Falla en ${estacion}`;
 
@@ -2577,10 +2743,10 @@ async function reportarFallaConReposicion(reg, estacion) {
     empresa_id: "vvgrafic-principal",
     tipo_registro: "ALERTA_REPOSICION",
     estacion,
-    id_rollo: reg.id_rollo_papel,
-    batch_id: reg.batch_id,
-    archivo_afectado: reg.cliente_archivo,
-    tela: reg.tela_destino,
+    id_rollo: reg.id_rollo_papel || null,
+    batch_id: reg.batch_id || null,
+    archivo_afectado: nombreArch,
+    tela: reg.tela_destino || reg.tela || reg.tela_rollo_color || null,
     metros_merma: metrosFalla,
     detalle_reposicion: `Reimprimir ${metrosFalla}m`,
     motivo,
@@ -2591,15 +2757,15 @@ async function reportarFallaConReposicion(reg, estacion) {
     empresa_id: "vvgrafic-principal",
     modulo: "SUBLIMACION",
     cliente: `REPOSICIÓN ${estacion.toUpperCase()}`,
-    nombre_archivo: `[REPO URGENTE] ${reg.cliente_archivo}`,
+    nombre_archivo: `[REPO URGENTE] ${nombreArch}`,
     medida_unitaria: metrosFalla,
     repeticiones: 1,
     metros_totales: metrosFalla,
-    perfil_detectado: reg.perfil,
-    tela_detectada: reg.tela_destino,
-    rollo_detectado: reg.num_rollo_tela,
-    color_detectado: reg.color_tela,
-    ruta_detectada: reg.ruta,
+    perfil_detectado: reg.perfil || "-",
+    tela_detectada: reg.tela_destino || reg.tela || reg.tela_rollo_color || "-",
+    rollo_detectado: reg.num_rollo_tela || "-",
+    color_detectado: reg.color_tela || "-",
+    ruta_detectada: reg.ruta || "-",
     prioridad_maxima: true,
     estado_impreso: "NO",
     file_id: `REPO-${Date.now()}`
@@ -3075,6 +3241,12 @@ export function inicializarEventosUI() {
       return;
     }
 
+    const btnLasKiosco = e.target.closest(".btn-laser-kiosco-lote");
+    if (btnLasKiosco) {
+      abrirKioscoLaser(btnLasKiosco.getAttribute("data-batch"), btnLasKiosco.getAttribute("data-ids"));
+      return;
+    }
+
     const btnLasCorte = e.target.closest(".btn-laser-cortar-lote");
     if (btnLasCorte) { cortarLoteLaser(btnLasCorte.getAttribute("data-ids")); return; }
 
@@ -3102,6 +3274,7 @@ export function inicializarEventosUI() {
   document.getElementById("btnGuardarModalCrud")?.addEventListener("click", guardarModalCrudUniversal);
   document.getElementById("btnKioscoBgPausar")?.addEventListener("click", alternarPausaKiosco);
   document.getElementById("btnKioscoBgVolver")?.addEventListener("click", restaurarKioscoDesdeFondo);
+  document.getElementById("btnAbrirKioscoLaserGeneral")?.addEventListener("click", () => abrirKioscoLaser());
 
   document.querySelectorAll(".vg-modal-close").forEach(btn => {
     btn.addEventListener("click", () => {

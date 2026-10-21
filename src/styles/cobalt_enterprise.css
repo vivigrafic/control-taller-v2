@@ -390,5 +390,5 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
     margin: 0 !important;
   }
 
-  #tabCalandrado .tabla-normal { min-width: 500px; }
+  #tabCalandrado .tabla-normal, #tabImpresion .tabla-normal, #sec-laser .tabla-normal { min-width: 800px !important; }
 }
