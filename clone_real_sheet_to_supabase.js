@@ -383,6 +383,13 @@ async function main() {
     const temp = numVal(r[14]) || 205;
     const mins = numVal(r[15]) || 0;
 
+    // El lote de impresión de un archivo (el calandrado se agrupa igual que se imprimió, no por la hora)
+    function loteDeImpresion(ids) {
+      const id = String(ids || '').split(',')[0].trim();
+      if (!id) return null;
+      const imp = historicoImp.find(x => String(x.file_id || '').split(',').map(t => t.trim()).includes(id));
+      return imp ? imp.batch_id : null;
+    }
     const isInfo = est.toLowerCase().includes('info') || clienteArchivo.includes('AJUSTE');
 
     if (allCalandra.length > 0 && !isInfo) {
@@ -395,6 +402,7 @@ async function main() {
         last.tela_destino === tela &&
         last.num_rollo_tela === numRollo &&
         last.color_tela === color &&
+        loteDeImpresion(last.file_id) && loteDeImpresion(last.file_id) === loteDeImpresion(fileId) &&
         !last.cliente_archivo.split(' | ').includes(clienteArchivo)
       ) {
         last.cliente_archivo += ' | ' + clienteArchivo;
@@ -412,7 +420,7 @@ async function main() {
     allCalandra.push({
       _tsRaw: tsRaw,
       empresa_id: 'vvgrafic-principal',
-      batch_id: `CAL-${rolloFila}-${tsRaw}-${seqIdx}`,
+      batch_id: loteDeImpresion(fileId) || `CAL-${rolloFila}-${tsRaw}-${seqIdx}`,
       fecha_hora: isoOrdered,
       fecha_terminado: esTerm ? isoOrdered : null,
       id_rollo_papel: rolloFila,

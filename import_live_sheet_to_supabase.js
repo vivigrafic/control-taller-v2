@@ -157,13 +157,17 @@ async function run() {
   console.log(`Filas recibidas: ${calCSV.length - 1}`);
 
   const calRows = [];
+  // El grupo de cada archivo es el de su impresión (no la hora: al terminar un rollo todas las filas quedan con la misma)
+  const lotePorArchivo = {};
+  impRows.forEach(x => String(x.file_id || '').split(',').map(t => t.trim()).filter(Boolean).forEach(id => { lotePorArchivo[id] = x.batch_id; }));
   for (let i = 1; i < calCSV.length; i++) {
     const r = calCSV[i];
     if (!r[0] && !r[1]) continue;
     const fIso = parseSpanishDate(r[0]);
     const rolloId = (r[1] || '').trim();
     const est = (r[11] || 'Pendiente').trim();
-    const batchKey = `BATCH-${rolloId.split('-C')[0]}-${new Date(fIso).getTime() || i}`;
+    const fileIdCal = (r[12] || '').trim();
+    const batchKey = lotePorArchivo[fileIdCal] || `CAL-${rolloId}-${new Date(fIso).getTime() || 0}-${i}`;
 
     calRows.push({
       empresa_id: 'vvgrafic-principal',
