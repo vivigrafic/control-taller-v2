@@ -148,10 +148,11 @@ function renderCajaMiniatura(thumbId, nombre, badgeTexto = "") {
 
   if (thumbId) {
     const thumbUrl = `https://drive.google.com/thumbnail?id=${escHtml(thumbId)}&sz=w140-h140`;
-    const fallbackThumbUrl = `https://lh3.googleusercontent.com/d/${escHtml(thumbId)}=s140`;
+    const fallback1 = `https://lh3.googleusercontent.com/d/${escHtml(thumbId)}=s140`;
+    const fallbackDirect = `https://drive.usercontent.google.com/download?id=${escHtml(thumbId)}`;
     return `
       <div class="caja-miniatura-wrap" style="position:relative; width:64px; height:64px; margin:0 auto; background:#111; border:1px solid #334155; border-radius:6px; overflow:hidden; display:flex; align-items:center; justify-content:center; ${cursorStyle}" ${clickAttr} title="${escHtml(nombre || "Ver archivo en Drive")}">
-        <img src="${thumbUrl}" alt="${nombreCorto}" style="width:100%; height:100%; object-fit:cover; display:block;" onerror="if(this.src!=='${fallbackThumbUrl}'){this.src='${fallbackThumbUrl}';}else{this.style.display='none'; this.nextElementSibling.style.display='flex';}" />
+        <img src="${thumbUrl}" alt="${nombreCorto}" referrerpolicy="no-referrer" loading="lazy" style="width:100%; height:100%; object-fit:cover; display:block;" onerror="if(this.dataset.step!=='1'&&this.dataset.step!=='2'){this.dataset.step='1';this.src='${fallback1}';}else if(this.dataset.step==='1'){this.dataset.step='2';this.src='${fallbackDirect}';}else{this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';}" />
         <div class="miniatura-ph" style="display:none; width:100%; height:100%; position:absolute; top:0; left:0; flex-direction:column; align-items:center; justify-content:center; background:#1e293b; color:#94a3b8; font-size:9px; text-align:center; padding:2px;">
           <span style="font-size:16px;">🖼️</span>
           <span style="font-size:8.5px; line-height:1; margin-top:2px; max-width:58px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${nombreCorto || "Diseño"}</span>
@@ -213,12 +214,13 @@ function renderCarruselCalandrado(c) {
     const driveUrl = thumbId ? `https://drive.google.com/file/d/${escHtml(thumbId)}/view` : null;
     const clickAttr = driveUrl ? `onclick="event.stopPropagation(); window.open('${driveUrl}', '_blank');"` : "";
     const thumbUrl = thumbId ? `https://drive.google.com/thumbnail?id=${escHtml(thumbId)}&sz=w160-h160` : "";
-    const fallbackThumbUrl = thumbId ? `https://lh3.googleusercontent.com/d/${escHtml(thumbId)}=s160` : "";
+    const fallback1 = thumbId ? `https://lh3.googleusercontent.com/d/${escHtml(thumbId)}=s160` : "";
+    const fallbackDirect = thumbId ? `https://drive.usercontent.google.com/download?id=${escHtml(thumbId)}` : "";
 
     slidesHtml.push(`
       <div class="cal-carrusel-slide" style="flex:0 0 76px; width:76px; height:76px; scroll-snap-align:center; position:relative; display:flex; align-items:center; justify-content:center; background:#0f172a; cursor:pointer;" ${clickAttr} title="${escHtml(archNom)} (Tocar para ver en Drive)">
         ${thumbId ? `
-          <img src="${thumbUrl}" alt="${archNomCorto}" style="width:100%; height:100%; object-fit:cover; display:block;" onerror="if(this.src!=='${fallbackThumbUrl}'){this.src='${fallbackThumbUrl}';}else{this.style.display='none'; this.nextElementSibling.style.display='flex';}" />
+          <img src="${thumbUrl}" alt="${archNomCorto}" referrerpolicy="no-referrer" loading="lazy" style="width:100%; height:100%; object-fit:cover; display:block;" onerror="if(this.dataset.step!=='1'&&this.dataset.step!=='2'){this.dataset.step='1';this.src='${fallback1}';}else if(this.dataset.step==='1'){this.dataset.step='2';this.src='${fallbackDirect}';}else{this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';}" />
           <div class="miniatura-ph" style="display:none; width:100%; height:100%; position:absolute; top:0; left:0; flex-direction:column; align-items:center; justify-content:center; background:#1e293b; color:#94a3b8; font-size:9px; text-align:center; padding:2px;">
             <span style="font-size:15px;">🖼️</span>
             <span style="max-width:70px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${archNomCorto}</span>
@@ -3204,11 +3206,13 @@ function renderContenidoModalKiosco() {
   const thumbIdActual = fileIds.length > 0 ? extraerThumbIdDrive(fileIds[0]) : null;
   const driveUrlActual = thumbIdActual ? `https://drive.google.com/file/d/${escHtml(thumbIdActual)}/view` : null;
   const clickAttrActual = driveUrlActual ? `onclick="event.stopPropagation(); window.open('${driveUrlActual}', '_blank');" title="Tocar para ver en Drive"` : "";
-  const fallbackThumbUrl = thumbIdActual ? `https://lh3.googleusercontent.com/d/${escHtml(thumbIdActual)}=s600` : "";
+  const thumbUrl = thumbIdActual ? `https://drive.google.com/thumbnail?id=${escHtml(thumbIdActual)}&sz=w600-h600` : "";
+  const fallback1 = thumbIdActual ? `https://lh3.googleusercontent.com/d/${escHtml(thumbIdActual)}=s600` : "";
+  const fallbackDirect = thumbIdActual ? `https://drive.usercontent.google.com/download?id=${escHtml(thumbIdActual)}` : "";
 
   const imgPreviewHtml = thumbIdActual
     ? `<div style="position:relative; width:100%; height:115px; background:#000; border:2px solid var(--accent-magenta); border-radius:8px; overflow:hidden; margin-bottom:6px; cursor:pointer;" ${clickAttrActual}>
-        <img class="kiosk-preview-img" src="https://drive.google.com/thumbnail?id=${escHtml(thumbIdActual)}&sz=w600-h600" style="width:100%; height:100%; object-fit:contain; display:block;" onerror="if(this.src!=='${fallbackThumbUrl}'){this.src='${fallbackThumbUrl}';}else{this.style.display='none'; this.nextElementSibling.style.display='flex';}" />
+        <img class="kiosk-preview-img" src="${thumbUrl}" alt="${nombreLimpio}" referrerpolicy="no-referrer" style="width:100%; height:100%; object-fit:contain; display:block;" onerror="if(this.dataset.step!=='1'&&this.dataset.step!=='2'){this.dataset.step='1';this.src='${fallback1}';}else if(this.dataset.step==='1'){this.dataset.step='2';this.src='${fallbackDirect}';}else{this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';}" />
         <div class="kiosk-preview-ph" style="display:none; width:100%; height:100%; position:absolute; top:0; left:0; align-items:center; justify-content:center; flex-direction:column; background:#111; color:#aaa; font-size:11px; font-weight:bold; padding:8px; text-align:center;">
           <span style="font-size:22px;">🖼️</span>
           <span style="margin-top:4px; max-width:90%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(nombreLimpio || "Ver en Drive")}</span>
