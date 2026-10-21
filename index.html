@@ -77,10 +77,11 @@
     <button type="button" class="tab-btn" data-tab="calandrado">2. CALANDRADO</button>
     <button type="button" class="tab-btn" data-tab="laser">3. LÁSER &amp; QC</button>
     <button type="button" class="tab-btn" data-tab="dtf">4. MÓDULO DTF</button>
-    <button type="button" class="tab-btn" data-tab="finanzas">5. FINANZAS</button>
-    <button type="button" class="tab-btn" data-tab="cierre">6. MANT. / CIERRE</button>
-    <button type="button" class="tab-btn" data-tab="metricas">7. MÉTRICAS (BI)</button>
-    <button type="button" class="tab-btn" data-tab="chat">8. 💬 CHAT (<span id="badgeTabChat">0</span>)</button>
+    <button type="button" class="tab-btn" data-tab="telas">5. 🧵 TELAS &amp; FICHAS</button>
+    <button type="button" class="tab-btn" data-tab="finanzas">6. FINANZAS</button>
+    <button type="button" class="tab-btn" data-tab="cierre">7. MANT. / CIERRE</button>
+    <button type="button" class="tab-btn" data-tab="metricas">8. MÉTRICAS (BI)</button>
+    <button type="button" class="tab-btn" data-tab="chat">9. 💬 CHAT (<span id="badgeTabChat">0</span>)</button>
   </div>
 
   <!-- ========================================================================
@@ -418,7 +419,65 @@
   </div>
 
   <!-- ========================================================================
-       TAB 5: FINANZAS Y STOCK (Copia exacta de Index.html líneas 289-319)
+       TAB 5: TELAS, FICHAS TÉCNICAS Y PARÁMETROS RELACIONALES
+       ======================================================================== -->
+  <div id="sec-telas" class="tab-content">
+    <div style="background: rgba(0, 230, 118, 0.08); border: 1px solid #00E676; padding: 10px 14px; border-radius: 6px; margin-bottom: 15px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <div>
+        <strong style="color:#00E676; font-size:15px;">🧵 Catálogo Maestro de Telas y Fichas Técnicas</strong>
+        <span style="color:#aaa; font-size:12px; margin-left:8px;">(Propiedades físicas, anchos aprendidos y parámetros calibrados de Calandrado y Corte Láser)</span>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button type="button" id="btnNuevaTelaModal" style="background:#00E676; color:#000; font-weight:900; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-size:12px; box-shadow:0 2px 8px rgba(0,230,118,0.3);">+ Nueva Tela / Ficha</button>
+      </div>
+    </div>
+
+    <!-- KPI BOXES DE TELAS -->
+    <div class="stats-grid">
+      <div class="stat-box" style="border-bottom: 3px solid #00E676;"><div class="stat-title" style="color:#00E676;">Telas Activas</div><div class="stat-value" id="kpiTelasActivas">0</div></div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--accent-blue);"><div class="stat-title">Partidas / Variantes</div><div class="stat-value" id="kpiTelasVariantes">0</div></div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--accent-orange);"><div class="stat-title">Rinde Promedio</div><div class="stat-value" id="kpiTelasRindeProm">0.00 m/kg</div></div>
+      <div class="stat-box" style="border-bottom: 3px solid var(--accent-magenta);"><div class="stat-title">Ancho Más Común</div><div class="stat-value" id="kpiTelasAnchoComun">1.50 m</div></div>
+      <div class="stat-box"><div class="stat-title">Temp Calandra Prom</div><div class="stat-value" id="kpiTelasTempProm">203 °C</div></div>
+      <div class="stat-box"><div class="stat-title">Vel Calandra Prom</div><div class="stat-value" id="kpiTelasVelProm">48 m/min</div></div>
+      <div class="stat-box"><div class="stat-title">Vel Láser Prom</div><div class="stat-value" id="kpiTelasVelLaserProm">315 mm/s</div></div>
+      <div class="stat-box"><div class="stat-title">Poder Láser Prom</div><div class="stat-value" id="kpiTelasPoderLaserProm">81 %</div></div>
+    </div>
+
+    <!-- BUSCADOR Y TABLA DE TELAS -->
+    <div class="card" style="border-top: 4px solid #00E676; margin-top:15px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+        <h2 style="margin:0; border:none; padding:0;">📋 Fichas Técnicas y Parámetros Relacionales de Máquina</h2>
+        <input type="text" id="searchTelasFichas" class="search-input" style="max-width:320px; margin:0;" placeholder="🔍 Buscar por nombre, código o composición..." />
+      </div>
+      <div style="overflow-x: auto;">
+        <table class="tabla-normal" id="tablaTelasFichas">
+          <thead>
+            <tr>
+              <th style="min-width:140px;">Acción</th>
+              <th>Código</th>
+              <th>Nombre Comercial</th>
+              <th>Composición</th>
+              <th>Ancho Real</th>
+              <th>Ancho Impresión</th>
+              <th>Rinde (m/kg)</th>
+              <th>Encogimiento</th>
+              <th>🔥 Calandrado</th>
+              <th>⚡ Corte Láser</th>
+              <th>Partida</th>
+              <th>Observaciones Técnicas</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyTelasFichas">
+            <tr><td colspan="12" style="text-align:center; padding:15px; color:#888;">Cargando catálogo de telas...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       TAB 6: FINANZAS Y STOCK (Copia exacta de Index.html líneas 289-319)
        ======================================================================== -->
   <div id="sec-finanzas" class="tab-content">
     <div class="stats-grid">
@@ -731,6 +790,130 @@
     </div>
   </div>
 
+  <!-- MODAL: CREAR / EDITAR TELA Y PARÁMETROS -->
+  <div id="modalTelaCrud" class="modal-overlay">
+    <div class="modal-content" style="border-color:#00E676; max-width:680px; width:100%; max-height:92dvh; display:flex; flex-direction:column; padding:0; overflow:hidden;">
+      <div style="background:#111; padding:12px 18px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #333;">
+        <h2 id="modalTelaCrudTitle" style="margin:0; border:none; padding:0; color:#00E676; font-size:16px;">🧵 Ficha Técnica de Tela</h2>
+        <button type="button" class="vg-modal-close" style="background:none; border:none; color:#ff5252; font-size:20px; font-weight:bold; cursor:pointer;">✖</button>
+      </div>
+      <div style="padding:16px; overflow-y:auto; flex:1;">
+        <input type="hidden" id="telaInputId" />
+        <input type="hidden" id="telaInputVarianteId" />
+
+        <div style="background:rgba(0,230,118,0.06); border:1px solid rgba(0,230,118,0.2); padding:10px; border-radius:6px; margin-bottom:12px;">
+          <h3 style="margin:0 0 8px 0; font-size:13px; color:#00E676;">1. Identificación de la Tela</h3>
+          <div class="grid-2">
+            <div>
+              <label>Nombre Comercial *</label>
+              <input type="text" id="telaInputNombre" placeholder="Ej: Sastrero Valentino" required />
+            </div>
+            <div>
+              <label>Código Interno</label>
+              <input type="text" id="telaInputCodigo" placeholder="Ej: TEL-SAST-VAL" />
+            </div>
+          </div>
+          <div class="grid-2" style="margin-top:6px;">
+            <div>
+              <label>Composición</label>
+              <input type="text" id="telaInputComposicion" placeholder="Ej: 100% Poliéster" />
+            </div>
+            <div>
+              <label>Proveedor Habitual</label>
+              <input type="text" id="telaInputProveedor" placeholder="Ej: Textil Principal" />
+            </div>
+          </div>
+          <label style="margin-top:6px;">Palabras Clave / Alias de Búsqueda (separados por coma)</label>
+          <input type="text" id="telaInputAlias" placeholder="Ej: VALENTINO, SASTRERO, VALENTINOS" />
+        </div>
+
+        <div style="background:rgba(33,150,243,0.06); border:1px solid rgba(33,150,243,0.2); padding:10px; border-radius:6px; margin-bottom:12px;">
+          <h3 style="margin:0 0 8px 0; font-size:13px; color:var(--accent-blue);">2. Partida y Propiedades Físicas</h3>
+          <div class="grid-2">
+            <div>
+              <label>Nombre Partida / Lote</label>
+              <input type="text" id="telaInputPartida" value="Estándar" placeholder="Ej: Estándar o Partida 1.60m" />
+            </div>
+            <div>
+              <label>Rinde (metros por kilo) *</label>
+              <input type="number" id="telaInputRinde" step="0.01" placeholder="Ej: 3.50" />
+            </div>
+          </div>
+          <div class="grid-2" style="margin-top:6px;">
+            <div>
+              <label>Ancho Real de Tela (m) *</label>
+              <input type="number" id="telaInputAnchoReal" step="0.01" placeholder="Ej: 1.50" />
+            </div>
+            <div>
+              <label>Ancho Sugerido Impresión (m) (Regla 2cm menos)</label>
+              <input type="number" id="telaInputAnchoImp" step="0.01" placeholder="Ej: 1.48" />
+            </div>
+          </div>
+          <div class="grid-2" style="margin-top:6px;">
+            <div>
+              <label>Gramaje (g/m²)</label>
+              <input type="number" id="telaInputGramaje" step="1" placeholder="Ej: 180" />
+            </div>
+            <div>
+              <label>Encogimiento Largo Calandra (%)</label>
+              <input type="number" id="telaInputEncogimiento" step="0.1" placeholder="Ej: 2.0" />
+            </div>
+          </div>
+        </div>
+
+        <div style="background:rgba(255,152,0,0.06); border:1px solid rgba(255,152,0,0.2); padding:10px; border-radius:6px; margin-bottom:12px;">
+          <h3 style="margin:0 0 8px 0; font-size:13px; color:var(--accent-orange);">3. Parámetros de Máquina Calibrados</h3>
+          <div class="grid-2">
+            <div>
+              <label>🔥 Calandra: Temperatura (°C)</label>
+              <input type="number" id="telaInputTempCal" step="1" placeholder="Ej: 205" />
+            </div>
+            <div>
+              <label>🔥 Calandra: Velocidad (m/min)</label>
+              <input type="number" id="telaInputVelCal" step="1" placeholder="Ej: 50" />
+            </div>
+          </div>
+          <div class="grid-2" style="margin-top:6px;">
+            <div>
+              <label>⚡ Láser: Velocidad (mm/s)</label>
+              <input type="number" id="telaInputVelLaser" step="10" placeholder="Ej: 300" />
+            </div>
+            <div>
+              <label>⚡ Láser: Potencia / Poder (%)</label>
+              <input type="number" id="telaInputPoderLaser" step="1" max="100" placeholder="Ej: 85" />
+            </div>
+          </div>
+        </div>
+
+        <label>Observaciones y Precauciones Técnicas</label>
+        <textarea id="telaInputObs" rows="2" placeholder="Indicaciones especiales de planchado, quemado de bordes, tensión, etc."></textarea>
+      </div>
+      <div style="background:#111; padding:12px 18px; border-top:1px solid #333; display:flex; justify-content:flex-end; gap:10px;">
+        <button type="button" class="btn-secondary vg-modal-close" style="width:auto; margin:0;">Cancelar</button>
+        <button type="button" id="btnGuardarTelaCrud" style="background:#00E676; color:#000; font-weight:900; border:none; padding:10px 20px; border-radius:6px; cursor:pointer; font-size:13px;">💾 Guardar Ficha Técnica</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: FICHA TÉCNICA RÁPIDA (Consulta flotante desde cualquier módulo) -->
+  <div id="modalTelaFichaRapida" class="modal-overlay">
+    <div class="modal-content" style="border-color:var(--accent-blue); max-width:540px; width:100%; max-height:90dvh; display:flex; flex-direction:column; padding:0; overflow:hidden;">
+      <div style="background:#111; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #333;">
+        <div>
+          <span style="font-size:11px; color:#888; text-transform:uppercase; font-weight:bold;">FICHA TÉCNICA TEXTIL</span>
+          <h2 id="fichaRapidaNombre" style="margin:0; border:none; padding:0; color:#2196F3; font-size:18px;">-</h2>
+        </div>
+        <button type="button" class="vg-modal-close" style="background:none; border:none; color:#ff5252; font-size:20px; font-weight:bold; cursor:pointer;">✖</button>
+      </div>
+      <div id="fichaRapidaBody" style="padding:16px; overflow-y:auto; flex:1;">
+        <!-- Inyectado dinámicamente -->
+      </div>
+      <div style="background:#111; padding:10px 18px; border-top:1px solid #333; display:flex; justify-content:flex-end;">
+        <button type="button" class="btn-secondary vg-modal-close" style="width:auto; margin:0;">Cerrar Ficha</button>
+      </div>
+    </div>
+  </div>
+
   <div id="modalCrudUniversal" class="modal-overlay">
     <div class="modal-content" style="border-color:var(--accent-blue); display:flex; flex-direction:column; max-height:90dvh; padding:0; overflow:hidden;">
       <div style="background:#111; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #333;">
@@ -750,6 +933,6 @@
   <datalist id="listColores"></datalist>
   <div id="vgToastContainer" style="position:fixed; top:16px; right:16px; z-index:3000; max-width:360px;"></div>
 
-  <script type="module" src="./src/app.js?v=20261020_07"></script>
+  <script type="module" src="./src/app.js?v=20261020_08"></script>
 </body>
 </html>

@@ -43,6 +43,11 @@ const STATE = {
   dtfPedidos: [],
   dtfCuentasClientes: [],
   chatMensajes: [],
+  telasFicha: [],
+  telasVariantes: [],
+  telasParametros: [],
+  historialAnchosTelas: [],
+  filtroTelasLocal: "",
 
   // Protección Dirty-Form (Pedido #7)
   impForm: {
@@ -230,7 +235,11 @@ export async function cargarDatosTodo() {
     resDtfTiradas,
     resDtfPedidos,
     resDtfCuentas,
-    resChat
+    resChat,
+    resTelasFicha,
+    resTelasVariantes,
+    resTelasParametros,
+    resHistorialAnchos
   ] = await Promise.all([
     client.from("v_prod_rollos_papel_saldos").select("*").order("fecha_montaje", { ascending: false }),
     client.from("v_prod_bloques_impresion").select("*"),
@@ -244,7 +253,11 @@ export async function cargarDatosTodo() {
     client.from("prod_dtf_tiradas").select("*").eq("anulado", false).order("fecha_hora", { ascending: false }),
     client.from("prod_dtf_pedidos").select("*").eq("anulado", false).order("fecha_hora", { ascending: false }),
     client.from("v_prod_dtf_cuentas_clientes").select("*").order("saldo_pendiente", { ascending: false }),
-    client.from("prod_chat_mensajes").select("*").order("created_at", { ascending: false }).limit(150)
+    client.from("prod_chat_mensajes").select("*").order("created_at", { ascending: false }).limit(150),
+    client.from("prod_telas_ficha").select("*").eq("activo", true).order("nombre_comercial", { ascending: true }),
+    client.from("prod_telas_variantes").select("*").order("es_predeterminada", { ascending: false }),
+    client.from("prod_telas_parametros").select("*"),
+    client.from("prod_historial_anchos_tela").select("*").order("fecha", { ascending: false }).limit(200)
   ]);
 
   STATE.rollosPapelSaldos = resRollosSaldos.data || [];
@@ -260,6 +273,10 @@ export async function cargarDatosTodo() {
   STATE.dtfPedidos = resDtfPedidos.data || [];
   STATE.dtfCuentasClientes = resDtfCuentas.data || [];
   STATE.chatMensajes = resChat.data || [];
+  STATE.telasFicha = resTelasFicha.data || [];
+  STATE.telasVariantes = resTelasVariantes.data || [];
+  STATE.telasParametros = resTelasParametros.data || [];
+  STATE.historialAnchosTelas = resHistorialAnchos.data || [];
 
   renderTodoRespetandoFormulario();
 }
@@ -326,6 +343,7 @@ function renderTodoRespetandoFormulario() {
   renderModuloCalandrado();
   renderModuloLaser();
   renderModuloDTF();
+  renderModuloTelas();
   renderModuloFinanzasYMantenimiento();
   renderModuloMetricasBI();
   renderModuloChat();
@@ -509,9 +527,15 @@ function renderChipsImpresion() {
   const perfiles = obtenerItemsMRU("PERFIL").slice(0, 5);
   const colores = obtenerItemsMRU("COLOR").slice(0, 6);
 
-  // Poblar datalists igual que en JS_Global.html
+  // Poblar datalists combinando telas maestras relacionales + MRU
   const dlTelas = document.getElementById("listTelas");
-  if (dlTelas) dlTelas.innerHTML = telas.map(t => `<option value="${escHtml(t.nombre)}">`).join("");
+  if (dlTelas) {
+    const nombresTelas = Array.from(new Set([
+      ...(STATE.telasFicha || []).map(t => t.nombre_comercial),
+      ...telas.map(t => t.nombre)
+    ]));
+    dlTelas.innerHTML = nombresTelas.map(nom => `<option value="${escHtml(nom)}">`).join("");
+  }
   const dlPerfiles = document.getElementById("listPerfiles");
   if (dlPerfiles) dlPerfiles.innerHTML = perfiles.map(p => `<option value="${escHtml(p.nombre)}">`).join("");
   const dlColores = document.getElementById("listColores");
@@ -1252,7 +1276,574 @@ function renderModuloDTF() {
 }
 
 // ============================================================================
-// MÓDULOS 5 Y 6: FINANZAS Y BITÁCORA
+// MÓDULO 5: TELAS, FICHAS TÉCNICAS Y PARÁMETROS RELACIONALES
+// ============================================================================
+
+export function normalizarTextoBusqueda(str = "") {
+  return String(str || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+export function buscarFichaTelaPorNombre(nombreRaw = "") {
+  if (!nombreRaw) return null;
+  const buscado = normalizarTextoBusqueda(nombreRaw);
+  if (!buscado || buscado === "-") return null;
+
+  // 1. Coincidencia exacta con nombre comercial o código
+  let encontrada = (STATE.telasFicha || []).find(t => {
+    const nom = normalizarTextoBusqueda(t.nombre_comercial);
+    const cod = normalizarTextoBusqueda(t.codigo_tela);
+    return nom === buscado || cod === buscado;
+  });
+  if (encontrada) return encontrada;
+
+  // 2. Coincidencia en array alias_busqueda
+  encontrada = (STATE.telasFicha || []).find(t => {
+    if (Array.isArray(t.alias_busqueda)) {
+      return t.alias_busqueda.some(a => {
+        const aNorm = normalizarTextoBusqueda(a);
+        return aNorm === buscado || buscado.includes(aNorm) || aNorm.includes(buscado);
+      });
+    }
+    return false;
+  });
+  if (encontrada) return encontrada;
+
+  // 3. Coincidencia por subcadena
+  encontrada = (STATE.telasFicha || []).find(t => {
+    const nom = normalizarTextoBusqueda(t.nombre_comercial);
+    return buscado.includes(nom) || nom.includes(buscado);
+  });
+  return encontrada || null;
+}
+
+export function obtenerVarianteYParametrosTela(telaId, varianteId = null) {
+  let variante = null;
+  if (varianteId) {
+    variante = (STATE.telasVariantes || []).find(v => v.id === varianteId) || null;
+  }
+  if (!variante) {
+    variante = (STATE.telasVariantes || []).find(v => v.tela_id === telaId && v.es_predeterminada) ||
+               (STATE.telasVariantes || []).find(v => v.tela_id === telaId) || null;
+  }
+  const parametros = variante
+    ? ((STATE.telasParametros || []).find(p => p.variante_id === variante.id) || null)
+    : null;
+  return { variante, parametros };
+}
+
+function renderModuloTelas() {
+  const tbody = document.getElementById("tbodyTelasFichas");
+  if (!tbody) return;
+
+  const telas = STATE.telasFicha || [];
+  const variantes = STATE.telasVariantes || [];
+  const parametros = STATE.telasParametros || [];
+  const historial = STATE.historialAnchosTelas || [];
+
+  // 1. Cálculo de KPIs
+  const totalTelas = telas.length;
+  const totalVariantes = variantes.length;
+
+  const rindesValidos = variantes.map(v => Number(v.rinde_mts_kg)).filter(n => n > 0);
+  const rindeProm = rindesValidos.length > 0 ? (rindesValidos.reduce((a, b) => a + b, 0) / rindesValidos.length).toFixed(2) : "0.00";
+
+  // Ancho más común
+  const mapaAnchos = {};
+  variantes.forEach(v => {
+    const a = Number(v.ancho_real_m || 0).toFixed(2);
+    if (Number(a) > 0) mapaAnchos[a] = (mapaAnchos[a] || 0) + 1;
+  });
+  let anchoComun = "1.50 m";
+  let maxCountAncho = 0;
+  for (const [anch, cant] of Object.entries(mapaAnchos)) {
+    if (cant > maxCountAncho) {
+      maxCountAncho = cant;
+      anchoComun = `${anch} m`;
+    }
+  }
+
+  // Promedios calandra y láser
+  const tempsCal = parametros.map(p => Number(p.calandra_temp_c)).filter(n => n > 0);
+  const tempCalProm = tempsCal.length > 0 ? `${Math.round(tempsCal.reduce((a, b) => a + b, 0) / tempsCal.length)} °C` : "-";
+
+  const velsCal = parametros.map(p => Number(p.calandra_vel_m_min)).filter(n => n > 0);
+  const velCalProm = velsCal.length > 0 ? `${Math.round(velsCal.reduce((a, b) => a + b, 0) / velsCal.length)} m/min` : "-";
+
+  const velsLaser = parametros.map(p => Number(p.laser_vel_mm_s)).filter(n => n > 0);
+  const velLaserProm = velsLaser.length > 0 ? `${Math.round(velsLaser.reduce((a, b) => a + b, 0) / velsLaser.length)} mm/s` : "-";
+
+  const poderLaser = parametros.map(p => Number(p.laser_poder_pct)).filter(n => n > 0);
+  const poderLaserProm = poderLaser.length > 0 ? `${Math.round(poderLaser.reduce((a, b) => a + b, 0) / poderLaser.length)} %` : "-";
+
+  setTxt("kpiTelasActivas", totalTelas);
+  setTxt("kpiTelasVariantes", totalVariantes);
+  setTxt("kpiTelasRindeProm", `${rindeProm} m/kg`);
+  setTxt("kpiTelasAnchoComun", anchoComun);
+  setTxt("kpiTelasTempProm", tempCalProm);
+  setTxt("kpiTelasVelProm", velCalProm);
+  setTxt("kpiTelasVelLaserProm", velLaserProm);
+  setTxt("kpiTelasPoderLaserProm", poderLaserProm);
+
+  // 2. Filtrado de la tabla
+  const filtro = normalizarTextoBusqueda(STATE.filtroTelasLocal);
+  const telasFiltradas = telas.filter(t => {
+    if (!filtro) return true;
+    const matchNom = normalizarTextoBusqueda(t.nombre_comercial).includes(filtro);
+    const matchCod = normalizarTextoBusqueda(t.codigo_tela).includes(filtro);
+    const matchComp = normalizarTextoBusqueda(t.composicion).includes(filtro);
+    const matchObs = normalizarTextoBusqueda(t.observaciones).includes(filtro);
+    const matchAlias = Array.isArray(t.alias_busqueda) && t.alias_busqueda.some(a => normalizarTextoBusqueda(a).includes(filtro));
+    return matchNom || matchCod || matchComp || matchObs || matchAlias;
+  });
+
+  if (telasFiltradas.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="12" style="text-align:center; padding:15px; color:#888;">No se encontraron telas con el filtro especificado.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = telasFiltradas.map(t => {
+    const { variante, parametros: param } = obtenerVarianteYParametrosTela(t.id);
+    const varsDeTela = variantes.filter(v => v.tela_id === t.id);
+
+    // Revisar aprendizaje de anchos de esta tela
+    const histDeTela = historial.filter(h => h.tela_id === t.id || normalizarTextoBusqueda(h.nombre_tela_raw) === normalizarTextoBusqueda(t.nombre_comercial));
+    let badgeAprendizaje = "";
+    if (histDeTela.length > 0) {
+      const anchosAprendidos = histDeTela.map(h => Number(h.ancho_archivo_impreso) + 0.02).filter(n => n > 0);
+      if (anchosAprendidos.length > 0) {
+        const promAprendido = (anchosAprendidos.reduce((a, b) => a + b, 0) / anchosAprendidos.length).toFixed(2);
+        badgeAprendizaje = `<span style="display:inline-block; font-size:10px; background:rgba(0,230,118,0.15); color:#00E676; border:1px solid #00E676; padding:1px 5px; border-radius:4px; margin-top:3px;" title="Ancho aprendido de ${histDeTela.length} impresiones">🧠 ~${promAprendido}m</span>`;
+      }
+    }
+
+    const anchoReal = variante ? Number(variante.ancho_real_m).toFixed(2) : "-";
+    const anchoImp = variante ? Number(variante.ancho_impresion_sugerido_m).toFixed(2) : "-";
+    const rinde = variante && Number(variante.rinde_mts_kg) > 0 ? `${Number(variante.rinde_mts_kg).toFixed(2)} m/kg` : "-";
+    const encog = variante && Number(variante.encogimiento_largo_pct) > 0 ? `${variante.encogimiento_largo_pct}%` : "-";
+    const partidaNom = variante ? (variante.codigo_partida || "Estándar") : "Estándar";
+
+    const calStr = param
+      ? `<strong style="color:var(--accent-orange);">${param.calandra_temp_c || 205}°C</strong> | <span style="color:#00E676;">${param.calandra_vel_m_min || 50} m/min</span>`
+      : `<span style="color:#666;">Sin calibrar</span>`;
+
+    const laserStr = param
+      ? `<strong style="color:#38BDF8;">${param.laser_vel_mm_s || 300} mm/s</strong> | <span style="color:#ff4081;">${param.laser_poder_pct || 85}%</span>`
+      : `<span style="color:#666;">Sin calibrar</span>`;
+
+    const badgePartidas = varsDeTela.length > 1
+      ? `<span class="badge" style="background:rgba(33,150,243,0.15); color:#2196F3; border:1px solid #2196F3; font-size:10px; margin-left:6px;" title="${varsDeTela.length} partidas registradas">${varsDeTela.length} partidas</span>`
+      : "";
+
+    return `
+      <tr>
+        <td data-label="Acción" style="white-space:nowrap;">
+          <div style="display:flex; gap:4px; align-items:center;">
+            <button type="button" class="btn-tela-ficha" data-tela-id="${t.id}" style="background:#1b2130; border:1px solid #2196F3; color:#2196F3; border-radius:4px; font-size:11px; font-weight:bold; padding:4px 8px; cursor:pointer;" title="Ver Ficha Técnica Completa">ℹ️ Ficha</button>
+            <button type="button" class="btn-tela-edit" data-tela-id="${t.id}" style="background:transparent; border:1px solid #00E676; color:#00E676; border-radius:4px; font-size:11px; padding:4px 8px; cursor:pointer;" title="Editar Parámetros">✏️</button>
+            <button type="button" class="btn-tela-add-partida" data-tela-id="${t.id}" style="background:transparent; border:1px solid var(--accent-orange); color:var(--accent-orange); border-radius:4px; font-size:10px; padding:4px 6px; cursor:pointer;" title="Añadir Variante o Partida Especial">+ Partida</button>
+            <button type="button" class="btn-tela-del" data-tela-id="${t.id}" style="background:transparent; border:1px solid var(--danger); color:var(--danger); border-radius:4px; font-size:11px; padding:4px 6px; cursor:pointer;" title="Archivar Tela">🗑️</button>
+          </div>
+        </td>
+        <td data-label="Código"><code style="background:#1a1c23; color:#38BDF8; padding:2px 6px; border-radius:4px; font-size:11px;">${escHtml(t.codigo_tela || "-")}</code></td>
+        <td data-label="Nombre Comercial">
+          <strong style="color:#fff; font-size:13px;">${escHtml(t.nombre_comercial)}</strong>
+          ${badgePartidas}
+        </td>
+        <td data-label="Composición" style="color:#bbb; font-size:12px;">${escHtml(t.composicion || "-")}</td>
+        <td data-label="Ancho Real" style="font-weight:bold; color:#00E676;">
+          ${anchoReal} m
+          ${badgeAprendizaje}
+        </td>
+        <td data-label="Ancho Impresión" style="color:#38BDF8; font-weight:bold;">${anchoImp} m</td>
+        <td data-label="Rinde (m/kg)">${rinde}</td>
+        <td data-label="Encogimiento">${encog}</td>
+        <td data-label="🔥 Calandrado" style="white-space:nowrap;">${calStr}</td>
+        <td data-label="⚡ Corte Láser" style="white-space:nowrap;">${laserStr}</td>
+        <td data-label="Partida"><span class="badge activo" style="font-size:10.5px;">${escHtml(partidaNom)}</span></td>
+        <td data-label="Observaciones" style="font-size:11.5px; color:#aaa; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escHtml(t.observaciones || "")}">${escHtml(t.observaciones || "-")}</td>
+      </tr>
+    `;
+  }).join("");
+}
+
+export function abrirModalFichaRapidaTela(idONombre) {
+  if (!idONombre) return;
+  const tela = (STATE.telasFicha || []).find(t => t.id === idONombre) || buscarFichaTelaPorNombre(idONombre);
+  if (!tela) {
+    toast(`No se encontró ficha técnica para: ${idONombre}`, "warn");
+    return;
+  }
+
+  const { variante, parametros: param } = obtenerVarianteYParametrosTela(tela.id);
+  const varsDeTela = (STATE.telasVariantes || []).filter(v => v.tela_id === tela.id);
+  const histDeTela = (STATE.historialAnchosTelas || []).filter(h => h.tela_id === tela.id || normalizarTextoBusqueda(h.nombre_tela_raw) === normalizarTextoBusqueda(tela.nombre_comercial)).slice(0, 5);
+
+  setTxt("fichaRapidaNombre", tela.nombre_comercial);
+
+  const container = document.getElementById("fichaRapidaBody");
+  if (!container) return;
+
+  const anchoReal = variante ? Number(variante.ancho_real_m).toFixed(2) : "1.50";
+  const anchoImp = variante ? Number(variante.ancho_impresion_sugerido_m).toFixed(2) : "1.48";
+  const rinde = variante && Number(variante.rinde_mts_kg) > 0 ? `${Number(variante.rinde_mts_kg).toFixed(2)} m/kg` : "-";
+  const gramaje = variante && Number(variante.gramaje_gsm) > 0 ? `${Number(variante.gramaje_gsm).toFixed(0)} g/m²` : "-";
+  const encog = variante ? `${variante.encogimiento_largo_pct || 2}% (largo) / ${variante.encogimiento_ancho_pct || 1}% (ancho)` : "-";
+
+  const tempCal = param ? (param.calandra_temp_c || 205) : 205;
+  const velCal = param ? (param.calandra_vel_m_min || 50) : 50;
+  const presCal = param ? (param.calandra_presion_bar || 4) : 4;
+  const velLaser = param ? (param.laser_vel_mm_s || 300) : 300;
+  const podLaser = param ? (param.laser_poder_pct || 85) : 85;
+  const precauciones = (param && param.precauciones) || tela.observaciones || "Mantener tensión regular y rollo centrado en calandra.";
+
+  container.innerHTML = `
+    <div style="background:#181c26; padding:12px; border-radius:8px; border:1px solid #2a324b; margin-bottom:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+        <span style="font-size:12px; color:#aaa;">Código: <code style="color:#38BDF8; font-weight:bold;">${escHtml(tela.codigo_tela || "-")}</code></span>
+        <span style="font-size:12px; color:#aaa;">Composición: <strong style="color:#fff;">${escHtml(tela.composicion || "100% Poliéster")}</strong></span>
+      </div>
+      ${Array.isArray(tela.alias_busqueda) && tela.alias_busqueda.length > 0 ? `
+        <div style="font-size:11px; color:#888; margin-top:6px;">
+          Alias reconocidos: <span style="color:#bbb;">${tela.alias_busqueda.map(a => `<code>${escHtml(a)}</code>`).join(" ")}</span>
+        </div>
+      ` : ""}
+    </div>
+
+    <div style="background:#141720; padding:12px; border-radius:8px; border:1px solid #2a324b; margin-bottom:12px;">
+      <h3 style="margin:0 0 10px 0; font-size:12px; color:#2196F3; text-transform:uppercase; letter-spacing:0.5px;">📐 Geometría y Propiedades Físicas</h3>
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:10px;">
+        <div style="background:#0f1118; padding:8px; border-radius:6px; border:1px solid #222;">
+          <div style="font-size:10px; color:#888;">ANCHO REAL TELA</div>
+          <div style="font-size:17px; font-weight:900; color:#00E676; margin-top:2px;">${anchoReal} m</div>
+        </div>
+        <div style="background:#0f1118; padding:8px; border-radius:6px; border:1px solid #222;">
+          <div style="font-size:10px; color:#888;">ANCHO IMPRESIÓN (2cm menos)</div>
+          <div style="font-size:17px; font-weight:900; color:#38BDF8; margin-top:2px;">${anchoImp} m</div>
+        </div>
+        <div style="background:#0f1118; padding:8px; border-radius:6px; border:1px solid #222;">
+          <div style="font-size:10px; color:#888;">RINDE METROS/KG</div>
+          <div style="font-size:16px; font-weight:bold; color:#fff; margin-top:2px;">${rinde}</div>
+        </div>
+        <div style="background:#0f1118; padding:8px; border-radius:6px; border:1px solid #222;">
+          <div style="font-size:10px; color:#888;">GRAMAJE APROX.</div>
+          <div style="font-size:16px; font-weight:bold; color:#fff; margin-top:2px;">${gramaje}</div>
+        </div>
+      </div>
+      <div style="font-size:11px; color:#aaa; margin-top:8px;">
+        Encogimiento estimado: <strong style="color:#ff9800;">${encog}</strong>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:12px;">
+      <div style="background:rgba(255,152,0,0.06); border:1.5px solid rgba(255,152,0,0.3); border-radius:8px; padding:12px;">
+        <h4 style="margin:0 0 8px 0; color:var(--accent-orange); font-size:12px; display:flex; align-items:center; gap:5px;">
+          🔥 CALANDRADO
+        </h4>
+        <div style="font-size:11.5px; line-height:1.6; color:#ccc;">
+          <div>Temp: <strong style="color:var(--accent-orange); font-size:15px;">${tempCal} °C</strong></div>
+          <div>Velocidad: <strong style="color:#00E676; font-size:15px;">${velCal} m/min</strong></div>
+          <div>Presión: <strong style="color:#fff;">${presCal} bar</strong></div>
+        </div>
+      </div>
+
+      <div style="background:rgba(56,189,248,0.06); border:1.5px solid rgba(56,189,248,0.3); border-radius:8px; padding:12px;">
+        <h4 style="margin:0 0 8px 0; color:#38BDF8; font-size:12px; display:flex; align-items:center; gap:5px;">
+          ⚡ CORTE LÁSER
+        </h4>
+        <div style="font-size:11.5px; line-height:1.6; color:#ccc;">
+          <div>Velocidad: <strong style="color:#38BDF8; font-size:15px;">${velLaser} mm/s</strong></div>
+          <div>Potencia: <strong style="color:#ff4081; font-size:15px;">${podLaser} %</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:#161922; border-left:4px solid #ff9800; padding:10px 12px; border-radius:6px; margin-bottom:12px; font-size:12px; color:#ddd;">
+      <strong style="color:#ff9800;">⚠️ Precauciones y Recomendaciones:</strong>
+      <div style="margin-top:4px;">${escHtml(precauciones)}</div>
+    </div>
+
+    ${histDeTela.length > 0 ? `
+      <div style="background:#10131a; border:1px solid #232a3b; border-radius:6px; padding:10px; margin-bottom:12px;">
+        <span style="font-size:11px; font-weight:bold; color:#00E676;">🧠 Aprendizaje Automático de Anchos (Últimas mediciones):</span>
+        <div style="margin-top:6px; font-size:11.5px; color:#aaa; line-height:1.6;">
+          ${histDeTela.map(h => `
+            <div style="display:flex; justify-content:space-between; border-bottom:1px solid #1a202c; padding:3px 0;">
+              <span>Impresión: <strong style="color:#38BDF8;">${Number(h.ancho_archivo_impreso).toFixed(2)}m</strong> ➔ Tela real estimada: <strong style="color:#00E676;">${(Number(h.ancho_archivo_impreso) + 0.02).toFixed(2)}m</strong></span>
+              <span style="color:#666; font-size:10.5px;">${fmtDateHora(h.fecha)}</span>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    ` : ""}
+
+    ${varsDeTela.length > 1 ? `
+      <div style="background:#10131a; border:1px solid #232a3b; border-radius:6px; padding:10px;">
+        <span style="font-size:11px; font-weight:bold; color:#2196F3;">📦 Partidas / Variantes adicionales (${varsDeTela.length}):</span>
+        <div style="margin-top:6px; font-size:11px; color:#bbb;">
+          ${varsDeTela.map(v => `
+            <span style="display:inline-block; background:#1b2130; border:1px solid #334155; padding:2px 8px; border-radius:4px; margin-right:6px; margin-bottom:4px;">
+              ${escHtml(v.codigo_partida)} (${v.ancho_real_m}m | Rinde: ${v.rinde_mts_kg}m/kg) ${v.es_predeterminada ? "⭐ Predet." : ""}
+            </span>
+          `).join("")}
+        </div>
+      </div>
+    ` : ""}
+  `;
+
+  document.getElementById("modalTelaFichaRapida").classList.add("open");
+}
+
+export function abrirModalTelaCrud(telaId = null, modo = "editar") {
+  const modal = document.getElementById("modalTelaCrud");
+  if (!modal) return;
+
+  const inpId = document.getElementById("telaInputId");
+  const inpModo = document.getElementById("telaInputModo");
+  const titulo = document.getElementById("modalTelaCrudTitle");
+
+  if (inpId) inpId.value = telaId || "";
+  if (inpModo) inpModo.value = modo;
+
+  if (modo === "crear") {
+    if (titulo) titulo.textContent = "✨ Nueva Ficha Técnica de Tela";
+    document.getElementById("telaInputNombre").value = "";
+    document.getElementById("telaInputNombre").readOnly = false;
+    document.getElementById("telaInputCodigo").value = `TEL-${Date.now().toString().slice(-6)}`;
+    document.getElementById("telaInputComposicion").value = "100% Poliéster";
+    document.getElementById("telaInputPartida").value = "Estándar";
+    document.getElementById("telaInputRinde").value = "3.50";
+    document.getElementById("telaInputAnchoReal").value = "1.50";
+    document.getElementById("telaInputAnchoImp").value = "1.48";
+    document.getElementById("telaInputGramaje").value = "160";
+    document.getElementById("telaInputEncogimiento").value = "2.0";
+    document.getElementById("telaInputTempCal").value = "205";
+    document.getElementById("telaInputVelCal").value = "50";
+    document.getElementById("telaInputVelLaser").value = "300";
+    document.getElementById("telaInputPoderLaser").value = "85";
+    document.getElementById("telaInputObs").value = "";
+  } else if (modo === "nueva_partida") {
+    const tela = (STATE.telasFicha || []).find(t => t.id === telaId);
+    if (!tela) return;
+    if (titulo) titulo.textContent = `➕ Nueva Partida / Variante: ${tela.nombre_comercial}`;
+    document.getElementById("telaInputNombre").value = tela.nombre_comercial;
+    document.getElementById("telaInputNombre").readOnly = true;
+    document.getElementById("telaInputCodigo").value = tela.codigo_tela;
+    document.getElementById("telaInputComposicion").value = tela.composicion || "100% Poliéster";
+    document.getElementById("telaInputPartida").value = "Partida Especial 1.60m";
+    document.getElementById("telaInputRinde").value = "3.20";
+    document.getElementById("telaInputAnchoReal").value = "1.60";
+    document.getElementById("telaInputAnchoImp").value = "1.58";
+    document.getElementById("telaInputGramaje").value = "180";
+    document.getElementById("telaInputEncogimiento").value = "2.0";
+    document.getElementById("telaInputTempCal").value = "205";
+    document.getElementById("telaInputVelCal").value = "48";
+    document.getElementById("telaInputVelLaser").value = "300";
+    document.getElementById("telaInputPoderLaser").value = "85";
+    document.getElementById("telaInputObs").value = `Partida alternativa con ancho especial.`;
+  } else {
+    // modo === "editar"
+    const tela = (STATE.telasFicha || []).find(t => t.id === telaId);
+    if (!tela) return;
+    const { variante, parametros: param } = obtenerVarianteYParametrosTela(tela.id);
+
+    if (titulo) titulo.textContent = `✏️ Editar Ficha: ${tela.nombre_comercial}`;
+    document.getElementById("telaInputNombre").value = tela.nombre_comercial;
+    document.getElementById("telaInputNombre").readOnly = false;
+    document.getElementById("telaInputCodigo").value = tela.codigo_tela || "";
+    document.getElementById("telaInputComposicion").value = tela.composicion || "";
+    document.getElementById("telaInputPartida").value = variante ? (variante.codigo_partida || "Estándar") : "Estándar";
+    document.getElementById("telaInputRinde").value = variante ? (variante.rinde_mts_kg || "") : "";
+    document.getElementById("telaInputAnchoReal").value = variante ? (variante.ancho_real_m || "1.50") : "1.50";
+    document.getElementById("telaInputAnchoImp").value = variante ? (variante.ancho_impresion_sugerido_m || "1.48") : "1.48";
+    document.getElementById("telaInputGramaje").value = variante ? (variante.gramaje_gsm || "") : "";
+    document.getElementById("telaInputEncogimiento").value = variante ? (variante.encogimiento_largo_pct || "") : "";
+    document.getElementById("telaInputTempCal").value = param ? (param.calandra_temp_c || "205") : "205";
+    document.getElementById("telaInputVelCal").value = param ? (param.calandra_vel_m_min || "50") : "50";
+    document.getElementById("telaInputVelLaser").value = param ? (param.laser_vel_mm_s || "300") : "300";
+    document.getElementById("telaInputPoderLaser").value = param ? (param.laser_poder_pct || "85") : "85";
+    document.getElementById("telaInputObs").value = tela.observaciones || (param ? param.precauciones : "") || "";
+  }
+
+  modal.classList.add("open");
+}
+
+export async function guardarTelaCrud() {
+  const inpId = document.getElementById("telaInputId")?.value;
+  const modo = document.getElementById("telaInputModo")?.value || "editar";
+
+  const nombre = document.getElementById("telaInputNombre")?.value.trim();
+  const codigo = document.getElementById("telaInputCodigo")?.value.trim();
+  const composicion = document.getElementById("telaInputComposicion")?.value.trim() || "100% Poliéster";
+  const partida = document.getElementById("telaInputPartida")?.value.trim() || "Estándar";
+  const rinde = parseFloat(document.getElementById("telaInputRinde")?.value) || 3.50;
+  const anchoReal = parseFloat(document.getElementById("telaInputAnchoReal")?.value) || 1.50;
+  const anchoImp = parseFloat(document.getElementById("telaInputAnchoImp")?.value) || Math.max(0.5, anchoReal - 0.02);
+  const gramaje = parseFloat(document.getElementById("telaInputGramaje")?.value) || 160;
+  const encog = parseFloat(document.getElementById("telaInputEncogimiento")?.value) || 2.0;
+
+  const tempCal = parseFloat(document.getElementById("telaInputTempCal")?.value) || 205;
+  const velCal = parseFloat(document.getElementById("telaInputVelCal")?.value) || 50;
+  const velLaser = parseFloat(document.getElementById("telaInputVelLaser")?.value) || 300;
+  const podLaser = parseFloat(document.getElementById("telaInputPoderLaser")?.value) || 85;
+  const obs = document.getElementById("telaInputObs")?.value.trim() || "";
+
+  if (!nombre) {
+    toast("El nombre comercial de la tela es obligatorio.", "warn");
+    return;
+  }
+
+  toast("⏳ Guardando ficha técnica de tela...", "info");
+
+  try {
+    if (modo === "crear") {
+      const { data: nuevaTela, error: errTela } = await sb().from("prod_telas_ficha").insert({
+        empresa_id: "vvgrafic-principal",
+        codigo_tela: codigo || `TEL-${Date.now().toString().slice(-6)}`,
+        nombre_comercial: nombre,
+        alias_busqueda: [nombre.toUpperCase(), codigo ? codigo.toUpperCase() : ""].filter(Boolean),
+        composicion,
+        observaciones: obs,
+        activo: true
+      }).select().single();
+
+      if (errTela) throw errTela;
+
+      const { data: nuevaVar, error: errVar } = await sb().from("prod_telas_variantes").insert({
+        tela_id: nuevaTela.id,
+        empresa_id: "vvgrafic-principal",
+        codigo_partida: partida,
+        ancho_real_m: anchoReal,
+        ancho_impresion_sugerido_m: anchoImp,
+        gramaje_gsm: gramaje,
+        rinde_mts_kg: rinde,
+        encogimiento_largo_pct: encog,
+        encogimiento_ancho_pct: 1.0,
+        es_predeterminada: true,
+        observaciones: obs
+      }).select().single();
+
+      if (errVar) throw errVar;
+
+      const { error: errParam } = await sb().from("prod_telas_parametros").insert({
+        variante_id: nuevaVar.id,
+        empresa_id: "vvgrafic-principal",
+        calandra_temp_c: tempCal,
+        calandra_vel_m_min: velCal,
+        calandra_presion_bar: 4.0,
+        laser_vel_mm_s: velLaser,
+        laser_poder_pct: podLaser,
+        precauciones: obs
+      });
+
+      if (errParam) throw errParam;
+
+      toast(`✅ Tela "${nombre}" creada y calibrada con éxito.`);
+    } else if (modo === "nueva_partida") {
+      const { data: nuevaVar, error: errVar } = await sb().from("prod_telas_variantes").insert({
+        tela_id: inpId,
+        empresa_id: "vvgrafic-principal",
+        codigo_partida: partida,
+        ancho_real_m: anchoReal,
+        ancho_impresion_sugerido_m: anchoImp,
+        gramaje_gsm: gramaje,
+        rinde_mts_kg: rinde,
+        encogimiento_largo_pct: encog,
+        encogimiento_ancho_pct: 1.0,
+        es_predeterminada: false,
+        observaciones: obs
+      }).select().single();
+
+      if (errVar) throw errVar;
+
+      await sb().from("prod_telas_parametros").insert({
+        variante_id: nuevaVar.id,
+        empresa_id: "vvgrafic-principal",
+        calandra_temp_c: tempCal,
+        calandra_vel_m_min: velCal,
+        calandra_presion_bar: 4.0,
+        laser_vel_mm_s: velLaser,
+        laser_poder_pct: podLaser,
+        precauciones: obs
+      });
+
+      toast(`✅ Partida "${partida}" añadida a la tela.`);
+    } else {
+      await sb().from("prod_telas_ficha").update({
+        nombre_comercial: nombre,
+        codigo_tela: codigo,
+        composicion,
+        observaciones: obs
+      }).eq("id", inpId);
+
+      const { variante } = obtenerVarianteYParametrosTela(inpId);
+      if (variante) {
+        await sb().from("prod_telas_variantes").update({
+          codigo_partida: partida,
+          ancho_real_m: anchoReal,
+          ancho_impresion_sugerido_m: anchoImp,
+          gramaje_gsm: gramaje,
+          rinde_mts_kg: rinde,
+          encogimiento_largo_pct: encog,
+          observaciones: obs
+        }).eq("id", variante.id);
+
+        const paramExistente = (STATE.telasParametros || []).find(p => p.variante_id === variante.id);
+        if (paramExistente) {
+          await sb().from("prod_telas_parametros").update({
+            calandra_temp_c: tempCal,
+            calandra_vel_m_min: velCal,
+            laser_vel_mm_s: velLaser,
+            laser_poder_pct: podLaser,
+            precauciones: obs
+          }).eq("id", paramExistente.id);
+        } else {
+          await sb().from("prod_telas_parametros").insert({
+            variante_id: variante.id,
+            empresa_id: "vvgrafic-principal",
+            calandra_temp_c: tempCal,
+            calandra_vel_m_min: velCal,
+            calandra_presion_bar: 4.0,
+            laser_vel_mm_s: velLaser,
+            laser_poder_pct: podLaser,
+            precauciones: obs
+          });
+        }
+      }
+      toast(`✅ Ficha de "${nombre}" actualizada.`);
+    }
+
+    document.getElementById("modalTelaCrud").classList.remove("open");
+    await cargarDatosTodo();
+  } catch (err) {
+    console.error("Error al guardar tela:", err);
+    toast("Error: " + (err.message || err), "error");
+  }
+}
+
+export async function eliminarTela(telaId) {
+  const tela = (STATE.telasFicha || []).find(t => t.id === telaId);
+  if (!tela) return;
+
+  if (!confirm(`¿Archivar la tela "${tela.nombre_comercial}" y sus variantes asociadas?`)) {
+    return;
+  }
+
+  try {
+    const { error } = await sb().from("prod_telas_ficha").update({ activo: false }).eq("id", telaId);
+    if (error) throw error;
+    toast(`🗑️ Tela "${tela.nombre_comercial}" archivada.`);
+    await cargarDatosTodo();
+  } catch (err) {
+    toast("Error al archivar tela: " + err.message, "error");
+  }
+}
+
+// ============================================================================
+// MÓDULOS 6 Y 7: FINANZAS Y BITÁCORA
 // ============================================================================
 function renderModuloFinanzasYMantenimiento() {
   const totalImp = STATE.impresiones
@@ -1564,6 +2155,41 @@ async function procesarImpresionLote() {
     try {
       fetch(`${bridgeUrl}?action=mover_a_impresos&file_ids=${encodeURIComponent(fileIdsUnidos)}`, { mode: "no-cors" }).catch(() => {});
     } catch (_) {}
+  }
+
+  // APRENDIZAJE AUTOMÁTICO DE ANCHO DE TELA (Regla de 2cm)
+  try {
+    const telaFicha = buscarFichaTelaPorNombre(tela);
+    if (telaFicha) {
+      let anchoImpM = 0;
+      for (const s of seleccionados) {
+        if (s.ancho_estimado_m && Number(s.ancho_estimado_m) > 0) {
+          anchoImpM = Math.max(anchoImpM, Number(s.ancho_estimado_m));
+        } else if (s.nombre_archivo) {
+          const matchW = s.nombre_archivo.match(/(\d+[\.,]?\d*)\s*[xX]/);
+          if (matchW) {
+            const w = parseFloat(matchW[1].replace(",", "."));
+            if (w >= 50 && w <= 320) anchoImpM = Math.max(anchoImpM, w / 100);
+            else if (w >= 0.5 && w <= 3.2) anchoImpM = Math.max(anchoImpM, w);
+          }
+        }
+      }
+      if (anchoImpM === 0) {
+        const { variante } = obtenerVarianteYParametrosTela(telaFicha.id);
+        if (variante) anchoImpM = Number(variante.ancho_impresion_sugerido_m || 1.48);
+      }
+      if (anchoImpM > 0) {
+        await sb().from("prod_historial_anchos_tela").insert({
+          empresa_id: "vvgrafic-principal",
+          tela_id: telaFicha.id,
+          nombre_tela_raw: tela || telaFicha.nombre_comercial,
+          ancho_archivo_impreso: anchoImpM,
+          metros_trabajo: metrosTotales
+        });
+      }
+    }
+  } catch (errLearn) {
+    console.warn("Aviso en aprendizaje de anchos:", errLearn);
   }
 
   await Promise.all([
@@ -2231,6 +2857,33 @@ function renderContenidoModalKiosco() {
   const metrosVal = fmtNum(trabActual.metros_totales || trabActual.metros || 0);
   const telaVal = trabActual.tela_destino || trabActual.tela || trabActual.tela_rollo_color || "-";
 
+  // Buscar ficha técnica recomendada para la tela actual
+  const telaFichaMatch = buscarFichaTelaPorNombre(telaVal);
+  let pillSugerenciaHtml = "";
+  if (telaFichaMatch) {
+    const { parametros: pMatch } = obtenerVarianteYParametrosTela(telaFichaMatch.id);
+    if (pMatch) {
+      const vSug = esLaser ? (pMatch.laser_vel_mm_s || 300) : (pMatch.calandra_vel_m_min || 50);
+      const tSug = esLaser ? (pMatch.laser_poder_pct || 85) : (pMatch.calandra_temp_c || 205);
+      const uV = esLaser ? "mm/s" : "m/min";
+      const uT = esLaser ? "%" : "°C";
+
+      pillSugerenciaHtml = `
+        <div style="background:rgba(0,230,118,0.10); border:1.5px solid #00E676; border-radius:6px; padding:4px 8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+          <div style="font-size:11.5px; color:#fff; display:flex; align-items:center; gap:6px;">
+            <span style="color:#00E676; font-weight:900;">💡 Sugerido (${escHtml(telaFichaMatch.nombre_comercial)}):</span>
+            <strong style="color:${esLaser ? '#38BDF8' : 'var(--accent-orange)'}; font-size:12.5px;">${tSug}${uT}</strong> |
+            <strong style="color:#00E676; font-size:12.5px;">${vSug} ${uV}</strong>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <button type="button" id="btnKioscoAplicarSugerencia" data-vel="${vSug}" data-temp="${tSug}" style="background:#00E676; color:#000; border:none; padding:3px 10px; border-radius:4px; font-weight:900; font-size:11px; cursor:pointer; box-shadow:0 2px 6px rgba(0,230,118,0.3);">⚡ Aplicar</button>
+            <button type="button" class="btn-ver-ficha-tela" data-tela-id="${telaFichaMatch.id}" style="background:#2196F3; color:#fff; border:none; padding:3px 8px; border-radius:4px; font-weight:bold; font-size:11px; cursor:pointer;" title="Ver Ficha Técnica Completa">ℹ️ Ficha</button>
+          </div>
+        </div>
+      `;
+    }
+  }
+
   // Burbujas grandes debajo de los metros en una sola línea
   const bubblesHtml = esLaser
     ? `
@@ -2328,6 +2981,8 @@ function renderContenidoModalKiosco() {
           <span style="font-size:18px; font-weight:900; color:#2196F3; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escHtml(telaVal)}">${escHtml(telaVal)}</span>
         </div>
 
+        ${pillSugerenciaHtml}
+
         <!-- Nombre del trabajo en máximo 2 líneas sin prefijo -->
         <div class="kiosk-info-cliente-rollo" style="background:#0f1117; padding:6px 12px; border-radius:6px; border:1px solid #2a324b;">
           <div class="kiosk-job-title-clamp" style="font-size:13px; font-weight:bold; color:#fff; line-height:1.25; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; text-overflow:ellipsis;" title="${escHtml(rawNombre)}">
@@ -2390,6 +3045,19 @@ function renderContenidoModalKiosco() {
     btnCerrarCola.onclick = () => {
       panelCola.style.display = "none";
       btnToggleCola.textContent = `${esLaser ? "📋 Ver cola láser" : "📋 Ver cola"} (${pendientesRestantes.length})`;
+    };
+  }
+
+  const btnAplicarSug = document.getElementById("btnKioscoAplicarSugerencia");
+  if (btnAplicarSug) {
+    btnAplicarSug.onclick = () => {
+      const v = btnAplicarSug.getAttribute("data-vel");
+      const t = btnAplicarSug.getAttribute("data-temp");
+      const inVel = document.getElementById("kioscoInputVelocidad");
+      const inTemp = document.getElementById("kioscoInputTemperatura");
+      if (inVel) inVel.value = v;
+      if (inTemp) inTemp.value = t;
+      toast(`⚡ Parámetros aplicados: ${t} / ${v}`, "info");
     };
   }
 
@@ -3269,7 +3937,53 @@ export function inicializarEventosUI() {
       }
       return;
     }
+
+    const btnTelaFicha = e.target.closest(".btn-tela-ficha") || e.target.closest(".btn-ver-ficha-tela");
+    if (btnTelaFicha) {
+      abrirModalFichaRapidaTela(btnTelaFicha.getAttribute("data-tela-id"));
+      return;
+    }
+
+    const btnTelaEdit = e.target.closest(".btn-tela-edit");
+    if (btnTelaEdit) {
+      abrirModalTelaCrud(btnTelaEdit.getAttribute("data-tela-id"), "editar");
+      return;
+    }
+
+    const btnTelaAddPartida = e.target.closest(".btn-tela-add-partida");
+    if (btnTelaAddPartida) {
+      abrirModalTelaCrud(btnTelaAddPartida.getAttribute("data-tela-id"), "nueva_partida");
+      return;
+    }
+
+    const btnTelaDel = e.target.closest(".btn-tela-del");
+    if (btnTelaDel) {
+      eliminarTela(btnTelaDel.getAttribute("data-tela-id"));
+      return;
+    }
   });
+
+  document.getElementById("btnNuevaTelaModal")?.addEventListener("click", () => {
+    abrirModalTelaCrud(null, "crear");
+  });
+
+  document.getElementById("btnGuardarTelaCrud")?.addEventListener("click", guardarTelaCrud);
+
+  document.getElementById("searchTelasFichas")?.addEventListener("input", (e) => {
+    STATE.filtroTelasLocal = e.target.value;
+    renderModuloTelas();
+  });
+
+  const inpAnchoReal = document.getElementById("telaInputAnchoReal");
+  const inpAnchoImp = document.getElementById("telaInputAnchoImp");
+  if (inpAnchoReal && inpAnchoImp) {
+    inpAnchoReal.addEventListener("input", () => {
+      const ar = parseFloat(inpAnchoReal.value);
+      if (!isNaN(ar) && ar > 0.1) {
+        inpAnchoImp.value = (Math.max(0.1, ar - 0.02)).toFixed(2);
+      }
+    });
+  }
 
   document.getElementById("btnGuardarModalCrud")?.addEventListener("click", guardarModalCrudUniversal);
   document.getElementById("btnKioscoBgPausar")?.addEventListener("click", alternarPausaKiosco);
