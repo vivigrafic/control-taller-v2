@@ -28,6 +28,7 @@ const STATE = {
   rolloMontadoCalandra: localStorage.getItem("vg_rollo_calandra_montado") || "",
   usuarioActual: localStorage.getItem("vg_operador_actual") || "Roberto",
   perfil: null,
+  telasSistema: [],
   dtfClientesVistos: new Map(),
   areaActual: localStorage.getItem("vg_area_actual") || "General",
   canalChatActivo: "Todos",
@@ -345,7 +346,8 @@ export async function cargarDatosTodo() {
     resTelasFicha,
     resTelasVariantes,
     resTelasParametros,
-    resHistorialAnchos
+    resHistorialAnchos,
+    resTelasSistema
   ] = await Promise.all([
     client.from("v_prod_rollos_papel_saldos").select("*").order("fecha_montaje", { ascending: false }),
     client.from("v_prod_bloques_impresion").select("*"),
@@ -362,7 +364,8 @@ export async function cargarDatosTodo() {
     client.from("prod_telas_ficha").select("*").eq("activo", true).eq("anulado", false).order("nombre_comercial", { ascending: true }),
     client.from("prod_telas_variantes").select("*").eq("anulado", false).order("es_predeterminada", { ascending: false }),
     client.from("prod_telas_parametros").select("*").eq("anulado", false),
-    client.from("prod_historial_anchos_tela").select("*").eq("anulado", false).order("fecha", { ascending: false }).limit(200)
+    client.from("prod_historial_anchos_tela").select("*").eq("anulado", false).order("fecha", { ascending: false }).limit(200),
+    client.rpc("taller_telas_sistema")
   ]);
 
   STATE.rollosPapelSaldos = resRollosSaldos.data || [];
@@ -381,6 +384,7 @@ export async function cargarDatosTodo() {
   STATE.telasVariantes = resTelasVariantes.data || [];
   STATE.telasParametros = resTelasParametros.data || [];
   STATE.historialAnchosTelas = resHistorialAnchos.data || [];
+  STATE.telasSistema = resTelasSistema.data || [];
 
   renderTodoRespetandoFormulario();
   avisarErroresVigia();
@@ -1798,6 +1802,7 @@ function renderModuloTelas() {
         <td data-label="Nombre Comercial">
           <strong style="color:#fff; font-size:13px;">${escHtml(t.nombre_comercial)}</strong>
           ${badgePartidas}
+          ${lineaTelaSistema(t)}
         </td>
         <td data-label="Composición" style="color:#bbb; font-size:12px;">${escHtml(t.composicion || "-")}</td>
         <td data-label="Ancho Real" style="font-weight:bold; color:#00E676;">
@@ -1814,6 +1819,95 @@ function renderModuloTelas() {
       </tr>
     `;
   }).join("");
+}
+
+// ===== Telas unidas con el sistema: cada ficha técnica es la ficha de una tela de Productos =====
+function puedeEditarCatalogo() {
+  const p = STATE.perfil;
+  return !!(p && (p.total || (p.permisos || []).includes("productos")));
+}
+
+function lineaTelaSistema(t) {
+  const item = t.item_id ? (STATE.telasSistema || []).find(x => x.id === t.item_id) : null;
+  if (item) {
+    const kg = [];
+    if (Number(item.kilos_propios) > 0) kg.push(`${fmtNum(item.kilos_propios)} kg propios`);
+    if (Number(item.kilos_clientes) > 0) kg.push(`${fmtNum(item.kilos_clientes)} kg de clientes`);
+    return `<div style="font-size:11px; color:#00E676; margin-top:3px;" title="Tela de Productos del sistema">🔗 ${escHtml(item.nombre)}${kg.length ? ` · ${kg.join(" · ")}` : ""}${
+      puedeEditarCatalogo() ? ` <a class="btn-tela-separar" data-tela-id="${t.id}" style="color:#888; cursor:pointer; margin-left:6px;" title="Separar de la tela del sistema">separar</a>` : ""}</div>`;
+  }
+  return puedeEditarCatalogo()
+    ? `<div><button type="button" class="btn-tela-unir" data-tela-id="${t.id}" style="margin-top:4px; background:transparent; border:1px dashed var(--accent-orange); color:var(--accent-orange); border-radius:4px; font-size:10.5px; padding:2px 6px; cursor:pointer;">🔗 Unir con el sistema</button></div>`
+    : `<div style="font-size:11px; color:#888; margin-top:3px;">Sin unir con el sistema</div>`;
+}
+
+// Qué tan parecidos son dos nombres de tela (para sugerir, no para decidir). Pesa más la primera palabra (el tipo de tela)
+// y acepta nombres casi iguales ("frisa" y "friza", "dry-fit" y "dryfit").
+function parecidoTela(a, b) {
+  const n = (x) => normalizarTextoBusqueda(x).replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+  const A = n(a), B = n(b);
+  if (!A || !B) return 0;
+  if (A.replace(/ /g, "") === B.replace(/ /g, "")) return 100;
+  const ta = A.split(" ").filter(w => w.length > 2), tb = B.split(" ").filter(w => w.length > 2);
+  let p = 0;
+  ta.forEach((w, i) => {
+    let mejor = 0, donde = -1;
+    tb.forEach((x, j) => {
+      const m = (x === w || x.startsWith(w.slice(0, 4)) || w.startsWith(x.slice(0, 4))) ? 20
+        : (w.slice(0, 3) === x.slice(0, 3) && Math.abs(w.length - x.length) <= 2) ? 12 : 0;
+      if (m > mejor) { mejor = m; donde = j; }
+    });
+    p += (i === 0 && donde === 0) ? mejor * 2 : mejor;
+  });
+  return p;
+}
+
+function unirTelaConSistema(fichaId) {
+  const ficha = (STATE.telasFicha || []).find(t => t.id === fichaId);
+  if (!ficha) return;
+  const opciones = (STATE.telasSistema || [])
+    .map(x => ({ ...x, puntos: parecidoTela(ficha.nombre_comercial, x.nombre) + (Array.isArray(ficha.alias_busqueda) ? Math.max(0, ...ficha.alias_busqueda.map(al => parecidoTela(al, x.nombre))) : 0) }))
+    .sort((a, b) => b.puntos - a.puntos || a.nombre.localeCompare(b.nombre));
+  const capa = document.createElement("div");
+  capa.className = "modal-overlay open";
+  capa.innerHTML = `
+    <div class="modal-content" style="border-color:var(--accent-orange); max-width:480px; width:100%;">
+      <h2 style="margin-top:0;">🔗 ¿Qué tela del sistema es "${escHtml(ficha.nombre_comercial)}"?</h2>
+      <p style="font-size:12px; color:#888; margin:0 0 8px;">Son las telas de Productos: las que se compran, se venden y tienen partidas en el módulo Telas. Arriba, las de nombre más parecido.</p>
+      <div style="max-height:320px; overflow-y:auto;">
+        ${opciones.map(x => {
+          const ocupada = x.ficha_id && x.ficha_id !== ficha.id;
+          const otra = ocupada ? (STATE.telasFicha || []).find(t => t.id === x.ficha_id) : null;
+          return `<button type="button" class="btn-secondary" data-item="${x.id}" ${ocupada ? "disabled" : ""} style="display:block; width:100%; text-align:left; margin:4px 0; ${ocupada ? "opacity:0.45;" : ""}">
+            ${x.puntos >= 40 ? "⭐ " : ""}${escHtml(x.nombre)}${Number(x.partidas) > 0 ? ` <span style="color:#888; font-size:11px;">· ${x.partidas} partida/s</span>` : ""}${ocupada ? ` <span style="font-size:11px;">(ya es la ficha "${escHtml(otra ? otra.nombre_comercial : "otra")}")</span>` : ""}
+          </button>`;
+        }).join("")}
+      </div>
+      <button type="button" class="btn-secondary" data-item="nueva" style="margin-top:8px; border-color:var(--accent-orange); color:var(--accent-orange);">➕ No está: crear "${escHtml(ficha.nombre_comercial)}" en Productos</button>
+      <button type="button" class="btn-secondary" data-x="cancelar" style="margin-top:6px;">Cancelar</button>
+    </div>`;
+  document.body.appendChild(capa);
+  capa.addEventListener("click", async (e) => {
+    if (e.target === capa || e.target.closest("[data-x='cancelar']")) { capa.remove(); return; }
+    const b = e.target.closest("[data-item]");
+    if (!b || b.disabled) return;
+    const nueva = b.dataset.item === "nueva";
+    if (nueva && !confirm(`¿Crear la tela "${ficha.nombre_comercial}" en Productos del sistema y unirla a esta ficha?`)) return;
+    const { data, error } = await sb().rpc("taller_tela_unir", { p_ficha: ficha.id, p_item: nueva ? null : b.dataset.item });
+    if (error) { toast("Error: " + error.message, "error"); return; }
+    capa.remove();
+    toast(`🔗 "${ficha.nombre_comercial}" quedó unida a "${data.nombre}"${data.creada ? " (creada en Productos)" : ""}.`);
+    await cargarDatosTodo();
+  });
+}
+
+async function separarTelaDeSistema(fichaId) {
+  const ficha = (STATE.telasFicha || []).find(t => t.id === fichaId);
+  if (!ficha || !confirm(`¿Separar "${ficha.nombre_comercial}" de su tela del sistema? La tela sigue en Productos.`)) return;
+  const { error } = await sb().rpc("taller_tela_separar", { p_ficha: fichaId });
+  if (error) { toast("Error: " + error.message, "error"); return; }
+  toast("Ficha separada.");
+  await cargarDatosTodo();
 }
 
 export function abrirModalFichaRapidaTela(idONombre) {
@@ -4446,6 +4540,11 @@ export function inicializarEventosUI() {
       abrirModalTelaCrud(btnTelaAddPartida.getAttribute("data-tela-id"), "nueva_partida");
       return;
     }
+
+    const btnTelaUnir = e.target.closest(".btn-tela-unir");
+    if (btnTelaUnir) { unirTelaConSistema(btnTelaUnir.getAttribute("data-tela-id")); return; }
+    const btnTelaSeparar = e.target.closest(".btn-tela-separar");
+    if (btnTelaSeparar) { separarTelaDeSistema(btnTelaSeparar.getAttribute("data-tela-id")); return; }
 
     const btnTelaDel = e.target.closest(".btn-tela-del");
     if (btnTelaDel) {
