@@ -2214,8 +2214,8 @@ function renderContenidoModalKiosco() {
 
   const thumbIdActual = extraerThumbIdDrive(trabActual.file_id);
   const imgPreviewHtml = thumbIdActual
-    ? `<img class="kiosk-preview-img" src="https://drive.google.com/thumbnail?id=${escHtml(thumbIdActual)}&sz=w600-h600" style="width:100%; height:200px; object-fit:contain; background:#000; border:2px solid var(--accent-magenta); border-radius:8px; margin-bottom:10px;" onerror="this.style.display='none';" />`
-    : `<div class="kiosk-preview-ph" style="width:100%; height:90px; background:#000; border:2px dashed #444; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#888; font-weight:bold; margin-bottom:10px;">${escHtml(trabActual.diseno || trabActual.cliente_archivo || "SIN VISTA PREVIA")}</div>`;
+    ? `<img class="kiosk-preview-img" src="https://drive.google.com/thumbnail?id=${escHtml(thumbIdActual)}&sz=w600-h600" style="width:100%; height:120px; object-fit:contain; background:#000; border:2px solid var(--accent-magenta); border-radius:8px; margin-bottom:6px;" onerror="this.style.display='none';" />`
+    : `<div class="kiosk-preview-ph" style="width:100%; height:50px; background:#000; border:2px dashed #444; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#888; font-weight:bold; margin-bottom:6px;">${escHtml(trabActual.diseno || trabActual.cliente_archivo || "SIN VISTA PREVIA")}</div>`;
 
   document.getElementById("kioscoTitulo").textContent = esLaser
     ? `⚡ MODO KIOSKO LÁSER (LOTE: ${rolloNombre})`
@@ -2231,21 +2231,21 @@ function renderContenidoModalKiosco() {
   const metrosVal = fmtNum(trabActual.metros_totales || trabActual.metros || 0);
   const telaVal = trabActual.tela_destino || trabActual.tela || trabActual.tela_rollo_color || "-";
 
-  // Burbujas grandes debajo de los metros
+  // Burbujas grandes debajo de los metros en una sola línea
   const bubblesHtml = esLaser
     ? `
-      <span class="kiosk-bubble-item" style="display:inline-flex; align-items:center; gap:5px; background:#1b2130; border:1.5px solid #ff9800; color:#ff9800; padding:5px 14px; border-radius:14px; font-size:13px; font-weight:900; white-space:nowrap; box-shadow:0 2px 8px rgba(255,152,0,0.25);">
+      <span class="kiosk-bubble-item" style="display:inline-flex; align-items:center; gap:5px; background:#1b2130; border:1.5px solid #ff9800; color:#ff9800; padding:4px 10px; border-radius:12px; font-size:12px; font-weight:900; white-space:nowrap; box-shadow:0 2px 6px rgba(255,152,0,0.25);">
         🏷️ Rollo: ${escHtml(trabActual.id_rollo_papel || "N/A")}
       </span>
-      <span class="kiosk-bubble-item" style="display:inline-flex; align-items:center; gap:5px; background:#182533; border:1.5px solid #38BDF8; color:#38BDF8; padding:5px 14px; border-radius:14px; font-size:13px; font-weight:900; white-space:nowrap; box-shadow:0 2px 8px rgba(56,189,248,0.25);">
+      <span class="kiosk-bubble-item" style="display:inline-flex; align-items:center; gap:5px; background:#182533; border:1.5px solid #38BDF8; color:#38BDF8; padding:4px 10px; border-radius:12px; font-size:12px; font-weight:900; white-space:nowrap; box-shadow:0 2px 6px rgba(56,189,248,0.25);">
         📦 Lote: ${escHtml(trabActual.batch_id || "N/A")}
       </span>
     `
     : `
-      <span class="kiosk-bubble-item" style="display:inline-flex; align-items:center; gap:5px; background:#1b2130; border:1.5px solid #ff9800; color:#ff9800; padding:5px 14px; border-radius:14px; font-size:13px; font-weight:900; white-space:nowrap; box-shadow:0 2px 8px rgba(255,152,0,0.25);">
+      <span class="kiosk-bubble-item" style="display:inline-flex; align-items:center; gap:5px; background:#1b2130; border:1.5px solid #ff9800; color:#ff9800; padding:4px 10px; border-radius:12px; font-size:12px; font-weight:900; white-space:nowrap; box-shadow:0 2px 6px rgba(255,152,0,0.25);">
         🏷️ Rollo: ${escHtml(trabActual.num_rollo_tela || "N/A")}
       </span>
-      <span class="kiosk-bubble-item" style="display:inline-flex; align-items:center; gap:5px; background:#182533; border:1.5px solid #38BDF8; color:#38BDF8; padding:5px 14px; border-radius:14px; font-size:13px; font-weight:900; white-space:nowrap; box-shadow:0 2px 8px rgba(56,189,248,0.25);">
+      <span class="kiosk-bubble-item" style="display:inline-flex; align-items:center; gap:5px; background:#182533; border:1.5px solid #38BDF8; color:#38BDF8; padding:4px 10px; border-radius:12px; font-size:12px; font-weight:900; white-space:nowrap; box-shadow:0 2px 6px rgba(56,189,248,0.25);">
         🎨 Color: ${escHtml(trabActual.color_tela || "Blanco")}
       </span>
     `;
@@ -2315,8 +2315,8 @@ function renderContenidoModalKiosco() {
         <div class="kiosk-metros-val" style="font-size:38px; font-weight:900; color:var(--accent-magenta); line-height:1;">${metrosVal} m</div>
         <div class="kiosk-metros-lbl" style="color:#aaa; font-size:11px; margin-top:3px; font-weight:bold; letter-spacing:0.5px;">${labelMetros}</div>
 
-        <!-- Burbujas Rollo y Color / Lote DEBAJO DE LOS METROS y más grandes -->
-        <div class="kiosk-bubbles-rollo-color" style="display:flex; justify-content:center; gap:10px; align-items:center; flex-wrap:wrap; margin-top:8px;">
+        <!-- Burbujas Rollo y Color en la misma línea lado a lado -->
+        <div class="kiosk-bubbles-rollo-color" style="display:flex; flex-direction:row; justify-content:center; align-items:center; gap:8px; flex-wrap:nowrap; margin-top:6px;">
           ${bubblesHtml}
         </div>
       </div>
@@ -2328,10 +2328,10 @@ function renderContenidoModalKiosco() {
           <span style="font-size:18px; font-weight:900; color:#2196F3; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escHtml(telaVal)}">${escHtml(telaVal)}</span>
         </div>
 
-        <!-- Cliente / Diseño Limpio (sin las burbujas adentro) -->
-        <div class="kiosk-info-cliente-rollo" style="background:#0f1117; padding:10px 14px; border-radius:8px; border:1px solid #2a324b; display:flex; flex-direction:column; gap:4px;">
-          <div style="font-size:14px; font-weight:bold; color:#fff; line-height:1.35;" title="${escHtml(rawNombre)}">
-            <span style="color:#888; font-size:11px; font-weight:normal; margin-right:4px;">CLIENTE / TRABAJO:</span>${escHtml(nombreLimpio)}
+        <!-- Nombre del trabajo en máximo 2 líneas sin prefijo -->
+        <div class="kiosk-info-cliente-rollo" style="background:#0f1117; padding:6px 12px; border-radius:6px; border:1px solid #2a324b;">
+          <div class="kiosk-job-title-clamp" style="font-size:13px; font-weight:bold; color:#fff; line-height:1.25; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; text-overflow:ellipsis;" title="${escHtml(rawNombre)}">
+            ${escHtml(nombreLimpio)}
           </div>
         </div>
 

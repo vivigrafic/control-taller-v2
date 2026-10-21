@@ -278,99 +278,127 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
   }
   .kiosk-player-grid {
     grid-template-columns: 1fr !important;
-    gap: 8px !important;
-    padding: 6px 8px !important;
-    margin-bottom: 6px !important;
+    gap: 4px !important;
+    padding: 2px 4px !important;
+    margin-bottom: 4px !important;
   }
   .kiosk-preview-img {
-    height: 175px !important;
-    max-height: 26vh !important;
-    margin-bottom: 8px !important;
+    height: 110px !important;
+    max-height: 14vh !important;
+    margin-bottom: 4px !important;
+    object-fit: contain !important;
   }
   .kiosk-preview-ph {
-    height: 60px !important;
-    margin-bottom: 6px !important;
-    font-size: 12px !important;
+    height: 44px !important;
+    margin-bottom: 4px !important;
+    font-size: 11px !important;
   }
   .kiosk-metros-val {
-    font-size: 34px !important;
+    font-size: 28px !important;
     line-height: 1 !important;
   }
   .kiosk-metros-lbl {
+    font-size: 10px !important;
+    margin-top: 1px !important;
+  }
+  .kiosk-bubbles-rollo-color {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: center !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+    gap: 6px !important;
+    margin-top: 4px !important;
+  }
+  .kiosk-bubble-item {
     font-size: 11px !important;
-    margin-top: 2px !important;
+    padding: 3px 8px !important;
+    border-radius: 10px !important;
+    white-space: nowrap !important;
   }
   .kiosk-info-tela {
-    padding: 8px 12px !important;
-  }
-  .kiosk-info-tela span:last-child {
-    font-size: 17px !important;
-  }
-  .kiosk-info-cliente-rollo {
-    padding: 8px 12px !important;
+    padding: 4px 10px !important;
     gap: 6px !important;
   }
+  .kiosk-info-tela span:last-child {
+    font-size: 14px !important;
+  }
+  .kiosk-info-cliente-rollo {
+    padding: 4px 10px !important;
+  }
+  .kiosk-job-title-clamp {
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 12px !important;
+    line-height: 1.25 !important;
+    font-weight: bold !important;
+    color: #fff !important;
+  }
   #kioscoParametrosBox {
-    padding: 10px 12px !important;
-    margin-top: 8px !important;
-    margin-bottom: 6px !important;
-    gap: 8px !important;
+    padding: 5px 8px !important;
+    margin-top: 4px !important;
+    margin-bottom: 2px !important;
+    gap: 6px !important;
+    justify-content: space-around !important;
   }
   #kioscoParametrosBox label {
-    font-size: 11px !important;
-    margin-bottom: 4px !important;
+    font-size: 9px !important;
+    margin-bottom: 2px !important;
     font-weight: bold !important;
   }
   #kioscoParametrosBox input {
-    width: 95px !important;
-    font-size: 24px !important;
-    padding: 6px !important;
-    height: 42px !important;
-    border-radius: 8px !important;
+    width: 75px !important;
+    font-size: 19px !important;
+    padding: 3px !important;
+    height: 34px !important;
+    border-radius: 6px !important;
   }
   #kioscoFallaBtns {
-    gap: 8px !important;
+    gap: 6px !important;
   }
   button.btn-kiosco-reportar-falla {
-    padding: 8px 12px !important;
-    font-size: 12px !important;
-    height: 42px !important;
-    border-radius: 8px !important;
+    padding: 5px 8px !important;
+    font-size: 11px !important;
+    height: 34px !important;
+    border-radius: 6px !important;
   }
   /* Footer del Kiosco en celular: Cronómetro y Botones grandes y ergonómicos */
   #kioscoFooterAcciones {
-    padding: 8px 12px !important;
-    gap: 8px !important;
+    padding: 6px 10px !important;
+    gap: 6px !important;
     flex-shrink: 0 !important;
     background: #0e1118 !important;
     border-top: 1px solid #2a324b !important;
   }
   #kioscoCronometroBox {
-    padding: 6px 12px !important;
-    min-height: 40px !important;
+    padding: 4px 10px !important;
+    min-height: 32px !important;
     flex-wrap: nowrap !important;
     justify-content: space-between !important;
   }
   #kioscoCronometro {
-    font-size: 24px !important;
+    font-size: 20px !important;
   }
   #kioscoCronometroBox span:first-child {
-    font-size: 12px !important;
+    font-size: 11px !important;
   }
   #btnKioscoPausarReanudar {
-    padding: 6px 16px !important;
-    font-size: 13px !important;
-    min-height: 34px !important;
+    padding: 4px 10px !important;
+    font-size: 12px !important;
+    min-height: 28px !important;
   }
   #kioscoBotonesAccion {
     display: flex !important;
     flex-direction: column !important;
-    gap: 8px !important;
+    gap: 5px !important;
   }
   #btnKioscoSiguienteTrabajo {
-    padding: 15px 12px !important;
-    font-size: 16px !important;
-    min-height: 50px !important;
+    padding: 10px 10px !important;
+    font-size: 14px !important;
+    min-height: 42px !important;
     font-weight: 900 !important;
     border-radius: 8px !important;
     margin: 0 !important;
@@ -379,12 +407,12 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
   #kioscoBotonesSecundarios {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
-    gap: 8px !important;
+    gap: 6px !important;
   }
   #btnKioscoDescartarSiguiente, #btnKioscoFinalizar {
-    padding: 8px 6px !important;
-    font-size: 12px !important;
-    min-height: 36px !important;
+    padding: 5px 4px !important;
+    font-size: 11px !important;
+    min-height: 30px !important;
     white-space: nowrap !important;
     font-weight: bold !important;
     margin: 0 !important;
