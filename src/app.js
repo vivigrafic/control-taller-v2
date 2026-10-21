@@ -383,6 +383,17 @@ export async function cargarDatosTodo() {
   STATE.historialAnchosTelas = resHistorialAnchos.data || [];
 
   renderTodoRespetandoFormulario();
+  avisarErroresVigia();
+}
+
+// El vigía de Google no pudo mover algún archivo impreso a IMPRESOS: se avisa una vez por archivo
+const erroresVigiaAvisados = new Set();
+function avisarErroresVigia() {
+  const nuevos = STATE.pendientesDrive.filter(p => p.vigia_error && !erroresVigiaAvisados.has(p.id));
+  if (!nuevos.length) return;
+  nuevos.forEach(p => erroresVigiaAvisados.add(p.id));
+  const quien = nuevos.length === 1 ? `"${nuevos[0].nombre_archivo}" no se pudo mover` : `${nuevos.length} archivos impresos no se pudieron mover`;
+  toast(`⚠️ ${quien} a IMPRESOS: ${nuevos[0].vigia_error}. Se reintenta solo cada 10 minutos.`, "warn");
 }
 
 function suscribirRealtime() {
@@ -4501,6 +4512,7 @@ export function inicializarEventosUI() {
 window.addEventListener("DOMContentLoaded", async () => {
   STATE.perfil = window.VG_ACCESO ? await window.VG_ACCESO.listo : null; // sin usuario del equipo no se carga nada
   if (window.VG_ACCESO?.pin) STATE.usuarioActual = window.VG_ACCESO.nombreOperario();
+  else window.VG_ACCESO?.operario(STATE.usuarioActual); // el nombre que se ve elegido es el que queda en cada cambio
   inicializarEventosUI();
   cargarDatosTodo();
   suscribirRealtime();
