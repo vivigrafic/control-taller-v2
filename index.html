@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261020_03" />
+  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261020_04" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./src/config/conexion.js?v=20261020_02"></script>
   <script src="./src/assets/logo.js?v=20261020_02"></script>
@@ -719,10 +719,12 @@
           </div>
         </div>
 
-        <div id="kioscoBotonesAccion" style="display:grid; grid-template-columns: 2fr 1.2fr 1fr; gap:10px;">
-          <button type="button" id="btnKioscoSiguienteTrabajo" class="btn-main" style="margin:0; padding:14px; font-size:15px; font-weight:bold; background:#00E676; color:#000;">✔️ TERMINAR ESTE Y SIGUIENTE ➔</button>
-          <button type="button" id="btnKioscoDescartarSiguiente" style="margin:0; padding:14px; font-size:13px; font-weight:bold; background:rgba(255,82,82,0.18); border:1px solid #ff5252; color:#ff5252; border-radius:6px; cursor:pointer;">✂️ DESECHAR PAPEL Y SIGUIENTE</button>
-          <button type="button" id="btnKioscoFinalizar" style="margin:0; padding:14px; font-size:13px; font-weight:bold; background:#2196F3; color:#fff; border:none; border-radius:6px; cursor:pointer;">🏁 TERMINAR TODO</button>
+        <div id="kioscoBotonesAccion" style="display:flex; flex-direction:column; gap:8px;">
+          <button type="button" id="btnKioscoSiguienteTrabajo" class="btn-main" style="margin:0; padding:14px; font-size:16px; font-weight:900; background:#00E676; color:#000; box-shadow:0 4px 15px rgba(0,230,118,0.3); border:none; border-radius:8px; cursor:pointer; width:100%;">✔️ TERMINAR ESTE Y SIGUIENTE ➔</button>
+          <div id="kioscoBotonesSecundarios" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+            <button type="button" id="btnKioscoDescartarSiguiente" style="margin:0; padding:10px 8px; font-size:12px; font-weight:bold; background:rgba(255,82,82,0.14); border:1px solid #ff5252; color:#ff5252; border-radius:6px; cursor:pointer;">✂️ DESECHAR PAPEL</button>
+            <button type="button" id="btnKioscoFinalizar" style="margin:0; padding:10px 8px; font-size:12px; font-weight:bold; background:#1e293b; color:#94a3b8; border:1px solid #475569; border-radius:6px; cursor:pointer;">🏁 TERMINAR TODO</button>
+          </div>
         </div>
       </div>
     </div>
@@ -747,6 +749,6 @@
   <datalist id="listColores"></datalist>
   <div id="vgToastContainer" style="position:fixed; top:16px; right:16px; z-index:3000; max-width:360px;"></div>
 
-  <script type="module" src="./src/app.js?v=20261020_03"></script>
+  <script type="module" src="./src/app.js?v=20261020_04"></script>
 </body>
 </html>

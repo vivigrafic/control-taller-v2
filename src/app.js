@@ -2210,50 +2210,96 @@ function renderContenidoModalKiosco() {
 
   const thumbIdActual = extraerThumbIdDrive(trabActual.file_id);
   const imgPreviewHtml = thumbIdActual
-    ? `<img class="kiosk-preview-img" src="https://drive.google.com/thumbnail?id=${escHtml(thumbIdActual)}&sz=w600-h600" style="width:100%; height:240px; object-fit:contain; background:#000; border:2px solid var(--accent-magenta); border-radius:8px; margin-bottom:10px;" onerror="this.style.display='none';" />`
-    : `<div class="kiosk-preview-ph" style="width:100%; height:140px; background:#000; border:2px dashed #444; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#888; font-weight:bold; margin-bottom:10px;">${escHtml(trabActual.diseno || "SIN VISTA PREVIA")}</div>`;
+    ? `<img class="kiosk-preview-img" src="https://drive.google.com/thumbnail?id=${escHtml(thumbIdActual)}&sz=w600-h600" style="width:100%; height:200px; object-fit:contain; background:#000; border:2px solid var(--accent-magenta); border-radius:8px; margin-bottom:10px;" onerror="this.style.display='none';" />`
+    : `<div class="kiosk-preview-ph" style="width:100%; height:90px; background:#000; border:2px dashed #444; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#888; font-weight:bold; margin-bottom:10px;">${escHtml(trabActual.diseno || "SIN VISTA PREVIA")}</div>`;
 
   document.getElementById("kioscoTitulo").textContent = `🔥 MODO KIOSKO ACTIVO (BOBINA: ${rolloNombre})`;
-  const proximoTrab = trabajos[STATE.kiosco.indiceActual + 1];
+
+  // Limpieza de extensiones y sufijos técnicos redundantes para máxima legibilidad del operario
+  const nombreLimpio = String(trabActual.cliente_archivo || "")
+    .replace(/\.(jpg|jpeg|png|tif|tiff|pdf|ai|psd)$/i, "")
+    .trim();
 
   document.getElementById("kioscoSubtitulo").innerHTML = `
-    <!-- Encabezado Kiosko General igual al original -->
-    <div id="kioscoTopHeader" style="display:flex; justify-content:space-between; align-items:center; background:#151821; border:1px solid #2a324b; padding:8px 14px; border-radius:8px; margin-bottom:12px;">
-      <div style="font-size:15px; font-weight:bold; color:#00E676;">
-        TRABAJO ${STATE.kiosco.indiceActual + 1} DE ${trabajos.length}
+    <!-- Encabezado Kiosko General con botón para ver cola opcional -->
+    <div id="kioscoTopHeader" style="display:flex; justify-content:space-between; align-items:center; background:#151821; border:1px solid #2a324b; padding:8px 14px; border-radius:8px; margin-bottom:10px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="font-size:15px; font-weight:900; color:#00E676;">TRABAJO ${STATE.kiosco.indiceActual + 1} DE ${trabajos.length}</span>
+        <button type="button" id="btnKioscoToggleCola" style="background:#1e293b; border:1px solid #475569; color:#94a3b8; font-size:11px; padding:3px 10px; border-radius:6px; cursor:pointer; font-weight:bold;" title="Ver todos los trabajos del rollo">📋 Ver cola (${pendientesRestantes.length})</button>
       </div>
       <div style="text-align:right; font-size:13px; color:#aaa;">
-        Restante del Rollo: <strong style="color:#4CAF50; font-size:16px;">${fmtNum(totalM)} m</strong>
+        Restante: <strong style="color:#4CAF50; font-size:16px;">${fmtNum(totalM)} m</strong>
       </div>
     </div>
 
-    <!-- Reproductor Principal de 2 Columnas (igual a panelReproductorCalandra original) -->
+    <!-- Panel de cola colapsable (oculto por defecto para cero distracciones) -->
+    <div id="kioscoPanelColaOculta" style="display:none; background:#11141c; border:1px solid #334155; border-radius:8px; padding:10px; margin-bottom:12px; max-height:240px; overflow-y:auto;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid #2a324b; padding-bottom:6px;">
+        <span style="font-size:12px; font-weight:bold; color:#00E676;">📋 SECUENCIA DEL ROLLO (${trabajos.length} trabajos) — Tocá uno para saltar a él:</span>
+        <button type="button" id="btnCerrarColaOculta" style="background:none; border:none; color:#ff5252; font-size:14px; font-weight:bold; cursor:pointer;">✖ Cerrar</button>
+      </div>
+      ${trabajos.map((t, idx) => {
+        const esActual = idx === STATE.kiosco.indiceActual;
+        const esCompletado = STATE.kiosco.completadosIds.has(t.id);
+        const esDescartado = STATE.kiosco.descartadosIds.has(t.id);
+
+        let borderStyle = "1px solid #333";
+        let bgStyle = "#1a1c23";
+        let badgeEstado = `<span style="background:#333; color:#ccc; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:bold;">#${idx + 1} EN COLA</span>`;
+
+        if (esCompletado) {
+          borderStyle = "1px solid #2e7d32";
+          bgStyle = "rgba(46, 125, 50, 0.12)";
+          badgeEstado = `<span style="background:#2e7d32; color:#fff; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:bold;">✅ YA CALANDRADO</span>`;
+        } else if (esDescartado) {
+          borderStyle = "1px solid #b71c1c";
+          bgStyle = "rgba(183, 28, 28, 0.12)";
+          badgeEstado = `<span style="background:#b71c1c; color:#fff; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:bold;">✂️ PAPEL DESECHADO</span>`;
+        } else if (esActual) {
+          borderStyle = "2px solid #00E676";
+          bgStyle = "rgba(0, 230, 118, 0.10)";
+          badgeEstado = `<span style="background:#00E676; color:#000; padding:3px 10px; border-radius:4px; font-size:11px; font-weight:bold;">🔥 CALANDRANDO AHORA</span>`;
+        }
+
+        return `
+          <div class="kiosco-item-card" data-kiosco-idx="${idx}" style="background:${bgStyle}; padding:8px 12px; border-radius:6px; border:${borderStyle}; margin-bottom:6px; font-size:12px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+            <div>
+              ${badgeEstado}
+              <strong style="color:#fff; margin-left:6px;">${escHtml(t.cliente_archivo)}</strong>
+              <span style="color:#2196F3; font-weight:bold; margin-left:6px;">[${escHtml(t.tela_destino || "-")}]</span>
+            </div>
+            <div style="font-size:14px; font-weight:bold; color:var(--accent); white-space:nowrap;">${fmtNum(t.metros)}m</div>
+          </div>
+        `;
+      }).join("")}
+    </div>
+
+    <!-- Reproductor Principal Limpio de 2 Columnas -->
     <div class="kiosk-player-grid">
       <div class="kiosk-player-left" style="text-align:center;">
         ${imgPreviewHtml}
-        <div class="kiosk-metros-val" style="font-size:34px; font-weight:bold; color:var(--accent-magenta); line-height:1;">${fmtNum(trabActual.metros)} m</div>
-        <div class="kiosk-metros-lbl" style="color:#aaa; font-size:11px; margin-top:2px;">METROS A CALANDRAR</div>
+        <div class="kiosk-metros-val" style="font-size:38px; font-weight:900; color:var(--accent-magenta); line-height:1;">${fmtNum(trabActual.metros)} m</div>
+        <div class="kiosk-metros-lbl" style="color:#aaa; font-size:11px; margin-top:3px; font-weight:bold; letter-spacing:0.5px;">METROS A CALANDRAR</div>
       </div>
 
       <div class="kiosk-player-right" style="display:flex; flex-direction:column; gap:8px;">
-        <!-- B: Nombre de la tela en una sola línea que ocupe la mitad de la altura -->
-        <div class="kiosk-info-tela" style="background:#0f1117; padding:6px 12px; border-radius:6px; border-left:4px solid #2196F3; display:flex; align-items:center; gap:8px; overflow:hidden;">
-          <span style="color:#888; font-size:11px; font-weight:bold; white-space:nowrap;">TELA:</span>
-          <span style="font-size:16px; font-weight:bold; color:#2196F3; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escHtml(trabActual.tela_destino || "-")}">${escHtml(trabActual.tela_destino || "-")}</span>
+        <!-- Tela en grande y visible -->
+        <div class="kiosk-info-tela" style="background:#0f1117; padding:8px 12px; border-radius:6px; border-left:4px solid #2196F3; display:flex; align-items:center; gap:8px; overflow:hidden;">
+          <span style="color:#888; font-size:12px; font-weight:bold; white-space:nowrap;">TELA:</span>
+          <span style="font-size:18px; font-weight:900; color:#2196F3; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escHtml(trabActual.tela_destino || "-")}">${escHtml(trabActual.tela_destino || "-")}</span>
         </div>
 
-        <!-- C & D: Cliente/Diseño máx 2 líneas, y abajo Rollo + Color en burbujas separadas en 1 sola línea -->
-        <div class="kiosk-info-cliente-rollo" style="background:#0f1117; padding:8px 10px; border-radius:6px; border:1px solid #2a324b; display:flex; flex-direction:column; gap:6px;">
-          <!-- C: Cliente/Diseño en 1 linea (máximo 2) -->
-          <div style="font-size:13px; font-weight:bold; color:#fff; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.25;" title="${escHtml(trabActual.cliente_archivo)}">
-            <span style="color:#888; font-size:11px; font-weight:normal; margin-right:4px;">CLIENTE / DISEÑO:</span>${escHtml(trabActual.cliente_archivo)}
+        <!-- Cliente / Diseño Limpio -->
+        <div class="kiosk-info-cliente-rollo" style="background:#0f1117; padding:8px 12px; border-radius:6px; border:1px solid #2a324b; display:flex; flex-direction:column; gap:6px;">
+          <div style="font-size:13px; font-weight:bold; color:#fff; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.3;" title="${escHtml(trabActual.cliente_archivo)}">
+            <span style="color:#888; font-size:11px; font-weight:normal; margin-right:4px;">CLIENTE / TRABAJO:</span>${escHtml(nombreLimpio)}
           </div>
-          <!-- D: Número y color de rollo en una sola línea abajo en burbujas separadas -->
-          <div style="display:flex; gap:8px; align-items:center; flex-wrap:nowrap; overflow-x:auto;">
-            <span style="display:inline-flex; align-items:center; gap:4px; background:#1b2130; border:1px solid #ff9800; color:#ff9800; padding:2px 9px; border-radius:12px; font-size:11px; font-weight:bold; white-space:nowrap;">
+          <!-- Número y color de rollo -->
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <span style="display:inline-flex; align-items:center; gap:4px; background:#1b2130; border:1px solid #ff9800; color:#ff9800; padding:2px 10px; border-radius:12px; font-size:11px; font-weight:bold; white-space:nowrap;">
               🏷️ Rollo: ${escHtml(trabActual.num_rollo_tela || "N/A")}
             </span>
-            <span style="display:inline-flex; align-items:center; gap:4px; background:#182533; border:1px solid #38BDF8; color:#38BDF8; padding:2px 9px; border-radius:12px; font-size:11px; font-weight:bold; white-space:nowrap;">
+            <span style="display:inline-flex; align-items:center; gap:4px; background:#182533; border:1px solid #38BDF8; color:#38BDF8; padding:2px 10px; border-radius:12px; font-size:11px; font-weight:bold; white-space:nowrap;">
               🎨 Color: ${escHtml(trabActual.color_tela || "Blanco")}
             </span>
           </div>
@@ -2264,68 +2310,44 @@ function renderContenidoModalKiosco() {
             ⚠️ NOTA: ${escHtml(trabActual.observaciones)}
           </div>
         ` : ""}
-
-        <div class="kiosk-info-proximo" style="background:rgba(255, 152, 0, 0.08); padding:6px 10px; border-radius:6px; border:1px dashed #ff9800; font-size:11px;">
-          <span style="color:#ff9800; font-weight:bold;">⏭️ PRÓXIMO:</span>
-          <span style="color:#ccc; margin-left:6px;">${proximoTrab ? `${escHtml(proximoTrab.tela_destino)} — ${fmtNum(proximoTrab.metros)}m (${escHtml(proximoTrab.cliente_archivo)})` : "🏁 Fin de la Bobina"}</span>
-        </div>
       </div>
     </div>
 
     <!-- Parámetros operativos (Velocidad y Temperatura) -->
-    <div id="kioscoParametrosBox" style="background:#111; border:1px solid #333; padding:10px; border-radius:8px; margin-bottom:12px; display:flex; justify-content:space-around; align-items:center; flex-wrap:wrap; gap:10px;">
+    <div id="kioscoParametrosBox" style="background:#111; border:1px solid #333; padding:10px 14px; border-radius:8px; margin-top:8px; display:flex; justify-content:space-around; align-items:center; flex-wrap:wrap; gap:10px;">
       <div style="text-align:center;">
         <label style="font-size:11px; color:#aaa; display:block; margin-bottom:4px; font-weight:bold;">⚙️ VELOCIDAD (m/min)</label>
-        <input type="number" id="kioscoInputVelocidad" value="${velActual}" step="1" style="width:110px; font-size:20px; text-align:center; padding:6px; background:#1a1c23; color:#00E676; border:1px solid #4CAF50; border-radius:6px; font-weight:bold;" />
+        <input type="number" id="kioscoInputVelocidad" value="${velActual}" step="1" style="width:105px; font-size:22px; text-align:center; padding:6px; background:#1a1c23; color:#00E676; border:1px solid #4CAF50; border-radius:6px; font-weight:bold;" />
       </div>
       <div style="text-align:center;">
         <label style="font-size:11px; color:#aaa; display:block; margin-bottom:4px; font-weight:bold;">🔥 TEMPERATURA (°C)</label>
-        <input type="number" id="kioscoInputTemperatura" value="${tempActual}" step="1" style="width:110px; font-size:20px; text-align:center; padding:6px; background:#1a1c23; color:#ff9800; border:1px solid #ff9800; border-radius:6px; font-weight:bold;" />
+        <input type="number" id="kioscoInputTemperatura" value="${tempActual}" step="1" style="width:105px; font-size:22px; text-align:center; padding:6px; background:#1a1c23; color:#ff9800; border:1px solid #ff9800; border-radius:6px; font-weight:bold;" />
       </div>
       <div id="kioscoFallaBtns" style="display:flex; gap:8px;">
         <button type="button" class="btn-kiosco-reportar-falla" data-id="${trabActual.id}" data-estacion="Calandrado" style="background:rgba(216,27,96,0.18); border:1px solid var(--accent-magenta); color:#ff4081; padding:10px 14px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">⚠️ FALLA CALANDRA</button>
         <button type="button" class="btn-kiosco-reportar-falla" data-id="${trabActual.id}" data-estacion="Impresión" style="background:rgba(255,152,0,0.18); border:1px solid var(--accent-orange); color:#ff9800; padding:10px 14px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">⚠️ FALLA IMPRESIÓN</button>
       </div>
     </div>
-
-    <div style="color:#aaa; font-size:12px; font-weight:bold; margin-bottom:6px;">
-      SECUENCIA DEL ROLLO (${pendientesRestantes.length} pendientes de ${trabajos.length}) — <span style="color:#00E676;">Tocá cualquier trabajo para saltar a él</span>:
-    </div>
-    ${trabajos.map((t, idx) => {
-      const esActual = idx === STATE.kiosco.indiceActual;
-      const esCompletado = STATE.kiosco.completadosIds.has(t.id);
-      const esDescartado = STATE.kiosco.descartadosIds.has(t.id);
-
-      let borderStyle = "1px solid #333";
-      let bgStyle = "#1a1c23";
-      let badgeEstado = `<span style="background:#333; color:#ccc; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:bold;">#${idx + 1} EN COLA</span>`;
-
-      if (esCompletado) {
-        borderStyle = "1px solid #2e7d32";
-        bgStyle = "rgba(46, 125, 50, 0.12)";
-        badgeEstado = `<span style="background:#2e7d32; color:#fff; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:bold;">✅ YA CALANDRADO</span>`;
-      } else if (esDescartado) {
-        borderStyle = "1px solid #b71c1c";
-        bgStyle = "rgba(183, 28, 28, 0.12)";
-        badgeEstado = `<span style="background:#b71c1c; color:#fff; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:bold;">✂️ PAPEL DESECHADO</span>`;
-      } else if (esActual) {
-        borderStyle = "2px solid #00E676";
-        bgStyle = "rgba(0, 230, 118, 0.10)";
-        badgeEstado = `<span style="background:#00E676; color:#000; padding:3px 10px; border-radius:4px; font-size:11px; font-weight:bold;">🔥 CALANDRANDO AHORA</span>`;
-      }
-
-      return `
-        <div class="kiosco-item-card" data-kiosco-idx="${idx}" style="background:${bgStyle}; padding:8px 12px; border-radius:6px; border:${borderStyle}; margin-bottom:6px; font-size:12px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; gap:8px;">
-          <div>
-            ${badgeEstado}
-            <strong style="color:#fff; margin-left:6px;">${escHtml(t.cliente_archivo)}</strong>
-            <span style="color:#2196F3; font-weight:bold; margin-left:6px;">[${escHtml(t.tela_destino || "-")}]</span>
-          </div>
-          <div style="font-size:14px; font-weight:bold; color:var(--accent); white-space:nowrap;">${fmtNum(t.metros)}m</div>
-        </div>
-      `;
-    }).join("")}
   `;
+
+  // Control para abrir y cerrar el cajón de la cola
+  const btnToggleCola = document.getElementById("btnKioscoToggleCola");
+  const panelCola = document.getElementById("kioscoPanelColaOculta");
+  const btnCerrarCola = document.getElementById("btnCerrarColaOculta");
+
+  if (btnToggleCola && panelCola) {
+    btnToggleCola.onclick = () => {
+      const oculto = panelCola.style.display === "none";
+      panelCola.style.display = oculto ? "block" : "none";
+      btnToggleCola.textContent = oculto ? "✖ Ocultar cola" : `📋 Ver cola (${pendientesRestantes.length})`;
+    };
+  }
+  if (btnCerrarCola && panelCola && btnToggleCola) {
+    btnCerrarCola.onclick = () => {
+      panelCola.style.display = "none";
+      btnToggleCola.textContent = `📋 Ver cola (${pendientesRestantes.length})`;
+    };
+  }
 
   const btnSig = document.getElementById("btnKioscoSiguienteTrabajo");
   const btnDesc = document.getElementById("btnKioscoDescartarSiguiente");
@@ -2336,7 +2358,7 @@ function renderContenidoModalKiosco() {
     btnSig.style.display = "block";
   }
   if (btnDesc) {
-    btnDesc.innerHTML = pendientesRestantes.length > 1 ? "✂️ DESECHAR PAPEL Y SIGUIENTE" : "✂️ DESECHAR PAPEL Y FINALIZAR";
+    btnDesc.innerHTML = "✂️ DESECHAR PAPEL";
     btnDesc.style.display = "block";
   }
   if (btnFin) {
@@ -2522,13 +2544,17 @@ function abrirKioscoCalandra(idCal, rolloId = null) {
   const btnFin = document.getElementById("btnKioscoFinalizar");
   if (btnFin) {
     btnFin.onclick = async () => {
-      const min = Math.max(1, Math.round(obtenerMsTranscurridosKiosco() / 60000));
-      const vel = parseFloat(document.getElementById("kioscoInputVelocidad")?.value) || 50;
-      const temp = parseFloat(document.getElementById("kioscoInputTemperatura")?.value) || 205;
-
       const pendientesIds = STATE.kiosco.trabajos
         .map(t => t.id)
         .filter(id => !STATE.kiosco.completadosIds.has(id) && !STATE.kiosco.descartadosIds.has(id));
+
+      if (pendientesIds.length > 0 && !confirm(`⚠️ ¿Deseas TERMINAR TODO y marcar como calandrados los ${pendientesIds.length} trabajos restantes de esta bobina?`)) {
+        return;
+      }
+
+      const min = Math.max(1, Math.round(obtenerMsTranscurridosKiosco() / 60000));
+      const vel = parseFloat(document.getElementById("kioscoInputVelocidad")?.value) || 50;
+      const temp = parseFloat(document.getElementById("kioscoInputTemperatura")?.value) || 205;
 
       cerrarKioscoDefinitivo();
       for (const id of pendientesIds) {
