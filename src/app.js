@@ -4629,4 +4629,17 @@ window.addEventListener("DOMContentLoaded", async () => {
   inicializarEventosUI();
   cargarDatosTodo();
   suscribirRealtime();
+  revisarFilaSola();
 });
+
+// La fila de Drive se revisa sola: al abrir la app y cada 2 minutos mientras está a la vista. El script no la revisa más
+// de una vez por minuto y medio aunque haya varios equipos abiertos. Lo nuevo aparece solo por los avisos en vivo de la base.
+function revisarFilaSola() {
+  const pedir = () => {
+    const url = window.VG_CONEXION?.sandboxBridgeUrl;
+    if (url && document.visibilityState === "visible") fetch(`${url}?action=sync_drive_auto`).catch(() => null);
+  };
+  pedir();
+  setInterval(pedir, 2 * 60 * 1000);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") pedir(); });
+}
