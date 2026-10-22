@@ -1837,7 +1837,7 @@ function lineaTelaSistema(t) {
       puedeEditarCatalogo() ? ` <a class="btn-tela-separar" data-tela-id="${t.id}" style="color:#888; cursor:pointer; margin-left:6px;" title="Separar de la tela del sistema">separar</a>` : ""}</div>`;
   }
   return puedeEditarCatalogo()
-    ? `<div><button type="button" class="btn-tela-unir" data-tela-id="${t.id}" style="margin-top:4px; background:transparent; border:1px dashed var(--accent-orange); color:var(--accent-orange); border-radius:4px; font-size:10.5px; padding:2px 6px; cursor:pointer;">🔗 Unir con el sistema</button></div>`
+    ? `<div><button type="button" class="btn-tela-unir" data-tela-id="${t.id}" style="margin-top:4px; background:transparent; border:1px dashed var(--accent-orange); color:var(--accent-orange); border-radius:4px; font-size:10.5px; padding:2px 6px; cursor:pointer; white-space:nowrap;" title="Unir esta ficha con su tela de Productos del sistema">🔗 Unir</button></div>`
     : `<div style="font-size:11px; color:#888; margin-top:3px;">Sin unir con el sistema</div>`;
 }
 
@@ -1866,7 +1866,7 @@ function unirTelaConSistema(fichaId) {
   const ficha = (STATE.telasFicha || []).find(t => t.id === fichaId);
   if (!ficha) return;
   const opciones = (STATE.telasSistema || [])
-    .map(x => ({ ...x, puntos: parecidoTela(ficha.nombre_comercial, x.nombre) + (Array.isArray(ficha.alias_busqueda) ? Math.max(0, ...ficha.alias_busqueda.map(al => parecidoTela(al, x.nombre))) : 0) }))
+    .map(x => ({ ...x, puntos: Math.max(parecidoTela(ficha.nombre_comercial, x.nombre), ...(Array.isArray(ficha.alias_busqueda) ? ficha.alias_busqueda : []).map(al => parecidoTela(al, x.nombre))) }))
     .sort((a, b) => b.puntos - a.puntos || a.nombre.localeCompare(b.nombre));
   const capa = document.createElement("div");
   capa.className = "modal-overlay open";
@@ -1879,7 +1879,7 @@ function unirTelaConSistema(fichaId) {
           const ocupada = x.ficha_id && x.ficha_id !== ficha.id;
           const otra = ocupada ? (STATE.telasFicha || []).find(t => t.id === x.ficha_id) : null;
           return `<button type="button" class="btn-secondary" data-item="${x.id}" ${ocupada ? "disabled" : ""} style="display:block; width:100%; text-align:left; margin:4px 0; ${ocupada ? "opacity:0.45;" : ""}">
-            ${x.puntos >= 40 ? "⭐ " : ""}${escHtml(x.nombre)}${Number(x.partidas) > 0 ? ` <span style="color:#888; font-size:11px;">· ${x.partidas} partida/s</span>` : ""}${ocupada ? ` <span style="font-size:11px;">(ya es la ficha "${escHtml(otra ? otra.nombre_comercial : "otra")}")</span>` : ""}
+            ${x.puntos >= 24 ? "⭐ " : ""}${escHtml(x.nombre)}${Number(x.partidas) > 0 ? ` <span style="color:#888; font-size:11px;">· ${x.partidas} partida/s</span>` : ""}${ocupada ? ` <span style="font-size:11px;">(ya es la ficha "${escHtml(otra ? otra.nombre_comercial : "otra")}")</span>` : ""}
           </button>`;
         }).join("")}
       </div>
