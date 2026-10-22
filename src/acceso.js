@@ -59,7 +59,14 @@
         <label for="vgClave">Contraseña</label><input id="vgClave" type="password" autocomplete="current-password" required>
         <div class="mensaje" id="vgMsg">${esc(motivo || "")}</div>
         <button type="submit">Entrar</button>
+        <button type="button" class="vg-olvide" id="vgOlvide">¿Te olvidaste la contraseña?</button>
       </form>`);
+    if (window.vgOjitoClaves) window.vgOjitoClaves();
+    d.querySelector("#vgOlvide").addEventListener("click", () => {
+      const u = d.querySelector("#vgUsuario").value.trim();
+      const erp = (window.VG_CONEXION && window.VG_CONEXION.erpUrl) || "https://erpvivigrafic.netlify.app";
+      window.open(erp + "/login.html?olvide=1" + (u ? "&usuario=" + encodeURIComponent(u) : ""), "_blank", "noopener");
+    });
     d.querySelector("form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const u = d.querySelector("#vgUsuario").value.trim().toLowerCase();
