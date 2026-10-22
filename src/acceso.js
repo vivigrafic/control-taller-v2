@@ -32,6 +32,11 @@
       cursor: pointer; background: var(--vg-brand-primary); color: var(--vg-text-primary); }
     .vg-acceso button.secundario { margin-top: 10px; background: transparent; border: 1px solid var(--vg-surface-border); color: var(--vg-text-secondary); }
     .vg-acceso .mensaje { color: var(--vg-status-alert); font-size: 14px; margin-top: 12px; }
+    .vg-acceso button.vg-clave-ojo { width: auto; margin: 0; padding: 6px 8px; border: none; background: none; color: var(--vg-text-secondary);
+      font-weight: 400; display: flex; align-items: center; }
+    .vg-acceso button.vg-clave-ojo:hover { color: var(--vg-text-primary); }
+    .vg-acceso button.vg-olvide { width: auto; display: block; margin: 14px auto 0; padding: 4px; border: none; background: none;
+      color: var(--vg-brand-secondary); font-weight: 400; font-size: 14px; text-decoration: underline; }
     .vg-equipo { position: fixed; right: 10px; bottom: 8px; z-index: 50; font: 12px var(--vg-font-sans); color: var(--vg-text-secondary);
       background: var(--vg-bg-app); border: 1px solid var(--vg-surface-border); border-radius: 999px; padding: 4px 10px; opacity: 0.85; }
     .vg-equipo a { color: var(--vg-brand-secondary); cursor: pointer; text-decoration: none; margin-left: 8px; }
