@@ -30,6 +30,7 @@ const STATE = {
   perfil: null,
   telasSistema: [],
   dtfClientesVistos: new Map(),
+  dtfPendienteElegido: null,
   areaActual: localStorage.getItem("vg_area_actual") || "General",
   canalChatActivo: "Todos",
 
@@ -4232,6 +4233,8 @@ export function inicializarEventosUI() {
     const cargo = document.getElementById("dtfInputTipoCargo")?.value || "VENTA";
     const obs = document.getElementById("dtfInputObs")?.value.trim() || "";
     const cliSel = STATE.dtfClientesVistos.get(document.getElementById("dtfInputCliente")?.value.trim() || "");
+    // Si el trabajo salió de la cola de Drive (botón "Cargar") y es el mismo archivo, queda impreso
+    const pend = STATE.dtfPendienteElegido && STATE.dtfPendienteElegido.nombre_archivo === archivo ? STATE.dtfPendienteElegido : null;
 
     const { data: tiradaData, error: errTirada } = await sb().from("prod_dtf_tiradas").insert({
       codigo_tirada: `DTF-${Date.now().toString().slice(-5)}`,
@@ -4247,6 +4250,7 @@ export function inicializarEventosUI() {
       cliente: cliSel ? cliSel.nombre : cliente,
       cliente_id: cliSel ? cliSel.id : null,
       nombre_archivo: archivo,
+      file_id: pend ? pend.file_id : null,
       tipo_cargo: cargo,
       metros_archivo: metrosArch,
       metros_facturados: cargo === "VENTA" ? metrosArch : 0,
@@ -4254,6 +4258,13 @@ export function inicializarEventosUI() {
       observaciones: obs
     });
     if (errPedido) { toast("Error: " + errPedido.message, "error"); return; }
+
+    // Sale de la cola y el vigía de Google lo pasa a IMPRESOS (suelto → "0001 IMPRESOS"; en carpeta → su "IMPRESOS")
+    STATE.dtfPendienteElegido = null;
+    if (pend) {
+      const { error: errPend } = await sb().from("prod_pendientes_drive").update({ estado_impreso: "SI" }).eq("id", pend.id);
+      if (errPend) toast("El trabajo quedó cargado, pero no se pudo sacar de la cola: " + errPend.message, "warn");
+    }
 
     if (cargo === "VENTA" && !cliSel) {
       toast("✅ Trabajo DTF registrado. El cliente del sistema se elige al hacer la venta.");
@@ -4515,6 +4526,7 @@ export function inicializarEventosUI() {
     if (btnDtfPend) {
       const p = STATE.pendientesDrive.find(x => x.id === btnDtfPend.getAttribute("data-id"));
       if (p) {
+        STATE.dtfPendienteElegido = p;
         document.getElementById("dtfInputCliente").value = p.cliente;
         document.getElementById("dtfInputCliente").dispatchEvent(new Event("input"));
         document.getElementById("dtfInputArchivo").value = p.nombre_archivo;
