@@ -91,13 +91,15 @@ const STATE = {
 
 const sb = () => window.vgSupabase;
 
+// Números como en Argentina: punto de miles y coma decimal (1.234,5). Plata: "$ 18.000" o "$ 18.890,50".
 function fmtNum(n, dec = 2) {
   const v = Number(n) || 0;
-  return v.toFixed(dec);
+  return v.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: dec });
 }
 function fmtMoney(n) {
-  const v = Number(n) || 0;
-  return "$" + v.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  const v = Math.round((Number(n) || 0) * 100) / 100;
+  const dec = Number.isInteger(v) ? 0 : 2;
+  return (v < 0 ? "-$ " : "$ ") + Math.abs(v).toLocaleString("es-AR", { minimumFractionDigits: dec, maximumFractionDigits: dec });
 }
 function fmtDateHora(isoStr) {
   if (!isoStr) return "-";
@@ -905,7 +907,7 @@ function aplicarAutodeteccionAlSeleccionarArchivos() {
 
 function sincronizarInputsImpresionConState() {
   const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ""; };
-  setVal("impInput_metrosLote", fmtNum(STATE.impForm.metrosLote));
+  setVal("impInput_metrosLote", (Number(STATE.impForm.metrosLote) || 0).toFixed(2));
   setVal("impInput_perfil", STATE.impForm.perfil);
   setVal("impInput_tela", STATE.impForm.tela);
   setVal("impInput_rolloTela", STATE.impForm.rolloTela);
@@ -1700,7 +1702,7 @@ function renderModuloTelas() {
   const totalVariantes = variantes.length;
 
   const rindesValidos = variantes.map(v => Number(v.rinde_mts_kg)).filter(n => n > 0);
-  const rindeProm = rindesValidos.length > 0 ? (rindesValidos.reduce((a, b) => a + b, 0) / rindesValidos.length).toFixed(2) : "0.00";
+  const rindeProm = rindesValidos.length > 0 ? fmtNum(rindesValidos.reduce((a, b) => a + b, 0) / rindesValidos.length) : "0";
 
   // Ancho más común
   const mapaAnchos = {};
@@ -1766,7 +1768,7 @@ function renderModuloTelas() {
     if (histDeTela.length > 0) {
       const anchosAprendidos = histDeTela.map(h => Number(h.ancho_archivo_impreso) + 0.02).filter(n => n > 0);
       if (anchosAprendidos.length > 0) {
-        const promAprendido = (anchosAprendidos.reduce((a, b) => a + b, 0) / anchosAprendidos.length).toFixed(2);
+        const promAprendido = fmtNum(anchosAprendidos.reduce((a, b) => a + b, 0) / anchosAprendidos.length);
         badgeAprendizaje = `<span style="display:inline-block; font-size:10px; background:rgba(0,230,118,0.15); color:#00E676; border:1px solid #00E676; padding:1px 5px; border-radius:4px; margin-top:3px;" title="Ancho aprendido de ${histDeTela.length} impresiones">🧠 ~${promAprendido}m</span>`;
       }
     }

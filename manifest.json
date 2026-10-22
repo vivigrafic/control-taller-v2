@@ -6,21 +6,27 @@
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#0a0a0c",
-  "theme_color": "#11141c",
+  "background_color": "#08142E",
+  "theme_color": "#08142E",
   "lang": "es-AR",
   "icons": [
     {
       "src": "icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "icons/apple-touch-icon.png",
@@ -34,21 +40,36 @@
       "short_name": "Calandrado",
       "description": "Acceso directo a cola y kiosko de Calandrado",
       "url": "./#sec-calandrado",
-      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
       "name": "⚡ Corte Láser",
       "short_name": "Láser",
       "description": "Acceso directo a cola y kiosko de Corte Láser",
       "url": "./#sec-laser",
-      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
       "name": "🧵 Telas & Fichas",
       "short_name": "Telas",
       "description": "Catálogo de telas y fichas técnicas",
       "url": "./#sec-telas",
-      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }
