@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261021_03" />
+  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261022_01" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./src/config/conexion.js?v=20261022_04"></script>
   <script src="./src/ver_clave.js?v=20261022_02"></script>
@@ -371,12 +371,38 @@
        ======================================================================== -->
   <div id="sec-dtf" class="tab-content">
     <div id="dtfRollosKpiContainer" class="stats-grid"></div>
-    <div class="grid-panel">
-      <div class="card" style="border-top: 3px solid var(--accent-magenta);">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <h2 style="margin:0; border:none; padding:0;">🎞️ Registrar Impresión / Pedido DTF</h2>
-          <button type="button" class="btn-secondary btn-crud-add" data-table="prod_dtf_rollos" style="width:auto; padding:5px 10px;">+ Rollo 100m</button>
+    <!-- Dos pasos separados: lo que se imprime junto (anidado) no siempre es del mismo cliente -->
+    <div class="dtf-pasos">
+      <button type="button" class="dtf-paso activo" data-dtf-paso="imprimir">🖨️ 1. Imprimir</button>
+      <button type="button" class="dtf-paso" data-dtf-paso="vender">🧾 2. Vender <span id="dtfBadgeVender" class="dtf-paso-contador" hidden></span></button>
+    </div>
+
+    <div class="grid-panel" data-dtf-panel="imprimir">
+      <div class="card" style="border-top: 3px solid var(--accent-blue);">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+          <h2 style="margin:0; border:none; padding:0;">Cola para imprimir</h2>
+          <input type="text" id="dtfFiltroCola" placeholder="Buscar cliente o archivo…" style="max-width:230px; margin:0;" />
         </div>
+        <p class="dtf-ayuda">Marcá lo que vas a imprimir anidado (pueden ser de distintos clientes) y tocá <b>Imprimir</b>. Los archivos pasan solos a IMPRESOS y a <b>Vender</b>.</p>
+        <div id="listaPendientesDTF"></div>
+        <div id="dtfBarraImprimir" class="dtf-barra-imprimir" hidden>
+          <span id="dtfResumenSeleccion"></span>
+          <span style="display:flex; gap:8px;">
+            <button type="button" id="btnDtfLimpiarSeleccion" class="btn-secondary" style="width:auto; margin:0;">Desmarcar</button>
+            <button type="button" id="btnDtfImprimirSeleccion" class="btn-main" style="width:auto; margin:0;">🖨️ Imprimir seleccionados</button>
+          </span>
+        </div>
+      </div>
+      <div>
+        <div class="card" style="border-top: 3px solid var(--accent);">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h2 style="margin:0; border:none; padding:0;">Últimas tiradas</h2>
+            <button type="button" class="btn-secondary btn-crud-add" data-table="prod_dtf_rollos" style="width:auto; padding:5px 10px;">+ Rollo 100m</button>
+          </div>
+          <div style="overflow-x:auto; margin-top:10px;"><table><thead><tr><th>Tirada</th><th>Fecha</th><th>Archivos</th><th>Metros</th><th>Rollo</th></tr></thead><tbody id="tbodyTiradasDTF"></tbody></table></div>
+        </div>
+        <details class="card dtf-a-mano" style="border-top: 3px solid var(--accent-magenta);">
+          <summary>➕ Agregar un trabajo a mano (no está en la fila de Drive)</summary>
         <div id="dtfDuplicateAlert" style="display:none; background:rgba(236,72,153,0.15); border:1px solid var(--danger); color:var(--danger); padding:8px; border-radius:6px; font-size:12px; margin-top:8px;"></div>
         <label>Rollo DTF Activo (60cm x 100m)</label>
         <select id="dtfInputRollo"></select>
@@ -401,20 +427,18 @@
         <label>Observaciones DTF</label>
         <input type="text" id="dtfInputObs" placeholder="Opcional..." />
         <button type="button" id="btnRegistrarPedidoDTF" class="btn-main">Confirmar Trabajo DTF (OK)</button>
+        </details>
       </div>
-      <div>
-        <div class="card" style="border-top: 3px solid var(--accent-blue);">
-          <h2>Cola DTF Pendiente en Drive</h2>
-          <div style="overflow-x:auto;"><table><thead><tr><th>Cliente</th><th>Archivo</th><th>Metros</th><th>Cargo</th><th>Acción</th></tr></thead><tbody id="tbodyPendientesDTF"></tbody></table></div>
-        </div>
-        <div class="card" style="border-top: 3px solid var(--accent);">
-          <h2>DTF para vender (por cliente)</h2>
-          <div style="overflow-x:auto;"><table><thead><tr><th>Cliente</th><th>Archivos</th><th>Metros</th><th>Venta</th></tr></thead><tbody id="tbodyCuentasClientesDTF"></tbody></table></div>
-        </div>
-        <div class="card">
-          <h2>Historial de Pedidos DTF</h2>
-          <div style="overflow-x:auto;"><table><thead><tr><th>Acción</th><th>Fecha</th><th>Cliente</th><th>Archivo</th><th>Cargo</th><th>Metros</th><th>Venta</th></tr></thead><tbody id="tbodyPedidosDTF"></tbody></table></div>
-        </div>
+    </div>
+
+    <div class="grid-panel" data-dtf-panel="vender" hidden>
+      <div class="card" style="border-top: 3px solid var(--accent);">
+        <h2>DTF para vender (por cliente)</h2>
+        <div style="overflow-x:auto;"><table><thead><tr><th>Cliente</th><th>Archivos</th><th>Metros</th><th>Venta</th></tr></thead><tbody id="tbodyCuentasClientesDTF"></tbody></table></div>
+      </div>
+      <div class="card">
+        <h2>Historial de Pedidos DTF</h2>
+        <div style="overflow-x:auto;"><table><thead><tr><th>Acción</th><th>Fecha</th><th>Cliente</th><th>Archivo</th><th>Cargo</th><th>Metros</th><th>Venta</th></tr></thead><tbody id="tbodyPedidosDTF"></tbody></table></div>
       </div>
     </div>
   </div>
@@ -934,7 +958,7 @@
   <datalist id="listColores"></datalist>
   <div id="vgToastContainer" style="position:fixed; top:16px; right:16px; z-index:3000; max-width:360px;"></div>
 
-  <script type="module" src="./src/app.js?v=20261022_09"></script>
+  <script type="module" src="./src/app.js?v=20261022_10"></script>
   <script>
     // Registro del Service Worker PWA
     if ('serviceWorker' in navigator) {

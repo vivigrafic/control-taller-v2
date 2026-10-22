@@ -44,6 +44,10 @@ const STATE = {
   fallasReposiciones: [],
   dtfRollosSaldos: [],
   dtfTiradas: [],
+  dtfSeleccion: new Set(), // archivos de la cola marcados para imprimir juntos
+  dtfCarpetasCerradas: new Set(),
+  dtfPaso: "imprimir",
+  dtfFiltroCola: "",
   dtfPedidos: [],
   dtfCuentasClientes: [],
   chatMensajes: [],
@@ -1472,7 +1476,6 @@ function renderModuloLaser() {
 // ============================================================================
 function renderModuloDTF() {
   const kpiWrap = document.getElementById("dtfRollosKpiContainer");
-  const tbodyPend = document.getElementById("tbodyPendientesDTF");
   const tbodyPedidos = document.getElementById("tbodyPedidosDTF");
   const tbodyCuentas = document.getElementById("tbodyCuentasClientesDTF");
   if (!kpiWrap) return;
@@ -1492,23 +1495,9 @@ function renderModuloDTF() {
     </div>
   `).join("");
 
-  const pendDtf = STATE.pendientesDrive.filter(p => p.modulo === "DTF" && p.estado_impreso !== "SI" && cumpleBusquedaUniversal(p));
-  if (tbodyPend) {
-    tbodyPend.innerHTML = pendDtf.length === 0
-      ? `<tr><td colspan="5" style="text-align:center;color:#888;">Sin archivos DTF pendientes.</td></tr>`
-      : pendDtf.map(p => {
-        const cargo = p.es_repo_muestra || "VENTA";
-        return `
-          <tr>
-            <td><strong>${escHtml(p.cliente)}</strong></td>
-            <td>${escHtml(p.nombre_archivo)}</td>
-            <td>${fmtNum(p.metros_totales)}m</td>
-            <td><span class="badge ${cargo === "VENTA" ? "activo" : "danger"}">${escHtml(cargo)}</span></td>
-            <td><button type="button" class="btn-secondary btn-dtf-cargar-pend" data-id="${p.id}" style="width:auto;padding:4px 8px;">Cargar</button></td>
-          </tr>
-        `;
-      }).join("");
-  }
+  renderColaDtf();
+  renderTiradasDtf();
+  mostrarPasoDtf(STATE.dtfPaso);
 
   const pedidosFilt = STATE.dtfPedidos.filter(d => cumpleFiltroFecha(d.fecha_hora) && cumpleBusquedaUniversal(d));
   if (tbodyPedidos) {
@@ -1541,6 +1530,142 @@ function renderModuloDTF() {
         </tr>
       `).join("");
   }
+}
+
+// ===== DTF paso 1: imprimir en lote =====
+// La cola es la fila de Drive del DTF, agrupada por carpeta (o cliente). Se marcan los archivos que se imprimen juntos
+// (anidados en el RIP, aunque sean de distintos clientes) y "Imprimir" crea UNA tirada con todos: cada archivo queda como
+// pedido para vender y sale de la fila (el vigía lo mueve a IMPRESOS). Lo hace la base: taller_dtf_imprimir.
+function colaDtf() {
+  const q = STATE.dtfFiltroCola.trim().toLowerCase();
+  return STATE.pendientesDrive.filter(p => p.modulo === "DTF" && p.estado_impreso !== "SI" && cumpleBusquedaUniversal(p)
+    && (!q || `${p.cliente} ${p.nombre_archivo}`.toLowerCase().includes(q)));
+}
+
+function renderColaDtf() {
+  const cont = document.getElementById("listaPendientesDTF");
+  if (!cont) return;
+  const enCola = new Set(STATE.pendientesDrive.filter(p => p.modulo === "DTF" && p.estado_impreso !== "SI").map(p => p.id));
+  [...STATE.dtfSeleccion].forEach(id => { if (!enCola.has(id)) STATE.dtfSeleccion.delete(id); }); // ya impresos o fuera de la fila
+  const lista = colaDtf();
+  if (!lista.length) {
+    cont.innerHTML = `<div style="padding:15px; text-align:center; color:#888;">${enCola.size ? "No hay archivos con esa búsqueda." : "No hay archivos DTF en la fila. Se revisa sola cada 2 minutos (o tocá Sincronizar)."}</div>`;
+  } else {
+    const carpetas = new Map();
+    lista.forEach(p => {
+      const cli = p.cliente || "SIN CLIENTE";
+      if (!carpetas.has(cli)) carpetas.set(cli, []);
+      carpetas.get(cli).push(p);
+    });
+    cont.innerHTML = [...carpetas.entries()].map(([cli, archivos]) => {
+      const cerrada = STATE.dtfCarpetasCerradas.has(cli);
+      const metros = archivos.reduce((a, b) => a + (Number(b.metros_totales) || 0), 0);
+      const marcados = archivos.filter(a => STATE.dtfSeleccion.has(a.id)).length;
+      return `
+        <div class="folder-header dtf-carpeta" data-carpeta="${escHtml(cli)}">
+          <span><input type="checkbox" class="chk-dtf-carpeta" data-carpeta="${escHtml(cli)}" ${marcados === archivos.length ? "checked" : ""} style="margin-right:10px; width:18px; height:18px;" title="Marcar toda la carpeta" />
+            📁 <strong>${escHtml(cli)}</strong> (${archivos.length}${marcados && marcados < archivos.length ? `, ${marcados} marcados` : ""})</span>
+          <span style="font-weight:bold; color:var(--accent);">${fmtNum(metros)}m ${cerrada ? "►" : "▼"}</span>
+        </div>
+        <div class="folder-content" style="display:${cerrada ? "none" : "block"};">
+          ${archivos.map(p => {
+            const cargo = p.es_repo_muestra ? String(p.es_repo_muestra).toUpperCase() : "";
+            return `
+            <label class="file-item dtf-archivo" style="${STATE.dtfSeleccion.has(p.id) ? "border-color:var(--accent-blue);" : ""}">
+              <input type="checkbox" class="chk-dtf-pend" data-id="${p.id}" ${STATE.dtfSeleccion.has(p.id) ? "checked" : ""} />
+              ${renderCajaMiniatura(p.file_id, p.nombre_archivo)}
+              <span class="fname">${p.prioridad_maxima ? "🚨 " : ""}${escHtml(p.nombre_archivo)}${cargo ? ` <span class="badge danger">${escHtml(cargo)}</span>` : ""}</span>
+              <span class="fmeters">${fmtNum(p.metros_totales)}m</span>
+            </label>`;
+          }).join("")}
+        </div>`;
+    }).join("");
+  }
+  const marcados = STATE.pendientesDrive.filter(p => STATE.dtfSeleccion.has(p.id));
+  const barra = document.getElementById("dtfBarraImprimir");
+  if (barra) barra.hidden = marcados.length === 0;
+  const resumen = document.getElementById("dtfResumenSeleccion");
+  if (resumen) {
+    const clientes = new Set(marcados.map(p => p.cliente || "SIN CLIENTE")).size;
+    resumen.textContent = `${marcados.length} archivo${marcados.length === 1 ? "" : "s"} · ${fmtNum(marcados.reduce((a, b) => a + (Number(b.metros_totales) || 0), 0))} m · ${clientes} cliente${clientes === 1 ? "" : "s"}`;
+  }
+}
+
+function renderTiradasDtf() {
+  const tbody = document.getElementById("tbodyTiradasDTF");
+  if (!tbody) return;
+  const porTirada = new Map();
+  STATE.dtfPedidos.forEach(d => { if (d.tirada_id) porTirada.set(d.tirada_id, (porTirada.get(d.tirada_id) || 0) + 1); });
+  const ultimas = STATE.dtfTiradas.slice(0, 15);
+  tbody.innerHTML = ultimas.length === 0
+    ? `<tr><td colspan="5" style="text-align:center;color:#888;">Todavía no hay tiradas.</td></tr>`
+    : ultimas.map(t => `
+      <tr>
+        <td><strong>${escHtml(t.codigo_tirada)}</strong>${t.es_anidado ? ` <span class="badge activo">anidado</span>` : ""}</td>
+        <td>${fmtDateHora(t.fecha_hora)}</td>
+        <td>${porTirada.get(t.id) || 0}</td>
+        <td>${fmtNum(t.metros_consumidos_rollo)}m</td>
+        <td>${escHtml(t.id_rollo_dtf)}</td>
+      </tr>`).join("");
+}
+
+function mostrarPasoDtf(paso) {
+  STATE.dtfPaso = paso;
+  document.querySelectorAll("[data-dtf-paso]").forEach(b => b.classList.toggle("activo", b.getAttribute("data-dtf-paso") === paso));
+  document.querySelectorAll("[data-dtf-panel]").forEach(p => { p.hidden = p.getAttribute("data-dtf-panel") !== paso; });
+  const badge = document.getElementById("dtfBadgeVender");
+  if (badge) {
+    const n = gruposDtfPorVender().length;
+    badge.hidden = n === 0;
+    badge.textContent = String(n);
+  }
+}
+
+// Cuadro para confirmar la impresión: rollo, metros reales del RIP (opcional) y observación
+function abrirImprimirDtf() {
+  const marcados = STATE.pendientesDrive.filter(p => STATE.dtfSeleccion.has(p.id));
+  if (!marcados.length) return;
+  const metros = marcados.reduce((a, b) => a + (Number(b.metros_totales) || 0), 0);
+  const clientes = [...new Set(marcados.map(p => p.cliente || "SIN CLIENTE"))];
+  const rolloElegido = document.getElementById("dtfInputRollo")?.value || (STATE.dtfRollosSaldos[0] && STATE.dtfRollosSaldos[0].id_rollo_dtf) || "";
+  const capa = document.createElement("div");
+  capa.className = "modal-overlay open";
+  capa.innerHTML = `
+    <div class="modal-content" style="border-color:var(--accent-blue); max-width:480px; width:100%;">
+      <h2 style="margin-top:0;">🖨️ Imprimir ${marcados.length} archivo${marcados.length === 1 ? "" : "s"}</h2>
+      <p style="font-size:13px; color:#aaa; margin:0 0 6px;">${fmtNum(metros)} m de archivos · ${clientes.map(escHtml).join(", ")}</p>
+      <label>Rollo de film</label>
+      <select data-x="rollo">${STATE.dtfRollosSaldos.map(r => `<option value="${escHtml(r.id_rollo_dtf)}" ${r.id_rollo_dtf === rolloElegido ? "selected" : ""}>${escHtml(r.id_rollo_dtf)} — ${escHtml(r.marca_fabricante)} (${fmtNum(r.metros_restantes_reales)}m disp.)</option>`).join("")}</select>
+      <label>Metros que usó del rollo (los del RIP)</label>
+      <input type="number" step="0.01" min="0" data-x="rip" placeholder="${fmtNum(metros)} (si lo dejás vacío)" />
+      <label>Observación</label>
+      <input type="text" data-x="obs" placeholder="Opcional…" />
+      <div style="display:flex; gap:8px; margin-top:14px;">
+        <button type="button" class="btn-secondary" data-x="cancelar">Cancelar</button>
+        <button type="button" class="btn-main" data-x="ok" style="margin:0;">✓ Ya se imprimió</button>
+      </div>
+    </div>`;
+  document.body.appendChild(capa);
+  const cerrar = () => capa.remove();
+  capa.addEventListener("click", async (e) => {
+    if (e.target === capa || e.target.closest("[data-x='cancelar']")) { cerrar(); return; }
+    const ok = e.target.closest("[data-x='ok']");
+    if (!ok) return;
+    const rollo = capa.querySelector("[data-x='rollo']").value;
+    if (!rollo) { toast("Elegí el rollo de film (o cargá uno con + Rollo 100m).", "warn"); return; }
+    ok.disabled = true;
+    ok.textContent = "⏳ Guardando…";
+    const { data, error } = await sb().rpc("taller_dtf_imprimir", { p: {
+      pendientes: marcados.map(p => p.id), id_rollo_dtf: rollo,
+      metros_rip: capa.querySelector("[data-x='rip']").value || null,
+      observaciones: capa.querySelector("[data-x='obs']").value.trim()
+    } });
+    if (error) { ok.disabled = false; ok.textContent = "✓ Ya se imprimió"; toast("Error: " + error.message, "error"); return; }
+    cerrar();
+    STATE.dtfSeleccion.clear();
+    toast(`✅ Tirada ${data.codigo}: ${data.archivos} archivo(s), ${fmtNum(data.metros)} m. Pasan a IMPRESOS y a Vender.`);
+    await cargarDatosTodo();
+  });
 }
 
 // ===== DTF: la plata va por Ventas del sistema (precio de la lista, cobros y saldo del cliente en un solo lugar) =====
@@ -4226,6 +4351,33 @@ export function inicializarEventosUI() {
     }, 250);
   });
 
+  // DTF paso 1: cola para imprimir (marcar archivos o carpetas enteras) y pasos Imprimir / Vender
+  const listaDtf = document.getElementById("listaPendientesDTF");
+  listaDtf?.addEventListener("change", (e) => {
+    const chk = e.target.closest(".chk-dtf-pend");
+    const chkCarpeta = e.target.closest(".chk-dtf-carpeta");
+    if (chk) {
+      if (chk.checked) STATE.dtfSeleccion.add(chk.getAttribute("data-id")); else STATE.dtfSeleccion.delete(chk.getAttribute("data-id"));
+    } else if (chkCarpeta) {
+      const cli = chkCarpeta.getAttribute("data-carpeta");
+      colaDtf().filter(p => (p.cliente || "SIN CLIENTE") === cli).forEach(p => {
+        if (chkCarpeta.checked) STATE.dtfSeleccion.add(p.id); else STATE.dtfSeleccion.delete(p.id);
+      });
+    } else return;
+    renderColaDtf();
+  });
+  listaDtf?.addEventListener("click", (e) => {
+    const cab = e.target.closest(".dtf-carpeta");
+    if (!cab || e.target.closest("input")) return;
+    const cli = cab.getAttribute("data-carpeta");
+    if (STATE.dtfCarpetasCerradas.has(cli)) STATE.dtfCarpetasCerradas.delete(cli); else STATE.dtfCarpetasCerradas.add(cli);
+    renderColaDtf();
+  });
+  document.getElementById("dtfFiltroCola")?.addEventListener("input", (e) => { STATE.dtfFiltroCola = e.target.value; renderColaDtf(); });
+  document.getElementById("btnDtfImprimirSeleccion")?.addEventListener("click", abrirImprimirDtf);
+  document.getElementById("btnDtfLimpiarSeleccion")?.addEventListener("click", () => { STATE.dtfSeleccion.clear(); renderColaDtf(); });
+  document.querySelectorAll("[data-dtf-paso]").forEach(b => b.addEventListener("click", () => mostrarPasoDtf(b.getAttribute("data-dtf-paso"))));
+
   document.getElementById("btnRegistrarPedidoDTF")?.addEventListener("click", async () => {
     const cliente = document.getElementById("dtfInputCliente")?.value.trim() || "CLIENTE DTF";
     const archivo = document.getElementById("dtfInputArchivo")?.value.trim() || "Archivo DTF.png";
@@ -4236,7 +4388,7 @@ export function inicializarEventosUI() {
     const obs = document.getElementById("dtfInputObs")?.value.trim() || "";
     const cliSel = STATE.dtfClientesVistos.get(document.getElementById("dtfInputCliente")?.value.trim() || "");
     // Si el trabajo salió de la cola de Drive (botón "Cargar") y es el mismo archivo, queda impreso
-    const pend = STATE.dtfPendienteElegido && STATE.dtfPendienteElegido.nombre_archivo === archivo ? STATE.dtfPendienteElegido : null;
+    const pend = null; // lo que viene de la fila se imprime en lote (Cola para imprimir); esto es solo para trabajos a mano
 
     const { data: tiradaData, error: errTirada } = await sb().from("prod_dtf_tiradas").insert({
       codigo_tirada: `DTF-${Date.now().toString().slice(-5)}`,
@@ -4523,19 +4675,6 @@ export function inicializarEventosUI() {
 
     const btnDtfVender = e.target.closest(".btn-dtf-vender");
     if (btnDtfVender) { venderDtf(btnDtfVender.getAttribute("data-clave")); return; }
-
-    const btnDtfPend = e.target.closest(".btn-dtf-cargar-pend");
-    if (btnDtfPend) {
-      const p = STATE.pendientesDrive.find(x => x.id === btnDtfPend.getAttribute("data-id"));
-      if (p) {
-        STATE.dtfPendienteElegido = p;
-        document.getElementById("dtfInputCliente").value = p.cliente;
-        document.getElementById("dtfInputCliente").dispatchEvent(new Event("input"));
-        document.getElementById("dtfInputArchivo").value = p.nombre_archivo;
-        document.getElementById("dtfInputMetrosArchivo").value = p.metros_totales;
-      }
-      return;
-    }
 
     const btnTelaFicha = e.target.closest(".btn-tela-ficha") || e.target.closest(".btn-ver-ficha-tela");
     if (btnTelaFicha) {

@@ -440,3 +440,17 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
 
   #tabCalandrado .tabla-normal, #tabImpresion .tabla-normal, #sec-laser .tabla-normal, #tablaTelasFichas { min-width: 800px !important; }
 }
+
+/* DTF: pasos Imprimir / Vender, cola con casillas y barra para imprimir */
+.dtf-pasos { display: flex; gap: 8px; margin: 4px 0 14px; flex-wrap: wrap; }
+.dtf-paso { flex: 1; min-width: 150px; padding: 14px; border-radius: 10px; border: 2px solid #333; background: #141414; color: #ccc; font-size: 16px; font-weight: 800; cursor: pointer; }
+.dtf-paso.activo { border-color: var(--accent-blue); color: #fff; background: rgba(59,130,246,0.12); }
+.dtf-paso-contador { display: inline-block; min-width: 22px; padding: 1px 7px; margin-left: 6px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 13px; }
+.dtf-ayuda { font-size: 12px; color: #888; margin: 6px 0 10px; }
+.dtf-archivo { gap: 10px; }
+.dtf-archivo .fname { font-size: 13px; color: #ddd; word-break: break-word; }
+.dtf-archivo .fmeters { margin-left: auto; font-weight: 800; color: var(--accent); white-space: nowrap; }
+.dtf-barra-imprimir { position: sticky; bottom: 0; z-index: 5; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; padding: 12px; border-radius: 10px; background: #0b1220; border: 2px solid var(--accent-blue); font-weight: 700; }
+.dtf-a-mano summary { cursor: pointer; font-weight: 800; padding: 4px 0; }
+.dtf-a-mano[open] summary { margin-bottom: 8px; }
+.dtf-barra-imprimir[hidden], .dtf-paso-contador[hidden], [data-dtf-panel][hidden] { display: none !important; }
