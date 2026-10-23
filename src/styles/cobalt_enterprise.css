@@ -471,3 +471,31 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
 .dtf-venta-pie button { width: auto; margin: 0; }
 .dtf-link { width: auto; margin: 0 0 0 4px; padding: 0 2px; border: none; background: none; color: var(--accent-blue); font-size: 12px; text-decoration: underline; cursor: pointer; }
 .dtf-quitar { width: auto; margin: 0 0 0 6px; padding: 2px 8px; border: 1px solid var(--vg-surface-border); border-radius: 6px; background: none; color: var(--vg-text-secondary); cursor: pointer; }
+/* DTF: lo que falta imprimir en Vender */
+.dtf-venta-falta { margin-top: 6px; font-size: 12px; font-weight: 700; color: var(--accent-orange); }
+.dtf-venta-completo { margin-top: 6px; font-size: 12px; font-weight: 700; color: var(--vg-status-ready); }
+/* DTF paso 2: separar (lista de tiradas y vista a pantalla completa) */
+.dtf-progreso { height: 8px; border-radius: 999px; background: var(--vg-surface-border); overflow: hidden; }
+.dtf-progreso span { display: block; height: 100%; background: var(--vg-status-ready); }
+.dtf-separador { position: fixed; inset: 0; z-index: 1500; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); background: var(--vg-bg-app); color: var(--vg-text-primary); }
+.dtf-sep-arriba { display: flex; align-items: center; gap: 10px; font-size: 15px; }
+.dtf-sep-arriba [data-x="contador"] { color: var(--vg-text-secondary); }
+.dtf-sep-arriba button { width: auto; margin: 0 0 0 auto; padding: 8px 14px; }
+.dtf-sep-imagen { position: relative; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 12px; border: 1px solid var(--vg-surface-border);
+  background: repeating-conic-gradient(var(--vg-surface-base) 0 25%, transparent 0 50%) 0 0 / 24px 24px; touch-action: pan-y; }
+.dtf-sep-imagen img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.dtf-sep-cargando { position: absolute; padding: 12px; text-align: center; font-weight: 700; color: var(--vg-text-secondary); }
+.dtf-sep-cliente { font-size: clamp(28px, 7vw, 56px); font-weight: 900; line-height: 1.05; word-break: break-word; }
+.dtf-sep-archivo { font-size: 14px; color: var(--vg-text-secondary); word-break: break-word; }
+.dtf-sep-estado { min-height: 20px; font-size: 15px; font-weight: 800; color: var(--accent-orange); }
+.dtf-sep-estado.si { color: var(--vg-status-ready); }
+.dtf-sep-botones { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 8px; }
+.dtf-sep-botones button { width: 100%; min-height: 64px; margin: 0; font-size: 17px; font-weight: 900; }
+.dtf-sep-botones .dtf-sep-ok { font-size: 22px; background: var(--vg-status-ready); border-color: var(--vg-status-ready); color: var(--vg-text-primary); }
+.dtf-sep-extra { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; }
+.dtf-sep-extra a.dtf-link { text-decoration: underline; }
+.dtf-sep-tira { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+.dtf-sep-chip { flex: 0 0 auto; width: auto; min-width: 64px; max-width: 120px; margin: 0; padding: 6px 8px; border-radius: 8px; border: 2px solid var(--vg-surface-border); background: var(--vg-surface-base); color: var(--vg-text-secondary); font-size: 11px; line-height: 1.2; text-align: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: pointer; }
+.dtf-sep-chip b { display: block; font-size: 15px; color: var(--vg-text-primary); }
+.dtf-sep-chip.listo { border-color: var(--vg-status-ready); color: var(--vg-status-ready); }
+.dtf-sep-chip.actual { border-color: var(--accent-blue); box-shadow: 0 0 0 2px var(--vg-brand-glow); }

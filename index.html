@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261023_01" />
+  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261023_02" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./src/config/conexion.js?v=20261022_04"></script>
   <script src="./src/ver_clave.js?v=20261022_02"></script>
@@ -374,7 +374,8 @@
     <!-- Dos pasos separados: lo que se imprime junto (anidado) no siempre es del mismo cliente -->
     <div class="dtf-pasos">
       <button type="button" class="dtf-paso activo" data-dtf-paso="imprimir">🖨️ 1. Imprimir</button>
-      <button type="button" class="dtf-paso" data-dtf-paso="vender">🧾 2. Vender <span id="dtfBadgeVender" class="dtf-paso-contador" hidden></span></button>
+      <button type="button" class="dtf-paso" data-dtf-paso="separar">✂️ 2. Separar <span id="dtfBadgeSeparar" class="dtf-paso-contador" hidden></span></button>
+      <button type="button" class="dtf-paso" data-dtf-paso="vender">🧾 3. Vender <span id="dtfBadgeVender" class="dtf-paso-contador" hidden></span></button>
     </div>
 
     <div class="grid-panel" data-dtf-panel="imprimir">
@@ -428,6 +429,14 @@
         <input type="text" id="dtfInputObs" placeholder="Opcional..." />
         <button type="button" id="btnRegistrarPedidoDTF" class="btn-main">Confirmar Trabajo DTF (OK)</button>
         </details>
+      </div>
+    </div>
+
+    <div class="grid-panel dtf-una-columna" data-dtf-panel="separar" hidden>
+      <div class="card" style="border-top: 3px solid var(--accent-orange);">
+        <h2 style="margin-top:0;">Separar lo impreso</h2>
+        <p class="dtf-ayuda">Al desenrollar una tirada tocá <b>Separar</b>: aparece cada impresión grande con su cliente. Tocá <b>✓ Separado</b> y pasa sola a la siguiente. Se ven las tiradas de las últimas 2 semanas.</p>
+        <div id="dtfListaSeparar" class="dtf-tarjetas"></div>
       </div>
     </div>
 
@@ -966,7 +975,7 @@
   <datalist id="listColores"></datalist>
   <div id="vgToastContainer" style="position:fixed; top:16px; right:16px; z-index:3000; max-width:360px;"></div>
 
-  <script type="module" src="./src/app.js?v=20261023_01"></script>
+  <script type="module" src="./src/app.js?v=20261023_02"></script>
   <script>
     // Registro del Service Worker PWA
     if ('serviceWorker' in navigator) {

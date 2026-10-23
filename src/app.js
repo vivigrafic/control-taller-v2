@@ -1523,6 +1523,7 @@ function renderModuloDTF() {
   }
 
   renderVentasDtf();
+  renderSepararDtf();
 }
 
 // ===== DTF paso 1: imprimir en lote =====
@@ -1606,6 +1607,12 @@ function mostrarPasoDtf(paso) {
   STATE.dtfPaso = paso;
   document.querySelectorAll("[data-dtf-paso]").forEach(b => b.classList.toggle("activo", b.getAttribute("data-dtf-paso") === paso));
   document.querySelectorAll("[data-dtf-panel]").forEach(p => { p.hidden = p.getAttribute("data-dtf-panel") !== paso; });
+  const badgeSep = document.getElementById("dtfBadgeSeparar");
+  if (badgeSep) {
+    const n = tiradasParaSeparar().reduce((a, x) => a + x.ped.length - x.separados, 0);
+    badgeSep.hidden = n === 0;
+    badgeSep.textContent = String(n);
+  }
   const badge = document.getElementById("dtfBadgeVender");
   if (badge) {
     const n = STATE.dtfPorVender.length;
@@ -1699,7 +1706,7 @@ function renderVentasDtf() {
           <div class="file-item dtf-archivo">
             ${vender ? `<input type="checkbox" class="chk-dtf-venta" data-id="${p.id}" ${STATE.dtfSelVenta.has(p.id) ? "checked" : ""} />` : ""}
             ${renderCajaMiniatura(p.file_id, p.nombre_archivo)}
-            <span class="fname">${escHtml(p.nombre_archivo)}${t.nombres.length > 1 ? ` <span class="badge">${escHtml(p.nombre)}</span>` : ""}<br><small style="color:var(--vg-text-secondary);">${fmtDateHora(p.fecha_hora)}</small></span>
+            <span class="fname">${escHtml(p.nombre_archivo)}${t.nombres.length > 1 ? ` <span class="badge">${escHtml(p.nombre)}</span>` : ""}${p.separado ? ` <span class="badge activo">✓ separado</span>` : ""}<br><small style="color:var(--vg-text-secondary);">${fmtDateHora(p.fecha_hora)}</small></span>
             <span class="fmeters">${fmtNum(p.metros)}m</span>
             ${vender && t.pedidos.length > 1 ? `<button type="button" class="dtf-quitar btn-dtf-sacar" data-id="${p.id}" title="Sacar de esta venta (queda aparte)">✕</button>` : ""}
           </div>`).join("");
@@ -1710,11 +1717,16 @@ function renderVentasDtf() {
             <div>
               <div class="dtf-venta-nombre">${escHtml(t.nombres.join(" + "))}</div>
               <div class="dtf-venta-cliente">${cliente}</div>
+              ${t.falta_metros > 0
+                ? `<div class="dtf-venta-falta">⏳ Impreso ${fmtNum(t.metros)} de ${fmtNum(t.metros + t.falta_metros)} m · faltan ${fmtNum(t.falta_metros)} m (${t.falta_archivos} archivo${t.falta_archivos === 1 ? "" : "s"} en la fila)</div>`
+                : (t.a_mano ? "" : `<div class="dtf-venta-completo">✓ No queda nada en la fila</div>`)}
             </div>
             <div class="dtf-venta-totales">
               <div class="dtf-venta-metros">${fmtNum(t.metros)} m</div>
               <div class="dtf-venta-sub">${t.archivos} archivo${t.archivos === 1 ? "" : "s"}</div>
-              ${t.total != null ? `<div class="dtf-venta-precio">≈ ${fmtMoney(t.total)}</div><div class="dtf-venta-sub">${fmtMoney(t.precio_metro)} el metro</div>` : ""}
+              ${t.total_trabajo != null
+                ? `<div class="dtf-venta-precio">≈ ${fmtMoney(t.total_trabajo)}</div><div class="dtf-venta-sub">trabajo entero, ${fmtMoney(t.precio_metro_trabajo)} el metro</div><div class="dtf-venta-sub">(lo impreso solo: ${fmtMoney(t.total)})</div>`
+                : t.total != null ? `<div class="dtf-venta-precio">≈ ${fmtMoney(t.total)}</div><div class="dtf-venta-sub">${fmtMoney(t.precio_metro)} el metro</div>` : ""}
             </div>
           </div>
           <details class="dtf-venta-archivos" data-clave="${clave}" ${abierta ? "open" : ""}><summary>Ver archivos</summary>${archivos}</details>
@@ -1733,6 +1745,259 @@ function renderVentasDtf() {
     const deTarjetas = new Set(marcados.map(x => x.t.clave)).size;
     resumen.textContent = `${marcados.length} archivo${marcados.length === 1 ? "" : "s"} · ${fmtNum(marcados.reduce((a, x) => a + (Number(x.p.metros) || 0), 0))} m · de ${deTarjetas} tarjeta${deTarjetas === 1 ? "" : "s"}`;
   }
+}
+
+// ===== DTF paso 2: separar =====
+// Al desenrollar una tirada anidada se separa cada impresión: la vista a pantalla completa muestra la imagen grande
+// (la trae el script de Google, hasta 1600 px) y el cliente en letras grandes. "✓ Separado" la marca y pasa a la siguiente.
+function tiradasParaSeparar() {
+  const desde = Date.now() - 14 * 864e5;
+  const porTirada = new Map();
+  STATE.dtfPedidos.forEach(d => {
+    if (!d.tirada_id) return;
+    if (!porTirada.has(d.tirada_id)) porTirada.set(d.tirada_id, []);
+    porTirada.get(d.tirada_id).push(d);
+  });
+  return STATE.dtfTiradas
+    .filter(t => porTirada.has(t.id) && new Date(t.fecha_hora).getTime() >= desde)
+    .map(t => { const ped = porTirada.get(t.id); return { t, ped, separados: ped.filter(d => d.separado_at).length }; });
+}
+
+function renderSepararDtf() {
+  const cont = document.getElementById("dtfListaSeparar");
+  if (!cont) return;
+  const lista = tiradasParaSeparar();
+  cont.innerHTML = lista.length === 0
+    ? `<div style="padding:15px; text-align:center; color:var(--vg-text-secondary);">No hay tiradas de las últimas 2 semanas.</div>`
+    : lista.map(({ t, ped, separados }) => {
+      const faltan = ped.length - separados;
+      const clientes = [...new Set(ped.map(d => d.cliente_limpio || d.cliente || "SIN NOMBRE"))];
+      const metros = ped.reduce((a, d) => a + (Number(d.metros_archivo) || 0), 0);
+      return `
+        <div class="dtf-venta">
+          <div class="dtf-venta-cab">
+            <div>
+              <div class="dtf-venta-nombre">${escHtml(t.codigo_tirada)}</div>
+              <div class="dtf-venta-cliente">${fmtDateHora(t.fecha_hora)} · ${escHtml(t.id_rollo_dtf)} · ${fmtNum(metros)} m</div>
+            </div>
+            <div class="dtf-venta-totales">
+              <div class="dtf-venta-metros">${separados} de ${ped.length}</div>
+              <div class="dtf-venta-sub">separados</div>
+            </div>
+          </div>
+          <div class="dtf-progreso"><span style="width:${Math.round(separados * 100 / ped.length)}%"></span></div>
+          <div class="dtf-venta-cliente">${clientes.map(escHtml).join(" · ")}</div>
+          <div class="dtf-venta-pie">
+            ${faltan > 0 && ped.length > 1 ? `<button type="button" class="btn-secondary btn-dtf-sep-todo" data-id="${t.id}">✓ Marcar toda</button>` : ""}
+            <button type="button" class="${faltan > 0 ? "btn-main" : "btn-secondary"} btn-dtf-separar" data-id="${t.id}">${faltan > 0 ? "✂️ Separar" : "✓ Todo separado · Ver"}</button>
+          </div>
+        </div>`;
+    }).join("");
+}
+
+async function separarTodaLaTirada(tiradaId) {
+  const x = tiradasParaSeparar().find(y => y.t.id === tiradaId);
+  if (!x) return;
+  const faltan = x.ped.filter(d => !d.separado_at);
+  if (!faltan.length || !confirm(`¿Marcar las ${faltan.length} impresiones que faltan de ${x.t.codigo_tirada} como separadas?`)) return;
+  const { error } = await sb().rpc("taller_dtf_separar", { p: { pedidos: faltan.map(d => d.id), separado: true } });
+  if (error) { toast("Error: " + error.message, "error"); return; }
+  toast(`✓ ${x.t.codigo_tirada}: todo separado.`);
+  await cargarDatosTodo();
+}
+
+// Imagen grande del archivo (la guarda mientras la app está abierta: ir y volver no la vuelve a pedir)
+const imagenesGrandes = new Map();
+function traerImagenGrande(fileId) {
+  const terminal = window.VG_CONEXION && window.VG_CONEXION.terminalUrl;
+  if (!fileId || !terminal) return Promise.resolve("");
+  if (!imagenesGrandes.has(fileId)) {
+    imagenesGrandes.set(fileId, fetch(`${terminal}?action=miniatura&id=${encodeURIComponent(fileId)}&lado=1600`)
+      .then(r => r.json()).then(d => (d && d.data) || "").catch(() => ""));
+  }
+  return imagenesGrandes.get(fileId);
+}
+
+function abrirSeparadorDtf(tiradaId) {
+  const t = STATE.dtfTiradas.find(x => x.id === tiradaId);
+  const ped = STATE.dtfPedidos.filter(d => d.tirada_id === tiradaId)
+    .sort((a, b) => String(a.cliente_limpio || "").localeCompare(String(b.cliente_limpio || "")) || String(a.nombre_archivo).localeCompare(String(b.nombre_archivo)));
+  if (!t || !ped.length) return;
+  let i = Math.max(ped.findIndex(d => !d.separado_at), 0);
+  let ocupado = false;
+  const capa = document.createElement("div");
+  capa.className = "dtf-separador";
+  capa.innerHTML = `
+    <div class="dtf-sep-arriba">
+      <strong>${escHtml(t.codigo_tirada)}</strong><span data-x="contador"></span>
+      <button type="button" class="btn-secondary" data-x="cerrar">✕ Cerrar</button>
+    </div>
+    <div class="dtf-sep-imagen" data-x="marco"><img data-x="img" alt="" /><div class="dtf-sep-cargando" data-x="cargando"></div></div>
+    <div>
+      <div class="dtf-sep-cliente" data-x="cliente"></div>
+      <div class="dtf-sep-archivo" data-x="archivo"></div>
+      <div class="dtf-sep-estado" data-x="estado"></div>
+    </div>
+    <div class="dtf-sep-botones">
+      <button type="button" class="btn-secondary" data-x="anterior">← Anterior</button>
+      <button type="button" class="btn-main dtf-sep-ok" data-x="ok">✓ Separado</button>
+      <button type="button" class="btn-secondary" data-x="saltar">Saltar →</button>
+    </div>
+    <div class="dtf-sep-extra">
+      <button type="button" class="dtf-link" data-x="deshacer">↩ No está separado</button>
+      <button type="button" class="dtf-link" data-x="falla">⚠️ Falla / reimprimir</button>
+      <a class="dtf-link" data-x="drive" target="_blank" rel="noopener">Abrir en Drive</a>
+    </div>
+    <div class="dtf-sep-tira" data-x="tira"></div>`;
+  document.body.appendChild(capa);
+  document.body.style.overflow = "hidden";
+  const $ = (x) => capa.querySelector(`[data-x="${x}"]`);
+  const img = $("img");
+
+  function pintarTira() {
+    $("tira").innerHTML = ped.map((d, k) => `<button type="button" class="dtf-sep-chip${d.separado_at ? " listo" : ""}${k === i ? " actual" : ""}" data-k="${k}" title="${escHtml(d.nombre_archivo)}"><b>${d.separado_at ? "✓" : k + 1}</b>${escHtml(d.cliente_limpio || d.cliente || "")}</button>`).join("");
+    const actual = $("tira").querySelector(".actual");
+    if (actual) actual.scrollIntoView({ block: "nearest", inline: "center" });
+  }
+
+  function mostrar() {
+    const d = ped[i];
+    const separados = ped.filter(x => x.separado_at).length;
+    $("contador").textContent = ` · ${i + 1} de ${ped.length} · ${separados === ped.length ? "🎉 todo separado" : `${separados} separados`}`;
+    $("cliente").textContent = d.cliente_limpio || d.cliente || "SIN NOMBRE";
+    $("archivo").textContent = `${d.nombre_archivo} · ${fmtNum(d.metros_archivo)} m${d.tipo_cargo !== "VENTA" ? ` · ${d.tipo_cargo}` : ""}`;
+    $("estado").className = "dtf-sep-estado" + (d.separado_at ? " si" : "");
+    $("estado").textContent = d.separado_at ? `✓ Separado${d.separado_por ? ` por ${d.separado_por}` : ""}` : "Falta separar";
+    $("deshacer").hidden = !d.separado_at;
+    $("ok").textContent = d.separado_at ? "Siguiente →" : "✓ Separado";
+    const drive = $("drive");
+    drive.hidden = !d.file_id;
+    if (d.file_id) drive.href = `https://drive.google.com/file/d/${encodeURIComponent(d.file_id)}/view`;
+    img.removeAttribute("src");
+    img.hidden = true;
+    $("cargando").textContent = d.file_id ? "Cargando imagen…" : "Sin imagen (trabajo cargado a mano)";
+    $("cargando").hidden = false;
+    if (d.file_id) {
+      traerImagenGrande(d.file_id).then(url => {
+        if (ped[i] !== d) return; // ya se pasó a otra
+        if (url) { img.src = url; img.hidden = false; $("cargando").hidden = true; }
+        else $("cargando").textContent = "No se pudo traer la imagen. Tocá «Abrir en Drive».";
+      });
+      // Se va trayendo la siguiente mientras se mira esta
+      [1, 2].forEach(k => { const sig = ped[(i + k) % ped.length]; if (sig && sig.file_id) traerImagenGrande(sig.file_id); });
+    }
+    pintarTira();
+  }
+
+  function ir(k) { i = (k + ped.length) % ped.length; mostrar(); }
+  function siguientePendiente() {
+    for (let k = 1; k <= ped.length; k++) { const j = (i + k) % ped.length; if (!ped[j].separado_at) { ir(j); return; } }
+    mostrar(); // ya está todo separado
+  }
+
+  async function marcar(si) {
+    if (ocupado) return;
+    const d = ped[i];
+    ocupado = true;
+    const { error } = await sb().rpc("taller_dtf_separar", { p: { pedidos: [d.id], separado: si } });
+    ocupado = false;
+    if (error) { toast("Error: " + error.message, "error"); return; }
+    d.separado_at = si ? new Date().toISOString() : null;
+    d.separado_por = si ? ((STATE.perfil && STATE.perfil.nombre) || "") : null;
+    if (si) siguientePendiente(); else mostrar();
+  }
+
+  function cerrar() {
+    document.removeEventListener("keydown", teclas, true);
+    capa.remove();
+    document.body.style.overflow = "";
+    cargarDatosTodo();
+  }
+
+  function teclas(e) {
+    if (!document.body.contains(capa) || document.querySelector(".modal-overlay.open")) return;
+    if (e.key === "Escape") { e.preventDefault(); cerrar(); }
+    else if (e.key === "ArrowRight") { e.preventDefault(); ir(i + 1); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); ir(i - 1); }
+    else if (e.key === " " || e.key === "Enter") { e.preventDefault(); if (ped[i].separado_at) siguientePendiente(); else marcar(true); }
+  }
+  document.addEventListener("keydown", teclas, true);
+
+  capa.addEventListener("click", (e) => {
+    const chip = e.target.closest("[data-k]");
+    if (chip) { ir(Number(chip.getAttribute("data-k"))); return; }
+    const x = e.target.closest("[data-x]");
+    if (!x) return;
+    const que = x.getAttribute("data-x");
+    if (que === "cerrar") cerrar();
+    else if (que === "anterior") ir(i - 1);
+    else if (que === "saltar") ir(i + 1);
+    else if (que === "ok") { if (ped[i].separado_at) siguientePendiente(); else marcar(true); }
+    else if (que === "deshacer") marcar(false);
+    else if (que === "falla") abrirFallaDtf(ped[i]);
+  });
+
+  // En el celular: deslizar la imagen para pasar
+  let x0 = null;
+  $("marco").addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+  $("marco").addEventListener("touchend", (e) => {
+    if (x0 === null) return;
+    const dx = e.changedTouches[0].clientX - x0;
+    x0 = null;
+    if (Math.abs(dx) > 60) ir(i + (dx < 0 ? 1 : -1));
+  });
+
+  mostrar();
+}
+
+// Falla en una impresión: se anota y, si se reimprime, el archivo vuelve solo a la fila como REPOSICIÓN (sin cargo)
+function abrirFallaDtf(d) {
+  const capa = document.createElement("div");
+  capa.className = "modal-overlay open";
+  capa.style.zIndex = "1600";
+  const vuelve = !!d.pendiente_id;
+  capa.innerHTML = `
+    <div class="modal-content" style="border-color:var(--danger); max-width:460px; width:100%;">
+      <h2 style="margin-top:0;">⚠️ Falla en la impresión</h2>
+      <p style="font-size:13px; color:var(--vg-text-secondary); margin:0 0 6px;">${escHtml(d.nombre_archivo)} · ${escHtml(d.cliente_limpio || d.cliente || "")}</p>
+      <label>¿Qué falló?</label>
+      <select data-x="tipo">
+        <option>Se corrió o salió movido</option>
+        <option>Manchas o falta de tinta</option>
+        <option>Falla del blanco</option>
+        <option>No pegó bien el polvo / se despega</option>
+        <option>Archivo o color equivocado</option>
+        <option value="">Otro (escribilo abajo)</option>
+      </select>
+      <input type="text" data-x="detalle" placeholder="Detalle (opcional)" />
+      <label>Metros que se perdieron</label>
+      <input type="number" step="0.01" min="0" data-x="metros" value="${Number(d.metros_archivo) || ""}" />
+      <label style="display:flex; gap:8px; align-items:center; margin-top:10px;"><input type="checkbox" data-x="reimprimir" checked style="width:18px; height:18px; margin:0;" /> Volver a imprimirlo</label>
+      <p style="font-size:12px; color:var(--vg-text-secondary); margin:4px 0 0;">${vuelve
+        ? "Vuelve solo a la cola de impresión, primero y como REPOSICIÓN (sin cargo). Lo impreso con falla se sigue cobrando una sola vez."
+        : "Este trabajo se cargó a mano (no vino de la fila de Drive): para reimprimirlo hay que volver a ponerlo en la carpeta."}</p>
+      <div style="display:flex; gap:8px; margin-top:14px;">
+        <button type="button" class="btn-secondary" data-x="cancelar">Cancelar</button>
+        <button type="button" class="btn-main" data-x="ok" style="margin:0;">Anotar la falla</button>
+      </div>
+    </div>`;
+  document.body.appendChild(capa);
+  capa.addEventListener("click", async (e) => {
+    if (e.target === capa || e.target.closest("[data-x='cancelar']")) { capa.remove(); return; }
+    const ok = e.target.closest("[data-x='ok']");
+    if (!ok) return;
+    const tipo = capa.querySelector("[data-x='tipo']").value;
+    const detalle = capa.querySelector("[data-x='detalle']").value.trim();
+    const motivo = [tipo, detalle].filter(Boolean).join(": ");
+    if (!motivo) { toast("Escribí qué falló.", "warn"); return; }
+    const reimprimir = capa.querySelector("[data-x='reimprimir']").checked;
+    ok.disabled = true;
+    const { data, error } = await sb().rpc("taller_dtf_falla", { p: { pedido: d.id, motivo, metros: capa.querySelector("[data-x='metros']").value || null, reimprimir } });
+    if (error) { ok.disabled = false; toast("Error: " + error.message, "error"); return; }
+    capa.remove();
+    toast(data.vuelve_a_la_fila ? "⚠️ Falla anotada. El archivo vuelve a la cola de impresión en un minuto, primero y como REPOSICIÓN."
+      : reimprimir ? "⚠️ Falla anotada. Para reimprimirlo, volvé a poner el archivo en la carpeta de la fila." : "⚠️ Falla anotada.", "warn");
+  });
 }
 
 async function agruparDtf(accion, pedidos) {
@@ -1830,7 +2095,12 @@ async function venderDtf(clave) {
     : await elegirClienteSistema("", { sugerido: t.sugerido, recordar: nombre });
   if (!cli) return;
   const estimado = t.total != null ? `\nPrecio estimado: ${fmtMoney(t.total)} (${fmtMoney(t.precio_metro)} el metro).` : "";
-  if (!confirm(`¿Hacer la venta de ${fmtNum(t.metros)} m de DTF (${t.archivos} archivo/s) a ${cli.nombre}?${estimado}\nEl precio sale de la lista de precios: escala por metros y lo que viene pagando ese cliente.`)) return;
+  const falta = t.falta_metros > 0
+    ? `\n\n⚠️ Todavía faltan imprimir ${fmtNum(t.falta_metros)} m de este cliente (${t.falta_archivos} archivo/s en la fila).`
+      + (t.precio_metro_trabajo != null ? ` Lo normal es vender todo junto al terminar: el metro sale a ${fmtMoney(t.precio_metro_trabajo)} en vez de ${fmtMoney(t.precio_metro)}.` : "")
+      + `\n¿Vender ahora solo lo impreso?`
+    : "";
+  if (!confirm(`¿Hacer la venta de ${fmtNum(t.metros)} m de DTF (${t.archivos} archivo/s) a ${cli.nombre}?${estimado}\nEl precio sale de la lista de precios: escala por metros y lo que viene pagando ese cliente.${falta}`)) return;
   const { data, error } = await sb().rpc("taller_dtf_vender", { p: { cliente_id: cli.id, pedidos: t.pedidos.map(p => p.id) } });
   if (error) { toast("Error: " + error.message, "error"); return; }
   if (cli.recordar && nombre) await recordarClienteDtf(nombre, cli);
@@ -4784,6 +5054,10 @@ export function inicializarEventosUI() {
 
     const btnDtfVender = e.target.closest(".btn-dtf-vender");
     if (btnDtfVender) { venderDtf(btnDtfVender.getAttribute("data-clave")); return; }
+    const btnDtfSeparar = e.target.closest(".btn-dtf-separar");
+    if (btnDtfSeparar) { abrirSeparadorDtf(btnDtfSeparar.getAttribute("data-id")); return; }
+    const btnDtfSepTodo = e.target.closest(".btn-dtf-sep-todo");
+    if (btnDtfSepTodo) { separarTodaLaTirada(btnDtfSepTodo.getAttribute("data-id")); return; }
     const btnDtfCli = e.target.closest(".btn-dtf-cliente, .btn-dtf-cliente-si");
     if (btnDtfCli) { elegirClienteDtf(btnDtfCli.getAttribute("data-clave"), btnDtfCli.classList.contains("btn-dtf-cliente-si")); return; }
     const btnDtfSacar = e.target.closest(".btn-dtf-sacar");
