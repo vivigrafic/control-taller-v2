@@ -521,3 +521,14 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
   .dtf-sep-extra { justify-content: flex-start; }
   .dtf-sep-tira { flex-wrap: wrap; align-content: flex-start; overflow-y: auto; }
 }
+/* DTF: totales, tarjetas de tiradas con la miniatura a todo el alto y "marcar todas" */
+.dtf-total { margin: 6px 0 2px; font-size: 15px; font-weight: 800; color: var(--vg-text-primary); }
+.dtf-total span { color: var(--accent); }
+.dtf-marcar-todas { display: inline-flex; align-items: center; gap: 8px; margin: 4px 0 10px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.dtf-marcar-todas input, .dtf-tirada-chk input { width: 20px; height: 20px; margin: 0; }
+.dtf-marcar-todas[hidden] { display: none; }
+.dtf-tirada { flex-direction: row; align-items: stretch; gap: 12px; }
+.dtf-tirada.marcada { border-color: var(--accent-blue); }
+.dtf-tirada > .dtf-tirada-mini { width: 92px; height: auto; min-height: 120px; align-self: stretch; }
+.dtf-tirada-cuerpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.dtf-tirada-chk { display: flex; align-items: flex-start; padding-top: 4px; cursor: pointer; }

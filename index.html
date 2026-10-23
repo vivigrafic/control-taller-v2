@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261023_03" />
+  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261023_04" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./src/config/conexion.js?v=20261022_04"></script>
   <script src="./src/ver_clave.js?v=20261022_02"></script>
@@ -373,7 +373,7 @@
     <div id="dtfRollosKpiContainer" class="stats-grid"></div>
     <!-- Dos pasos separados: lo que se imprime junto (anidado) no siempre es del mismo cliente -->
     <div class="dtf-pasos">
-      <button type="button" class="dtf-paso activo" data-dtf-paso="imprimir">🖨️ 1. Imprimir</button>
+      <button type="button" class="dtf-paso activo" data-dtf-paso="imprimir">🖨️ 1. Imprimir <span id="dtfBadgeImprimir" class="dtf-paso-contador" hidden></span></button>
       <button type="button" class="dtf-paso" data-dtf-paso="separar">✂️ 2. Separar <span id="dtfBadgeSeparar" class="dtf-paso-contador" hidden></span></button>
       <button type="button" class="dtf-paso" data-dtf-paso="vender">🧾 3. Vender <span id="dtfBadgeVender" class="dtf-paso-contador" hidden></span></button>
     </div>
@@ -384,6 +384,7 @@
           <h2 style="margin:0; border:none; padding:0;">Cola para imprimir</h2>
           <input type="text" id="dtfFiltroCola" placeholder="Buscar cliente o archivo…" style="max-width:230px; margin:0;" />
         </div>
+        <div id="dtfTotalCola" class="dtf-total"></div>
         <p class="dtf-ayuda">Marcá lo que vas a imprimir anidado (pueden ser de distintos clientes) y tocá <b>Imprimir</b>. Los archivos pasan solos a IMPRESOS y a <b>Vender</b>.</p>
         <div id="listaPendientesDTF"></div>
         <div id="dtfBarraImprimir" class="dtf-barra-imprimir" hidden>
@@ -398,7 +399,7 @@
         <div class="card" style="border-top: 3px solid var(--accent);">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <h2 style="margin:0; border:none; padding:0;">Últimas tiradas</h2>
-            <button type="button" class="btn-secondary btn-crud-add" data-table="prod_dtf_rollos" style="width:auto; padding:5px 10px;">+ Rollo 100m</button>
+            <button type="button" id="btnDtfRolloNuevo" class="btn-secondary" style="width:auto; padding:5px 10px;">🧻 Montar rollo nuevo</button>
           </div>
           <div style="overflow-x:auto; margin-top:10px;"><table><thead><tr><th>Tirada</th><th>Fecha</th><th>Archivos</th><th>Metros</th><th>Rollo</th></tr></thead><tbody id="tbodyTiradasDTF"></tbody></table></div>
         </div>
@@ -436,7 +437,16 @@
       <div class="card" style="border-top: 3px solid var(--accent-orange);">
         <h2 style="margin-top:0;">Separar lo impreso</h2>
         <p class="dtf-ayuda">Al desenrollar una tirada tocá <b>Separar</b>: aparece cada impresión grande con su cliente. Tocá <b>✓ Separado</b> y pasa sola a la siguiente. Se ven las tiradas de las últimas 2 semanas.</p>
+        <div id="dtfTotalSeparar" class="dtf-total"></div>
+        <label id="dtfSepTodasWrap" class="dtf-marcar-todas"><input type="checkbox" id="chkDtfSepTodas" /> Marcar todas</label>
         <div id="dtfListaSeparar" class="dtf-tarjetas"></div>
+        <div id="dtfBarraSeparar" class="dtf-barra-imprimir" hidden>
+          <span id="dtfResumenSeparar"></span>
+          <span style="display:flex; gap:8px;">
+            <button type="button" id="btnDtfSepDesmarcar" class="btn-secondary" style="width:auto; margin:0;">Desmarcar</button>
+            <button type="button" id="btnDtfSepMarcar" class="btn-main" style="width:auto; margin:0;">✓ Marcar como separadas</button>
+          </span>
+        </div>
       </div>
       <div class="card">
         <h2 style="margin-top:0;">📋 Tiradas ya separadas</h2>
@@ -979,7 +989,7 @@
   <datalist id="listColores"></datalist>
   <div id="vgToastContainer" style="position:fixed; top:16px; right:16px; z-index:3000; max-width:360px;"></div>
 
-  <script type="module" src="./src/app.js?v=20261023_04"></script>
+  <script type="module" src="./src/app.js?v=20261023_05"></script>
   <script>
     // Registro del Service Worker PWA
     if ('serviceWorker' in navigator) {
