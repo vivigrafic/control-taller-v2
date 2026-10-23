@@ -47,6 +47,7 @@ const STATE = {
   dtfSeleccion: new Set(), // archivos de la cola marcados para imprimir juntos
   dtfCarpetasAbiertas: new Set(), // las carpetas de la cola arrancan cerradas: el operario abre la que quiere
   dtfSelTiradas: new Set(), // tiradas marcadas para darlas por separadas juntas
+  dtfMesaVistos: new Set(), // archivos que ya están en la mesa (los nuevos entran con animación)
   dtfPaso: "imprimir",
   dtfFiltroCola: "",
   dtfPorVender: [], // tarjetas para vender (las arma la base: taller_dtf_por_vender)
@@ -1482,9 +1483,9 @@ function renderModuloLaser() {
 // MÓDULO 4: MÓDULO DTF
 // ============================================================================
 function renderModuloDTF() {
-  const kpiWrap = document.getElementById("dtfRollosKpiContainer");
+  const tablero = document.getElementById("dtfTablero");
   const tbodyPedidos = document.getElementById("tbodyPedidosDTF");
-  if (!kpiWrap) return;
+  if (!tablero) return;
 
   const selRollo = document.getElementById("dtfInputRollo");
   if (selRollo) {
@@ -1497,14 +1498,7 @@ function renderModuloDTF() {
     selRollo.value = selRollo.dataset.aMano && rollosDtfEnUso().some(r => r.id_rollo_dtf === antes) ? antes : rolloDtfPuesto();
   }
 
-  kpiWrap.innerHTML = rollosDtfEnUso().map(r => `
-    <div class="stat-box" style="border-bottom: 3px solid var(--accent);">
-      <div class="stat-title">${escHtml(r.id_rollo_dtf)} (${escHtml(r.marca_fabricante)})</div>
-      <div class="stat-value">${fmtNum(r.metros_restantes_reales)}m</div>
-      <div style="font-size:10px; color:var(--vg-text-secondary); margin-top:3px;">${escHtml(r.perfil_impresion)}${r.estado === "Activo" ? " · 🟢 puesto" : r.estado ? ` · ${escHtml(r.estado)}` : ""}</div>
-    </div>
-  `).join("");
-
+  renderTableroDtf();
   renderColaDtf();
   renderTiradasDtf();
   mostrarPasoDtf(STATE.dtfPaso);
@@ -1593,6 +1587,7 @@ function renderColaDtf() {
     const clientes = new Set(marcados.map(p => p.cliente || "SIN CLIENTE")).size;
     resumen.textContent = `${marcados.length} archivo${marcados.length === 1 ? "" : "s"} · ${fmtNum(marcados.reduce((a, b) => a + (Number(b.metros_totales) || 0), 0))} m · ${clientes} cliente${clientes === 1 ? "" : "s"}`;
   }
+  renderMesaDtf();
 }
 
 function renderTiradasDtf() {
@@ -1633,8 +1628,153 @@ function mostrarPasoDtf(paso) {
   if (badge) {
     const n = STATE.dtfPorVender.length;
     badge.hidden = n === 0;
-    badge.textContent = String(n);
+    badge.textContent = `${n} · ${fmtNum(STATE.dtfPorVender.reduce((a, t) => a + (Number(t.metros) || 0), 0))} m`;
   }
+}
+
+// ===== DTF: tablero de lo impreso =====
+// Metros de film usados en las tiradas (consumido + desperdicio, igual que el saldo del rollo), archivos y tiradas
+function metricasDtf(desde, hasta = null) {
+  const tir = STATE.dtfTiradas.filter(t => {
+    const f = new Date(t.fecha_hora);
+    return !isNaN(f.getTime()) && f >= desde && (!hasta || f < hasta);
+  });
+  const ids = new Set(tir.map(t => t.id));
+  return {
+    metros: tir.reduce((a, t) => a + (Number(t.metros_consumidos_rollo) || 0) + (Number(t.metros_desperdicio) || 0), 0),
+    tiradas: tir.length,
+    archivos: STATE.dtfPedidos.filter(d => ids.has(d.tirada_id)).length
+  };
+}
+
+function renderTableroDtf() {
+  const cont = document.getElementById("dtfTablero");
+  if (!cont) return;
+  const { hoyIni, ayerIni, semActualIni, semAntIni, mesActualIni } = obtenerVentanasTemporales();
+  const mesAntIni = new Date(mesActualIni.getFullYear(), mesActualIni.getMonth() - 1, 1);
+  const mes = (d) => { const n = d.toLocaleDateString("es-AR", { month: "long" }); return n.charAt(0).toUpperCase() + n.slice(1); };
+  const plural = (n, una, varias) => `${n} ${n === 1 ? una : varias}`;
+  const cuadro = (titulo, act, ant, antNombre) => {
+    const dif = ant.metros > 0 ? Math.round((act.metros - ant.metros) * 100 / ant.metros) : null;
+    const chip = dif === null ? (act.metros > 0 ? `<span class="dtf-dif sube">▲ nuevo</span>` : "")
+      : dif > 0 ? `<span class="dtf-dif sube">▲ ${dif}%</span>` : dif < 0 ? `<span class="dtf-dif baja">▼ ${Math.abs(dif)}%</span>` : `<span class="dtf-dif">= igual</span>`;
+    return `
+      <div class="dtf-metrica">
+        <div class="dtf-metrica-titulo">${titulo}</div>
+        <div class="dtf-metrica-valor">${fmtNum(act.metros)}<small> m</small></div>
+        <div class="dtf-metrica-sub">${plural(act.archivos, "archivo", "archivos")} · ${plural(act.tiradas, "tirada", "tiradas")}</div>
+        <div class="dtf-metrica-antes"><span>${antNombre}: <b>${fmtNum(ant.metros)} m</b> · ${plural(ant.archivos, "archivo", "archivos")}</span>${chip}</div>
+      </div>`;
+  };
+  const rollos = rollosDtfEnUso();
+  const puesto = rollos.find(r => r.id_rollo_dtf === rolloDtfPuesto());
+  const otros = rollos.filter(r => r !== puesto);
+  const pct = puesto ? Math.max(0, Math.min(100, Math.round((Number(puesto.metros_restantes_reales) || 0) * 100 / (Number(puesto.metros_iniciales) || 100)))) : 0;
+  cont.innerHTML =
+    cuadro("Hoy", metricasDtf(hoyIni), metricasDtf(ayerIni, hoyIni), "Ayer") +
+    cuadro("Esta semana", metricasDtf(semActualIni), metricasDtf(semAntIni, semActualIni), "Semana pasada") +
+    cuadro(`Este mes · ${mes(mesActualIni)}`, metricasDtf(mesActualIni), metricasDtf(mesAntIni, mesActualIni), mes(mesAntIni)) +
+    `<div class="dtf-metrica dtf-metrica-rollo">
+      <div class="dtf-metrica-titulo">🧻 Rollo puesto${puesto ? ` · ${escHtml(puesto.id_rollo_dtf)}` : ""}</div>
+      ${puesto
+        ? `<div class="dtf-metrica-valor">${fmtNum(puesto.metros_restantes_reales)}<small> m</small></div>
+           <div class="dtf-metrica-sub">quedan de ${fmtNum(puesto.metros_iniciales)} m · ${escHtml(puesto.marca_fabricante)}</div>
+           <div class="dtf-progreso${pct < 15 ? " poco" : ""}"><span style="width:${pct}%"></span></div>`
+        : `<div class="dtf-metrica-sub" style="margin-top:8px;">No hay rollo puesto.</div>`}
+      ${otros.length ? `<div class="dtf-metrica-antes"><span>En stock: ${otros.map(r => `${escHtml(r.id_rollo_dtf)} (${fmtNum(r.metros_restantes_reales)} m)`).join(", ")}</span></div>` : ""}
+      <button type="button" class="btn-secondary btn-dtf-rollo-nuevo" style="margin:10px 0 0;">🧻 Montar rollo nuevo</button>
+    </div>`;
+}
+
+// ===== DTF: la mesa con lo que se va a imprimir =====
+// Los archivos marcados, grandes y uno al lado del otro, en el orden en que se marcaron, colgando del rollo.
+// Cada cliente tiene su color (para reconocerlo al separar) y cada pieza es más larga cuantos más metros tiene.
+const COLORES_CLIENTE_DTF = ["var(--accent-blue)", "var(--accent-magenta)", "var(--accent-orange)", "var(--vg-status-ready)", "var(--vg-brand-primary)"];
+
+// Como dtf_nombre_limpio de la base: "IVAN (22-10-26) - [165 MTS]" → "IVAN"
+function nombreLimpioDtf(t) {
+  return String(t || "").replace(/\[[^\]]*\]/g, " ").replace(/\((dtf|[^)]*\d[^)]*)\)/gi, " ")
+    .replace(/\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}/g, " ").replace(/\d+([.,]\d+)?\s*(mts|mt|metros|metro|m)\b/gi, " ")
+    .replace(/\s+/g, " ").trim().replace(/^[\s\-_.,:;]+|[\s\-_.,:;]+$/g, "").toUpperCase() || "SIN NOMBRE";
+}
+
+function renderMesaDtf() {
+  const mesa = document.getElementById("dtfMesa");
+  if (!mesa) return;
+  const marcados = [...STATE.dtfSeleccion].map(id => STATE.pendientesDrive.find(p => p.id === id)).filter(Boolean);
+  const metros = marcados.reduce((a, p) => a + (Number(p.metros_totales) || 0), 0);
+  const clientes = [...new Set(marcados.map(p => nombreLimpioDtf(p.cliente)))];
+  const resumen = document.getElementById("dtfMesaResumen");
+  if (resumen) resumen.textContent = marcados.length ? `${marcados.length} archivo${marcados.length === 1 ? "" : "s"} · ${clientes.length} cliente${clientes.length === 1 ? "" : "s"} · ${fmtNum(metros)} m` : "";
+  const pie = document.getElementById("dtfMesaPie");
+  if (pie) pie.hidden = marcados.length === 0;
+
+  // El rollo: cuánto lleva esta impresión y cuánto queda después
+  const rolloEl = document.getElementById("dtfMesaRollo");
+  if (rolloEl) {
+    const rollo = rollosDtfEnUso().find(r => r.id_rollo_dtf === rolloDtfPuesto());
+    if (!rollo) {
+      rolloEl.innerHTML = `<div class="dtf-rollo-texto alerta">🧻 No hay rollo puesto. <button type="button" class="dtf-link btn-dtf-rollo-nuevo">Montar uno</button></div>`;
+    } else {
+      const total = Number(rollo.metros_iniciales) || 100;
+      const quedan = Number(rollo.metros_restantes_reales) || 0;
+      const alcanza = metros <= quedan;
+      rolloEl.innerHTML = `
+        <div class="dtf-mesa-barra-rollo">
+          <div class="dtf-rollo-cilindro">${escHtml(rollo.id_rollo_dtf)} · ${escHtml(rollo.marca_fabricante)}</div>
+          <div class="dtf-rollo-consumo" title="Gris: ya usado · Azul: esta impresión · Verde: lo que queda después">
+            <span class="usado" style="width:${Math.max(0, total - quedan) * 100 / total}%"></span>
+            <span class="esta${alcanza ? "" : " no-alcanza"}" style="width:${Math.min(metros, quedan) * 100 / total}%"></span>
+          </div>
+          <div class="dtf-rollo-texto${alcanza ? "" : " alerta"}">${!metros
+            ? `Quedan <b>${fmtNum(quedan)} m</b> de ${fmtNum(total)} m`
+            : alcanza
+              ? `Esta impresión lleva <b>${fmtNum(metros)} m</b> · quedan ${fmtNum(quedan)} m → después <b>${fmtNum(quedan - metros)} m</b>`
+              : `⚠️ No alcanza el rollo: la impresión lleva ${fmtNum(metros)} m y quedan ${fmtNum(quedan)} m. <button type="button" class="dtf-link btn-dtf-rollo-nuevo">Montar rollo nuevo</button>`}</div>
+        </div>`;
+    }
+  }
+
+  if (!marcados.length) {
+    mesa.innerHTML = `<div class="dtf-mesa-vacia"><div class="dtf-mesa-vacia-icono">🖨️</div><b>Marcá archivos en la cola</b><span>Van a aparecer acá, grandes y uno al lado del otro, en el orden en que los marques.</span></div>`;
+    STATE.dtfMesaVistos = new Set();
+    return;
+  }
+  const max = Math.max(...marcados.map(p => Number(p.metros_totales) || 0), 0.01);
+  mesa.innerHTML = marcados.map((p, k) => {
+    const m = Number(p.metros_totales) || 0;
+    const cliente = nombreLimpioDtf(p.cliente);
+    const nueva = !STATE.dtfMesaVistos.has(p.id);
+    const cargo = p.es_repo_muestra ? String(p.es_repo_muestra).toUpperCase() : "";
+    return `
+      <figure class="dtf-pieza${nueva ? " nueva" : ""}" style="--alto:${Math.round(45 + 55 * Math.sqrt(m / max))}%; --color:${COLORES_CLIENTE_DTF[clientes.indexOf(cliente) % COLORES_CLIENTE_DTF.length]};${nueva ? ` animation-delay:${Math.min(k, 8) * 45}ms;` : ""}">
+        <span class="dtf-pieza-n">${k + 1}</span>
+        <button type="button" class="dtf-pieza-quitar btn-dtf-mesa-quitar" data-id="${p.id}" title="Sacar de esta impresión">✕</button>
+        <div class="dtf-pieza-img btn-dtf-mesa-ver" data-id="${p.id}" title="Ver en grande">${p.file_id ? `<img src="https://drive.google.com/thumbnail?id=${escHtml(p.file_id)}&sz=w200" alt="" />` : `<span>Sin imagen</span>`}</div>
+        <figcaption><b>${escHtml(cliente)}${cargo ? ` · ${escHtml(cargo)}` : ""}</b><span class="dtf-pieza-m">${fmtNum(m)} m</span><small title="${escHtml(p.nombre_archivo)}">${escHtml(p.nombre_archivo)}</small></figcaption>
+      </figure>`;
+  }).join("");
+  STATE.dtfMesaVistos = new Set(marcados.map(p => p.id));
+}
+
+// Un archivo de la mesa en grande (toca en cualquier lado para cerrar)
+function verPiezaDtf(id) {
+  const p = STATE.pendientesDrive.find(x => x.id === id);
+  if (!p) return;
+  const capa = document.createElement("div");
+  capa.className = "dtf-lightbox";
+  capa.innerHTML = `<div class="dtf-sep-cargando">${p.file_id ? "Cargando imagen…" : "Sin imagen"}</div><img alt="" hidden />
+    <div class="dtf-lightbox-texto"><b>${escHtml(nombreLimpioDtf(p.cliente))}</b>${escHtml(p.nombre_archivo)} · ${fmtNum(p.metros_totales)} m</div>`;
+  const cerrar = () => { capa.remove(); document.removeEventListener("keydown", tecla, true); };
+  const tecla = (e) => { if (e.key === "Escape") cerrar(); };
+  capa.addEventListener("click", cerrar);
+  document.addEventListener("keydown", tecla, true);
+  document.body.appendChild(capa);
+  if (p.file_id) traerImagenGrande(p.file_id).then(url => {
+    const img = capa.querySelector("img");
+    if (url) { img.src = url; img.hidden = false; capa.querySelector(".dtf-sep-cargando").remove(); }
+    else capa.querySelector(".dtf-sep-cargando").textContent = "No se pudo traer la imagen.";
+  });
 }
 
 // ===== Rollos de film DTF =====
@@ -1777,6 +1917,16 @@ function renderVentasDtf() {
   const tarjetas = STATE.dtfPorVender.filter(t => cumpleBusquedaUniversal(t));
   const vivos = new Set(STATE.dtfPorVender.flatMap(t => t.pedidos.map(p => p.id)));
   [...STATE.dtfSelVenta].forEach(id => { if (!vivos.has(id)) STATE.dtfSelVenta.delete(id); });
+  const totalVender = document.getElementById("dtfTotalVender");
+  if (totalVender) {
+    const pv = STATE.dtfPorVender;
+    const metros = pv.reduce((a, t) => a + (Number(t.metros) || 0), 0);
+    const archivos = pv.reduce((a, t) => a + (Number(t.archivos) || 0), 0);
+    const plata = pv.every(t => t.total != null) ? pv.reduce((a, t) => a + Number(t.total), 0) : null;
+    totalVender.innerHTML = pv.length
+      ? `Para vender: ${pv.length} cliente${pv.length === 1 ? "" : "s"} · ${archivos} archivo${archivos === 1 ? "" : "s"} · <span>${fmtNum(metros)} m</span>${plata ? ` · ≈ ${fmtMoney(plata)}` : ""}`
+      : "";
+  }
 
   cont.innerHTML = tarjetas.length === 0
     ? `<div style="padding:15px; text-align:center; color:var(--vg-text-secondary);">${STATE.dtfPorVender.length ? "No hay ventas con esa búsqueda." : "Todo el DTF de venta ya está vendido."}</div>`
@@ -3057,6 +3207,32 @@ function renderModuloMetricasBI() {
   setTxt("biLasSemAnt", fmtNum(sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", semAntIni, semActualIni)));
   setTxt("biLasMes", fmtNum(sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", mesActualIni)));
   setTxt("biLasHis", fmtNum(lasTerm.reduce((a, b) => a + (Number(b.metros) || 0), 0)));
+
+  // DTF: metros de film usados en las tiradas (como el tablero del módulo DTF) y lo que espera en la cola
+  const mesAntIni = new Date(mesActualIni.getFullYear(), mesActualIni.getMonth() - 1, 1);
+  setTxt("biDtfHoy", fmtNum(metricasDtf(hoyIni).metros));
+  setTxt("biDtfAyer", fmtNum(metricasDtf(ayerIni, hoyIni).metros));
+  setTxt("biDtfSem", fmtNum(metricasDtf(semActualIni).metros));
+  setTxt("biDtfSemAnt", fmtNum(metricasDtf(semAntIni, semActualIni).metros));
+  setTxt("biDtfMes", fmtNum(metricasDtf(mesActualIni).metros));
+  setTxt("biDtfMesAnt", fmtNum(metricasDtf(mesAntIni, mesActualIni).metros));
+  const qDtf = STATE.pendientesDrive.filter(p => p.modulo === "DTF" && p.estado_impreso !== "SI").reduce((a, b) => a + (Number(b.metros_totales) || 0), 0);
+  setTxt("radarQDtf", `${fmtNum(qDtf, 0)}m`);
+  const elTopDtf = document.getElementById("dashTopClientesDtf");
+  if (elTopDtf) {
+    const porCli = {};
+    STATE.dtfPedidos.filter(d => d.tipo_cargo === "VENTA" && new Date(d.fecha_hora) >= mesActualIni).forEach(d => {
+      const c = d.cliente_limpio || nombreLimpioDtf(d.cliente);
+      porCli[c] = (porCli[c] || 0) + (Number(d.metros_archivo) || 0);
+    });
+    const arr = Object.entries(porCli).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const maxD = arr[0]?.[1] || 1;
+    elTopDtf.innerHTML = arr.length === 0 ? `<div style="color:var(--vg-text-secondary); font-size:12px;">Todavía no hay DTF este mes.</div>` : arr.map(([c, m], i) => `
+      <div style="margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:2px; color:var(--vg-text-secondary);"><span>${i + 1}. ${escHtml(c)}</span><span>${fmtNum(m, 1)}m</span></div>
+        <div style="width:100%; background:var(--vg-surface-border); border-radius:4px; height:10px; overflow:hidden;"><div style="width:${(m / maxD) * 100}%; background:var(--accent-blue); height:100%;"></div></div>
+      </div>`).join("");
+  }
 
   // Top Telas Histórico (Idéntico a JS_Dashboards.html líneas 54-80)
   const conteoTelas = {};
@@ -4964,7 +5140,6 @@ export function inicializarEventosUI() {
   });
   document.getElementById("btnDtfSepDesmarcar")?.addEventListener("click", () => { STATE.dtfSelTiradas.clear(); renderSepararDtf(); });
   document.getElementById("btnDtfSepMarcar")?.addEventListener("click", separarTiradasMarcadas);
-  document.getElementById("btnDtfRolloNuevo")?.addEventListener("click", abrirRolloNuevoDtf);
 
   // DTF paso 2: marcar archivos para juntarlos en una venta
   const tarjetasDtf = document.getElementById("dtfTarjetasVender");
@@ -5283,6 +5458,13 @@ export function inicializarEventosUI() {
 
     const btnDtfVender = e.target.closest(".btn-dtf-vender");
     if (btnDtfVender) { venderDtf(btnDtfVender.getAttribute("data-clave")); return; }
+    if (e.target.closest(".btn-dtf-rollo-nuevo")) { abrirRolloNuevoDtf(); return; }
+    const btnMesaQuitar = e.target.closest(".btn-dtf-mesa-quitar");
+    if (btnMesaQuitar) { STATE.dtfSeleccion.delete(btnMesaQuitar.getAttribute("data-id")); renderColaDtf(); return; }
+    const btnMesaVer = e.target.closest(".btn-dtf-mesa-ver");
+    if (btnMesaVer) { verPiezaDtf(btnMesaVer.getAttribute("data-id")); return; }
+    if (e.target.closest(".btn-dtf-mesa-limpiar")) { STATE.dtfSeleccion.clear(); renderColaDtf(); return; }
+    if (e.target.closest(".btn-dtf-mesa-imprimir")) { abrirImprimirDtf(); return; }
     const btnDtfSeparar = e.target.closest(".btn-dtf-separar");
     if (btnDtfSeparar) { abrirSeparadorDtf(btnDtfSeparar.getAttribute("data-id")); return; }
     const btnDtfCli = e.target.closest(".btn-dtf-cliente, .btn-dtf-cliente-si");

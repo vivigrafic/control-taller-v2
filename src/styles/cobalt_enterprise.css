@@ -532,3 +532,72 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
 .dtf-tirada > .dtf-tirada-mini { width: 92px; height: auto; min-height: 120px; align-self: stretch; }
 .dtf-tirada-cuerpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .dtf-tirada-chk { display: flex; align-items: flex-start; padding-top: 4px; cursor: pointer; }
+/* DTF: tablero de lo impreso (hoy, semana y mes contra el período anterior) y el rollo puesto */
+.dtf-tablero { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.dtf-metrica { padding: 14px 16px; border-radius: 14px; border: 1px solid var(--vg-surface-border); background: linear-gradient(160deg, var(--vg-surface-base), var(--vg-brand-glow)); }
+.dtf-metrica-titulo { font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--vg-text-secondary); }
+.dtf-metrica-valor { margin-top: 4px; font-size: 34px; font-weight: 900; line-height: 1.1; color: var(--vg-text-primary); }
+.dtf-metrica-valor small { font-size: 16px; color: var(--vg-text-secondary); }
+.dtf-metrica-sub { margin-top: 2px; font-size: 12px; color: var(--vg-text-secondary); }
+.dtf-metrica-antes { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--vg-surface-border); font-size: 12px; color: var(--vg-text-secondary); }
+.dtf-metrica-antes b { color: var(--vg-text-primary); }
+.dtf-dif { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; background: var(--vg-surface-border); color: var(--vg-text-primary); white-space: nowrap; }
+.dtf-dif.sube { background: color-mix(in srgb, var(--vg-status-ready) 22%, transparent); color: var(--vg-status-ready); }
+.dtf-dif.baja { background: color-mix(in srgb, var(--vg-status-processing) 22%, transparent); color: var(--vg-status-processing); }
+.dtf-metrica-rollo .dtf-progreso { margin-top: 8px; }
+.dtf-progreso.poco span { background: var(--vg-status-alert); }
+/* DTF: la mesa con lo que se va a imprimir (los archivos marcados, colgando del rollo) */
+.dtf-mesa { display: flex; flex-direction: column; gap: 10px; border-top: 3px solid var(--accent-blue); min-width: 0; }
+.dtf-mesa-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.dtf-mesa-resumen { font-size: 13px; font-weight: 800; color: var(--accent); }
+.dtf-mesa-barra-rollo { display: flex; flex-direction: column; gap: 6px; }
+.dtf-rollo-cilindro { position: relative; height: 34px; border-radius: 17px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: var(--vg-text-primary);
+  background: linear-gradient(180deg, var(--vg-surface-border) 0%, var(--vg-brand-glow) 35%, var(--vg-surface-base) 55%, var(--vg-surface-border) 100%); border: 1px solid var(--vg-surface-border); box-shadow: inset 0 -4px 8px var(--vg-bg-app); }
+.dtf-rollo-cilindro::before, .dtf-rollo-cilindro::after { content: ""; position: absolute; top: 4px; bottom: 4px; width: 14px; border-radius: 50%; background: var(--vg-bg-app); border: 1px solid var(--vg-surface-border); }
+.dtf-rollo-cilindro::before { left: 8px; }
+.dtf-rollo-cilindro::after { right: 8px; }
+.dtf-rollo-consumo { display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--vg-status-ready) 30%, transparent); }
+.dtf-rollo-consumo .usado { background: var(--vg-surface-border); }
+.dtf-rollo-consumo .esta { background: var(--accent-blue); transition: width .3s; }
+.dtf-rollo-consumo .esta.no-alcanza { background: var(--vg-status-alert); }
+.dtf-rollo-texto { font-size: 12px; color: var(--vg-text-secondary); }
+.dtf-rollo-texto b { color: var(--vg-text-primary); }
+.dtf-rollo-texto.alerta { color: var(--vg-status-alert); font-weight: 700; }
+.dtf-mesa-tira { position: relative; display: flex; align-items: flex-start; gap: 14px; height: 380px; padding: 14px 4px 6px; overflow-x: auto; overflow-y: hidden; border-top: 3px solid var(--vg-surface-border); }
+.dtf-mesa-vacia { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 6px; max-width: 280px; text-align: center; color: var(--vg-text-secondary); }
+.dtf-mesa-vacia-icono { font-size: 54px; opacity: .6; }
+.dtf-mesa-vacia b { color: var(--vg-text-primary); font-size: 16px; }
+.dtf-pieza { position: relative; flex: 0 0 140px; height: var(--alto); min-height: 150px; margin: 0; display: flex; flex-direction: column; overflow: hidden; border-radius: 0 0 12px 12px;
+  border: 1px solid var(--vg-surface-border); border-top: 5px solid var(--color); background: var(--vg-surface-base); box-shadow: 0 10px 22px -12px var(--vg-bg-app); transform-origin: top center; }
+.dtf-pieza.nueva { animation: dtf-desenrollar .5s cubic-bezier(.2,.8,.3,1) both; }
+@keyframes dtf-desenrollar { from { transform: scaleY(.15); opacity: 0; } to { transform: scaleY(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .dtf-pieza.nueva { animation: none; } }
+.dtf-pieza-n { position: absolute; top: 6px; left: 6px; z-index: 1; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 900; background: var(--color); color: var(--vg-bg-app); }
+.dtf-pieza-quitar { position: absolute; top: 6px; right: 6px; z-index: 1; width: 24px; height: 24px; margin: 0; padding: 0; border-radius: 50%; border: none; background: var(--vg-bg-app); color: var(--vg-text-primary); font-size: 12px; cursor: pointer; opacity: .85; }
+.dtf-pieza-quitar:hover { opacity: 1; background: var(--vg-status-alert); }
+.dtf-pieza-img { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 6px; cursor: zoom-in;
+  background: repeating-conic-gradient(var(--vg-surface-border) 0 25%, transparent 0 50%) 0 0 / 14px 14px; }
+.dtf-pieza-img img { max-width: 100%; max-height: 100%; object-fit: contain; filter: drop-shadow(0 2px 4px var(--vg-bg-app)); }
+.dtf-pieza-img span { font-size: 12px; color: var(--vg-text-secondary); }
+.dtf-pieza figcaption { padding: 6px 8px 8px; display: flex; flex-direction: column; gap: 1px; background: var(--vg-bg-app); }
+.dtf-pieza figcaption b { font-size: 13px; color: var(--color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dtf-pieza-m { font-size: 18px; font-weight: 900; color: var(--vg-text-primary); }
+.dtf-pieza figcaption small { font-size: 10px; color: var(--vg-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dtf-mesa-pie { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.dtf-mesa-pie button { width: auto; margin: 0; }
+.dtf-mesa-pie[hidden] { display: none; }
+@media (max-width: 700px) { .dtf-mesa-tira { height: 300px; } .dtf-pieza { flex-basis: 118px; } }
+.dtf-lightbox { position: fixed; inset: 0; z-index: 1500; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px; background: var(--vg-bg-app); cursor: zoom-out; }
+.dtf-lightbox img { max-width: 100%; max-height: calc(100% - 80px); object-fit: contain; }
+.dtf-lightbox-texto { text-align: center; color: var(--vg-text-secondary); }
+.dtf-lightbox-texto b { display: block; font-size: 28px; color: var(--vg-text-primary); }
+/* Métricas (BI): tarjeta de DTF */
+.bi-dtf { flex: 1; min-width: 300px; padding: 20px; border-radius: 12px; color: var(--vg-text-primary); border: 1px solid var(--vg-surface-border);
+  background: linear-gradient(135deg, var(--vg-bg-app) 0%, var(--vg-brand-primary) 100%); box-shadow: 0 8px 25px var(--vg-brand-glow); }
+.bi-dtf h3 { margin-top: 0; font-size: 16px; padding-bottom: 10px; display: flex; justify-content: space-between; border-bottom: 1px solid var(--vg-surface-border); }
+.bi-dtf-chip { padding: 2px 8px; border-radius: 12px; font-size: 11px; background: var(--vg-surface-border); }
+.bi-dtf-grilla { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 15px; }
+.bi-dtf-tit { margin-bottom: 3px; font-size: 11px; letter-spacing: 1px; opacity: .7; }
+.bi-dtf-grande { font-size: 28px; font-weight: 900; }
+.bi-dtf-chico { font-size: 20px; font-weight: bold; color: var(--accent-blue); }
+@media (min-width: 900px) { .bi-tarjetas > div { box-sizing: border-box; flex-basis: calc(50% - 10px); min-width: calc(50% - 10px) !important; } } /* de a dos por fila (impresión, calandrado, láser y DTF) */

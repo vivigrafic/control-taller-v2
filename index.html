@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261023_04" />
+  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261023_05" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./src/config/conexion.js?v=20261022_04"></script>
   <script src="./src/ver_clave.js?v=20261022_02"></script>
@@ -370,7 +370,7 @@
        TAB 4: MÓDULO DTF (Con el mismo estilo exacto de tarjetas oscuras)
        ======================================================================== -->
   <div id="sec-dtf" class="tab-content">
-    <div id="dtfRollosKpiContainer" class="stats-grid"></div>
+    <div id="dtfTablero" class="dtf-tablero"></div>
     <!-- Dos pasos separados: lo que se imprime junto (anidado) no siempre es del mismo cliente -->
     <div class="dtf-pasos">
       <button type="button" class="dtf-paso activo" data-dtf-paso="imprimir">🖨️ 1. Imprimir <span id="dtfBadgeImprimir" class="dtf-paso-contador" hidden></span></button>
@@ -378,7 +378,8 @@
       <button type="button" class="dtf-paso" data-dtf-paso="vender">🧾 3. Vender <span id="dtfBadgeVender" class="dtf-paso-contador" hidden></span></button>
     </div>
 
-    <div class="grid-panel" data-dtf-panel="imprimir">
+    <div data-dtf-panel="imprimir">
+    <div class="grid-panel">
       <div class="card" style="border-top: 3px solid var(--accent-blue);">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
           <h2 style="margin:0; border:none; padding:0;">Cola para imprimir</h2>
@@ -395,14 +396,25 @@
           </span>
         </div>
       </div>
-      <div>
-        <div class="card" style="border-top: 3px solid var(--accent);">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <h2 style="margin:0; border:none; padding:0;">Últimas tiradas</h2>
-            <button type="button" id="btnDtfRolloNuevo" class="btn-secondary" style="width:auto; padding:5px 10px;">🧻 Montar rollo nuevo</button>
-          </div>
-          <div style="overflow-x:auto; margin-top:10px;"><table><thead><tr><th>Tirada</th><th>Fecha</th><th>Archivos</th><th>Metros</th><th>Rollo</th></tr></thead><tbody id="tbodyTiradasDTF"></tbody></table></div>
+      <div class="card dtf-mesa">
+        <div class="dtf-mesa-cab">
+          <h2 style="margin:0; border:none; padding:0;">Lo que vas a imprimir</h2>
+          <span id="dtfMesaResumen" class="dtf-mesa-resumen"></span>
         </div>
+        <div id="dtfMesaRollo"></div>
+        <div id="dtfMesa" class="dtf-mesa-tira"></div>
+        <div id="dtfMesaPie" class="dtf-mesa-pie" hidden>
+          <button type="button" class="btn-secondary btn-dtf-mesa-limpiar">Desmarcar todo</button>
+          <button type="button" class="btn-main btn-dtf-mesa-imprimir">🖨️ Imprimir esto</button>
+        </div>
+      </div>
+    </div>
+    <div class="grid-panel">
+      <div class="card" style="border-top: 3px solid var(--accent);">
+        <h2 style="margin:0; border:none; padding:0;">Últimas tiradas</h2>
+        <div style="overflow-x:auto; margin-top:10px;"><table><thead><tr><th>Tirada</th><th>Fecha</th><th>Archivos</th><th>Metros</th><th>Rollo</th></tr></thead><tbody id="tbodyTiradasDTF"></tbody></table></div>
+      </div>
+      <div>
         <details class="card dtf-a-mano" style="border-top: 3px solid var(--accent-magenta);">
           <summary>➕ Agregar un trabajo a mano (no está en la fila de Drive)</summary>
         <div id="dtfDuplicateAlert" style="display:none; background:rgba(236,72,153,0.15); border:1px solid var(--danger); color:var(--danger); padding:8px; border-radius:6px; font-size:12px; margin-top:8px;"></div>
@@ -432,8 +444,8 @@
         </details>
       </div>
     </div>
+    </div>
 
-    <div class="grid-panel dtf-una-columna" data-dtf-panel="separar" hidden>
       <div class="card" style="border-top: 3px solid var(--accent-orange);">
         <h2 style="margin-top:0;">Separar lo impreso</h2>
         <p class="dtf-ayuda">Al desenrollar una tirada tocá <b>Separar</b>: aparece cada impresión grande con su cliente. Tocá <b>✓ Separado</b> y pasa sola a la siguiente. Se ven las tiradas de las últimas 2 semanas.</p>
@@ -457,6 +469,7 @@
     <div class="grid-panel dtf-una-columna" data-dtf-panel="vender" hidden>
       <div class="card" style="border-top: 3px solid var(--accent);">
         <h2 style="margin-top:0;">Para vender</h2>
+        <div id="dtfTotalVender" class="dtf-total"></div>
         <p class="dtf-ayuda">Una tarjeta por cliente: lo de la misma carpeta o cliente cae junto aunque sea de días distintos. Para hacer una sola venta con archivos de varias tarjetas, marcalos y tocá <b>Juntar</b>.</p>
         <div id="dtfTarjetasVender" class="dtf-tarjetas"></div>
         <div id="dtfBarraJuntar" class="dtf-barra-imprimir" hidden>
@@ -598,7 +611,7 @@
     </div>
 
     <!-- TARJETAS CON DEGRADADO EXACTAS DE Index.html líneas 349-426 -->
-    <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:15px;">
+    <div class="bi-tarjetas" style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:15px;">
       <!-- IMPRESIÓN -->
       <div style="flex:1; min-width:300px; background:linear-gradient(135deg, #2b0b3f 0%, #61237a 100%); border-radius:12px; padding:20px; color:#fff; box-shadow:0 8px 25px rgba(97, 35, 122, 0.4); border:1px solid rgba(255,255,255,0.1);">
         <h3 style="margin-top:0; font-size:16px; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:10px; display:flex; justify-content:space-between;">
@@ -643,6 +656,19 @@
           <div><div style="font-size:11px; opacity:0.7; letter-spacing:1px; margin-bottom:3px;">HISTÓRICO</div><div id="biLasHis" style="font-size:22px; font-weight:bold; color:#99e6ff;">0.00</div></div>
         </div>
       </div>
+
+      <!-- DTF (metros de film usados en las tiradas) -->
+      <div class="bi-dtf">
+        <h3><span>🧻 DTF</span> <span class="bi-dtf-chip">PRODUCCIÓN</span></h3>
+        <div class="bi-dtf-grilla">
+          <div><div class="bi-dtf-tit">DIARIO (HOY)</div><div id="biDtfHoy" class="bi-dtf-grande">0.00</div></div>
+          <div><div class="bi-dtf-tit">ESTA SEMANA</div><div id="biDtfSem" class="bi-dtf-grande">0.00</div></div>
+          <div><div class="bi-dtf-tit">DÍA ANTERIOR (AYER)</div><div id="biDtfAyer" class="bi-dtf-chico">0.00</div></div>
+          <div><div class="bi-dtf-tit">SEMANA ANTERIOR</div><div id="biDtfSemAnt" class="bi-dtf-chico">0.00</div></div>
+          <div><div class="bi-dtf-tit">ESTE MES</div><div id="biDtfMes" class="bi-dtf-chico">0.00</div></div>
+          <div><div class="bi-dtf-tit">MES ANTERIOR</div><div id="biDtfMesAnt" class="bi-dtf-chico">0.00</div></div>
+        </div>
+      </div>
     </div>
 
     <!-- RADAR DE PRODUCCIÓN (EN COLA) — Copia exacta de Index.html líneas 429-445 -->
@@ -661,6 +687,10 @@
           <div style="font-size:12px; color:#888; font-weight:bold;">ESPERANDO LÁSER</div>
           <div id="radarQLas" style="font-size:32px; color:#fff; font-weight:bold;">0m</div>
         </div>
+        <div style="flex:1; min-width:150px; background:var(--vg-surface-base); padding:15px; border-radius:8px; border-left:5px solid var(--accent-blue);">
+          <div style="font-size:12px; color:var(--vg-text-secondary); font-weight:bold;">ESPERANDO DTF</div>
+          <div id="radarQDtf" style="font-size:32px; color:var(--vg-text-primary); font-weight:bold;">0m</div>
+        </div>
       </div>
     </div>
 
@@ -677,6 +707,10 @@
       <div style="flex:1; min-width:300px; background:#1a1c23; border:1px solid #333; border-radius:12px; padding:20px;">
         <h3 style="color:#aaa; margin-top:0; font-size:14px; text-transform:uppercase;">Rendimiento Real Calandra (Mts/Hr)</h3>
         <div id="dashRendimiento"><div style="color:#888; font-size:12px;">Vel 50 — Promedio: 82 m/h</div></div>
+      </div>
+      <div style="flex:1; min-width:300px; background:var(--vg-surface-base); border:1px solid var(--vg-surface-border); border-radius:12px; padding:20px;">
+        <h3 style="color:var(--vg-text-secondary); margin-top:0; font-size:14px; text-transform:uppercase;">Top clientes DTF (este mes)</h3>
+        <div id="dashTopClientesDtf"></div>
       </div>
     </div>
   </div>
@@ -989,7 +1023,7 @@
   <datalist id="listColores"></datalist>
   <div id="vgToastContainer" style="position:fixed; top:16px; right:16px; z-index:3000; max-width:360px;"></div>
 
-  <script type="module" src="./src/app.js?v=20261023_05"></script>
+  <script type="module" src="./src/app.js?v=20261023_06"></script>
   <script>
     // Registro del Service Worker PWA
     if ('serviceWorker' in navigator) {
