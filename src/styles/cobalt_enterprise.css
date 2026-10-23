@@ -477,13 +477,26 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
 /* DTF paso 2: separar (lista de tiradas y vista a pantalla completa) */
 .dtf-progreso { height: 8px; border-radius: 999px; background: var(--vg-surface-border); overflow: hidden; }
 .dtf-progreso span { display: block; height: 100%; background: var(--vg-status-ready); }
-.dtf-separador { position: fixed; inset: 0; z-index: 1500; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); background: var(--vg-bg-app); color: var(--vg-text-primary); }
+.dtf-tirada-mini { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; width: 56px; height: 76px; margin: 0; padding: 2px; overflow: hidden; border-radius: 8px; border: 1px solid var(--vg-surface-border);
+  background: repeating-conic-gradient(var(--vg-surface-base) 0 25%, transparent 0 50%) 0 0 / 12px 12px; color: var(--vg-text-secondary); cursor: pointer; }
+.dtf-tirada-mini img { max-width: 100%; max-height: 100%; object-fit: contain; }
+/* La vista de separar: en el celular parado, una columna; en la compu o tablet acostada, la imagen a la izquierda y los botones a la derecha */
+.dtf-separador { position: fixed; inset: 0; z-index: 1500; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto auto auto auto;
+  grid-template-areas: "arriba" "imagen" "datos" "botones" "extra" "tira"; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); background: var(--vg-bg-app); color: var(--vg-text-primary); }
+.dtf-sep-arriba { grid-area: arriba; }
+.dtf-sep-imagen { grid-area: imagen; }
+.dtf-sep-datos { grid-area: datos; }
+.dtf-sep-botones { grid-area: botones; }
+.dtf-sep-extra { grid-area: extra; }
+.dtf-sep-tira { grid-area: tira; }
 .dtf-sep-arriba { display: flex; align-items: center; gap: 10px; font-size: 15px; }
 .dtf-sep-arriba [data-x="contador"] { color: var(--vg-text-secondary); }
 .dtf-sep-arriba button { width: auto; margin: 0 0 0 auto; padding: 8px 14px; }
 .dtf-sep-imagen { position: relative; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 12px; border: 1px solid var(--vg-surface-border);
   background: repeating-conic-gradient(var(--vg-surface-base) 0 25%, transparent 0 50%) 0 0 / 24px 24px; touch-action: pan-y; }
-.dtf-sep-imagen img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.dtf-sep-imagen img { max-width: 100%; max-height: 100%; object-fit: contain; cursor: zoom-in; }
+.dtf-sep-imagen.zoom { display: block; overflow: auto; }
+.dtf-sep-imagen.zoom img { display: block; width: 100%; height: auto; max-width: none; max-height: none; cursor: zoom-out; }
 .dtf-sep-cargando { position: absolute; padding: 12px; text-align: center; font-weight: 700; color: var(--vg-text-secondary); }
 .dtf-sep-cliente { font-size: clamp(28px, 7vw, 56px); font-weight: 900; line-height: 1.05; word-break: break-word; }
 .dtf-sep-archivo { font-size: 14px; color: var(--vg-text-secondary); word-break: break-word; }
@@ -499,3 +512,12 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
 .dtf-sep-chip b { display: block; font-size: 15px; color: var(--vg-text-primary); }
 .dtf-sep-chip.listo { border-color: var(--vg-status-ready); color: var(--vg-status-ready); }
 .dtf-sep-chip.actual { border-color: var(--accent-blue); box-shadow: 0 0 0 2px var(--vg-brand-glow); }
+@media (orientation: landscape) and (min-width: 700px) {
+  .dtf-separador { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto auto auto auto minmax(0, 1fr);
+    grid-template-areas: "imagen arriba" "imagen datos" "imagen botones" "imagen extra" "imagen tira"; column-gap: 20px; row-gap: 14px; }
+  .dtf-sep-cliente { font-size: clamp(34px, 4.6vw, 72px); }
+  .dtf-sep-botones { grid-template-columns: 1fr 1fr; }
+  .dtf-sep-botones [data-x="ok"] { grid-column: 1 / -1; grid-row: 1; min-height: 120px; font-size: 30px; }
+  .dtf-sep-extra { justify-content: flex-start; }
+  .dtf-sep-tira { flex-wrap: wrap; align-content: flex-start; overflow-y: auto; }
+}

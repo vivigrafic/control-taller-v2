@@ -1763,20 +1763,29 @@ function tiradasParaSeparar() {
     .map(t => { const ped = porTirada.get(t.id); return { t, ped, separados: ped.filter(d => d.separado_at).length }; });
 }
 
+// Mismo orden en la tarjeta y en la vista grande: por cliente y nombre de archivo
+const ordenSepararDtf = (a, b) => String(a.cliente_limpio || "").localeCompare(String(b.cliente_limpio || "")) || String(a.nombre_archivo).localeCompare(String(b.nombre_archivo));
+
+// Las tiradas con algo por separar van en tarjetas; las ya separadas quedan en el registro de abajo
 function renderSepararDtf() {
   const cont = document.getElementById("dtfListaSeparar");
   if (!cont) return;
   const lista = tiradasParaSeparar();
-  cont.innerHTML = lista.length === 0
-    ? `<div style="padding:15px; text-align:center; color:var(--vg-text-secondary);">No hay tiradas de las últimas 2 semanas.</div>`
-    : lista.map(({ t, ped, separados }) => {
-      const faltan = ped.length - separados;
-      const clientes = [...new Set(ped.map(d => d.cliente_limpio || d.cliente || "SIN NOMBRE"))];
-      const metros = ped.reduce((a, d) => a + (Number(d.metros_archivo) || 0), 0);
+  const datosDe = (ped) => ({
+    clientes: [...new Set(ped.map(d => d.cliente_limpio || d.cliente || "SIN NOMBRE"))],
+    metros: ped.reduce((a, d) => a + (Number(d.metros_archivo) || 0), 0)
+  });
+  const porSeparar = lista.filter(x => x.separados < x.ped.length);
+  cont.innerHTML = porSeparar.length === 0
+    ? `<div style="padding:15px; text-align:center; color:var(--vg-text-secondary);">${lista.length ? "🎉 Todo separado." : "No hay tiradas de las últimas 2 semanas."}</div>`
+    : porSeparar.map(({ t, ped, separados }) => {
+      const { clientes, metros } = datosDe(ped);
+      const primero = [...ped].sort(ordenSepararDtf)[0];
       return `
         <div class="dtf-venta">
           <div class="dtf-venta-cab">
-            <div>
+            <button type="button" class="dtf-tirada-mini btn-dtf-separar" data-id="${t.id}" title="Separar">${primero.file_id ? `<img src="https://drive.google.com/thumbnail?id=${escHtml(primero.file_id)}&sz=w120" alt="" />` : "🖼️"}</button>
+            <div style="flex:1; min-width:0;">
               <div class="dtf-venta-nombre">${escHtml(t.codigo_tirada)}</div>
               <div class="dtf-venta-cliente">${fmtDateHora(t.fecha_hora)} · ${escHtml(t.id_rollo_dtf)} · ${fmtNum(metros)} m</div>
             </div>
@@ -1788,11 +1797,30 @@ function renderSepararDtf() {
           <div class="dtf-progreso"><span style="width:${Math.round(separados * 100 / ped.length)}%"></span></div>
           <div class="dtf-venta-cliente">${clientes.map(escHtml).join(" · ")}</div>
           <div class="dtf-venta-pie">
-            ${faltan > 0 && ped.length > 1 ? `<button type="button" class="btn-secondary btn-dtf-sep-todo" data-id="${t.id}">✓ Marcar toda</button>` : ""}
-            <button type="button" class="${faltan > 0 ? "btn-main" : "btn-secondary"} btn-dtf-separar" data-id="${t.id}">${faltan > 0 ? "✂️ Separar" : "✓ Todo separado · Ver"}</button>
+            ${ped.length > 1 ? `<button type="button" class="btn-secondary btn-dtf-sep-todo" data-id="${t.id}">✓ Marcar toda</button>` : ""}
+            <button type="button" class="btn-main btn-dtf-separar" data-id="${t.id}">✂️ Separar</button>
           </div>
         </div>`;
     }).join("");
+
+  const reg = document.getElementById("dtfRegistroSeparadas");
+  if (reg) {
+    const separadas = lista.filter(x => x.separados === x.ped.length);
+    reg.innerHTML = separadas.length === 0
+      ? `<tr><td colspan="6" style="text-align:center; color:var(--vg-text-secondary);">Todavía no hay tiradas separadas.</td></tr>`
+      : separadas.map(({ t, ped }) => {
+        const { clientes, metros } = datosDe(ped);
+        return `
+          <tr>
+            <td><strong>${escHtml(t.codigo_tirada)}</strong></td>
+            <td>${fmtDateHora(t.fecha_hora)}</td>
+            <td>${ped.length}</td>
+            <td>${fmtNum(metros)}m</td>
+            <td>${clientes.map(escHtml).join(", ")}</td>
+            <td><button type="button" class="btn-secondary btn-dtf-separar" data-id="${t.id}" style="width:auto; margin:0; padding:4px 10px;">👁️ Ver</button></td>
+          </tr>`;
+      }).join("");
+  }
 }
 
 async function separarTodaLaTirada(tiradaId) {
@@ -1820,8 +1848,7 @@ function traerImagenGrande(fileId) {
 
 function abrirSeparadorDtf(tiradaId) {
   const t = STATE.dtfTiradas.find(x => x.id === tiradaId);
-  const ped = STATE.dtfPedidos.filter(d => d.tirada_id === tiradaId)
-    .sort((a, b) => String(a.cliente_limpio || "").localeCompare(String(b.cliente_limpio || "")) || String(a.nombre_archivo).localeCompare(String(b.nombre_archivo)));
+  const ped = STATE.dtfPedidos.filter(d => d.tirada_id === tiradaId).sort(ordenSepararDtf);
   if (!t || !ped.length) return;
   let i = Math.max(ped.findIndex(d => !d.separado_at), 0);
   let ocupado = false;
@@ -1833,7 +1860,7 @@ function abrirSeparadorDtf(tiradaId) {
       <button type="button" class="btn-secondary" data-x="cerrar">✕ Cerrar</button>
     </div>
     <div class="dtf-sep-imagen" data-x="marco"><img data-x="img" alt="" /><div class="dtf-sep-cargando" data-x="cargando"></div></div>
-    <div>
+    <div class="dtf-sep-datos">
       <div class="dtf-sep-cliente" data-x="cliente"></div>
       <div class="dtf-sep-archivo" data-x="archivo"></div>
       <div class="dtf-sep-estado" data-x="estado"></div>
@@ -1847,6 +1874,7 @@ function abrirSeparadorDtf(tiradaId) {
       <button type="button" class="dtf-link" data-x="deshacer">↩ No está separado</button>
       <button type="button" class="dtf-link" data-x="falla">⚠️ Falla / reimprimir</button>
       <a class="dtf-link" data-x="drive" target="_blank" rel="noopener">Abrir en Drive</a>
+      <span style="font-size:12px; color:var(--vg-text-secondary);">🔍 Tocá la imagen para agrandarla</span>
     </div>
     <div class="dtf-sep-tira" data-x="tira"></div>`;
   document.body.appendChild(capa);
@@ -1875,6 +1903,8 @@ function abrirSeparadorDtf(tiradaId) {
     if (d.file_id) drive.href = `https://drive.google.com/file/d/${encodeURIComponent(d.file_id)}/view`;
     img.removeAttribute("src");
     img.hidden = true;
+    $("marco").classList.remove("zoom");
+    $("marco").scrollTop = 0;
     $("cargando").textContent = d.file_id ? "Cargando imagen…" : "Sin imagen (trabajo cargado a mano)";
     $("cargando").hidden = false;
     if (d.file_id) {
@@ -1937,14 +1967,20 @@ function abrirSeparadorDtf(tiradaId) {
     else if (que === "falla") abrirFallaDtf(ped[i]);
   });
 
-  // En el celular: deslizar la imagen para pasar
+  // En el celular: deslizar la imagen para pasar. Tocarla la agranda al ancho (y se recorre hacia abajo)
   let x0 = null;
-  $("marco").addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+  let deslizo = false;
+  $("marco").addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; deslizo = false; }, { passive: true });
   $("marco").addEventListener("touchend", (e) => {
     if (x0 === null) return;
     const dx = e.changedTouches[0].clientX - x0;
     x0 = null;
-    if (Math.abs(dx) > 60) ir(i + (dx < 0 ? 1 : -1));
+    if (Math.abs(dx) > 60) { deslizo = true; ir(i + (dx < 0 ? 1 : -1)); }
+  });
+  img.addEventListener("click", () => {
+    if (deslizo) { deslizo = false; return; }
+    $("marco").classList.toggle("zoom");
+    $("marco").scrollTop = 0;
   });
 
   mostrar();

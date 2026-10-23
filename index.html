@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261023_02" />
+  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261023_03" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./src/config/conexion.js?v=20261022_04"></script>
   <script src="./src/ver_clave.js?v=20261022_02"></script>
@@ -437,6 +437,10 @@
         <h2 style="margin-top:0;">Separar lo impreso</h2>
         <p class="dtf-ayuda">Al desenrollar una tirada tocá <b>Separar</b>: aparece cada impresión grande con su cliente. Tocá <b>✓ Separado</b> y pasa sola a la siguiente. Se ven las tiradas de las últimas 2 semanas.</p>
         <div id="dtfListaSeparar" class="dtf-tarjetas"></div>
+      </div>
+      <div class="card">
+        <h2 style="margin-top:0;">📋 Tiradas ya separadas</h2>
+        <div style="overflow-x:auto;"><table><thead><tr><th>Tirada</th><th>Fecha</th><th>Archivos</th><th>Metros</th><th>Clientes</th><th></th></tr></thead><tbody id="dtfRegistroSeparadas"></tbody></table></div>
       </div>
     </div>
 
@@ -975,7 +979,7 @@
   <datalist id="listColores"></datalist>
   <div id="vgToastContainer" style="position:fixed; top:16px; right:16px; z-index:3000; max-width:360px;"></div>
 
-  <script type="module" src="./src/app.js?v=20261023_02"></script>
+  <script type="module" src="./src/app.js?v=20261023_03"></script>
   <script>
     // Registro del Service Worker PWA
     if ('serviceWorker' in navigator) {
