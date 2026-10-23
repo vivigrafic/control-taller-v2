@@ -601,3 +601,21 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
 .bi-dtf-grande { font-size: 28px; font-weight: 900; }
 .bi-dtf-chico { font-size: 20px; font-weight: bold; color: var(--accent-blue); }
 @media (min-width: 900px) { .bi-tarjetas > div { box-sizing: border-box; flex-basis: calc(50% - 10px); min-width: calc(50% - 10px) !important; } } /* de a dos por fila (impresión, calandrado, láser y DTF) */
+/* Los seis cuadros de números de cada estación (Impresión, Calandrado, Láser y DTF), con el modelo de Calandrado */
+.stat-box.kpi-pendiente { border: 2px dashed var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+.stat-box.kpi-pendiente .stat-title { color: var(--danger); }
+.stat-box.kpi-diario { border-bottom: 3px solid var(--accent-magenta); }
+.stat-box.kpi-semanal { border-bottom: 3px solid var(--accent-blue); }
+.stat-box.kpi-mensual { border-bottom: 3px solid var(--accent); }
+.stat-box.kpi-anual { border-bottom: 3px solid var(--accent-orange); }
+.stat-box.kpi-historico { border-bottom: 3px solid var(--vg-text-primary); }
+.kpi-sub { margin-top: 2px; font-size: 10px; color: var(--vg-text-secondary); }
+/* Barra del rollo puesto (DTF), igual a la de Impresión */
+.barra-rollo { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; padding: 10px; border-radius: 6px;
+  border: 1px solid var(--accent-blue); background: color-mix(in srgb, var(--accent-blue) 10%, transparent); }
+.barra-rollo .br-valor { font-size: 16px; }
+.barra-rollo .br-poco { color: var(--danger); font-weight: bold; }
+.barra-rollo button { width: auto; margin: 0; padding: 8px 12px; }
+#vgBarraBusqueda[hidden] { display: none; }
+/* En el celular los botones de arriba van abajo del logo (no lo tapan) */
+@media (max-width: 700px) { .vg-cabecera-acciones { position: static !important; justify-content: center; flex-wrap: wrap; margin-top: 8px; } }

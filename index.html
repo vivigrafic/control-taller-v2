@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261023_05" />
+  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261023_06" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./src/config/conexion.js?v=20261022_04"></script>
   <script src="./src/ver_clave.js?v=20261022_02"></script>
@@ -27,7 +27,8 @@
   <!-- LOGO OFICIAL V&V GRAFIC (Idéntico a Index.html línea 13) -->
   <div style="text-align: center; margin-bottom: 10px; position: relative;">
     <img id="imgLogoVV" src="" alt="V&amp;V Grafic Logo" style="height: 60px; object-fit: contain;" />
-    <div style="position:absolute; right:0; top:0; display:flex; gap:6px; align-items:center;">
+    <div class="vg-cabecera-acciones" style="position:absolute; right:0; top:0; display:flex; gap:6px; align-items:center;">
+      <button type="button" id="btnVgBuscar" class="badge" style="cursor:pointer; margin:0;" title="Buscar en todo el taller">🔎 Buscar</button>
       <button type="button" id="btnInstalarPwa" class="badge" style="cursor:pointer; margin:0; background:rgba(0, 230, 118, 0.15); border:1.5px solid #00E676; color:#00E676; font-weight:900; font-size:11px; display:inline-flex; align-items:center; gap:4px; box-shadow:0 2px 6px rgba(0,230,118,0.25);" title="Instalar App en el Celular">📱 Instalar App</button>
       <select id="vgSelectOperadorActual" style="width:auto; padding:4px 8px; font-size:11px; background:#111; border:1px solid #333;">
         <option value="Roberto">👤 Roberto</option>
@@ -43,24 +44,11 @@
     </div>
   </div>
 
-  <!-- BARRA FILTRO RENDIMIENTO POR FECHA (Idéntica a Index.html línea 16 + Botones Ayer/Semana Ant y Buscador Global) -->
-  <div class="card" style="padding:10px 15px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; background:#111; border:1px solid #333; margin-bottom:15px;">
-    <strong style="color:#aaa; font-size:12px;">📅 Filtro Rendimiento por Fecha:</strong>
-    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-      <input type="date" id="vgDateDesde" style="width:135px; padding:5px; font-size:12px;" />
-      <input type="date" id="vgDateHasta" style="width:135px; padding:5px; font-size:12px;" />
-      <button type="button" id="btnCalcularRango" class="btn-main" style="width:auto; margin:0; padding:5px 15px; font-size:12px; border-radius:4px;">🔍 Calcular</button>
-      <button type="button" class="badge vg-period-pill activo" data-period="todo" style="cursor:pointer;">Histórico</button>
-      <button type="button" class="badge vg-period-pill" data-period="hoy" style="cursor:pointer;">Hoy</button>
-      <button type="button" class="badge vg-period-pill" data-period="ayer" style="cursor:pointer;">Ayer</button>
-      <button type="button" class="badge vg-period-pill" data-period="semana_actual" style="cursor:pointer;">Esta Sem.</button>
-      <button type="button" class="badge vg-period-pill" data-period="semana_anterior" style="cursor:pointer;">Sem. Anterior</button>
-    </div>
-    <div style="flex:1; min-width:200px; position:relative;">
-      <input type="text" id="vgOmniSearchInput" style="padding:5px 10px; font-size:12px; background:#222; border:1px solid #444;" placeholder="🔎 Buscar trabajo en todo el sistema (cliente, archivo, tela, perfil, rollo, metros)..." />
-      <button type="button" id="vgOmniSearchClear" style="position:absolute; right:6px; top:4px; background:none; border:none; color:#888; cursor:pointer; font-size:12px;">✖</button>
-    </div>
-    <div id="vgPeriodSummaryMetrics" style="font-weight:bold; color:var(--accent); font-size:12px; text-align:right;">(Selecciona fechas para ver metros producidos)</div>
+  <!-- BUSCADOR GLOBAL: se abre con "🔎 Buscar" (arriba a la derecha). El filtro por fechas se sacó: cada pestaña muestra
+       diario, semanal, mensual, año e histórico, y la pestaña Métricas tiene los períodos -->
+  <div id="vgBarraBusqueda" class="card" style="padding:8px 12px; margin-bottom:12px; position:relative;" hidden>
+    <input type="text" id="vgOmniSearchInput" style="padding:6px 34px 6px 10px; font-size:13px; margin:0;" placeholder="🔎 Buscar trabajo en todo el taller (cliente, archivo, tela, perfil, rollo, metros)..." />
+    <button type="button" id="vgOmniSearchClear" title="Cerrar el buscador" style="position:absolute; right:18px; top:13px; width:auto; margin:0; padding:0; background:none; border:none; color:var(--vg-text-secondary); cursor:pointer; font-size:13px;">✖</button>
   </div>
 
   <!-- PANEL DE RESULTADOS DE BÚSQUEDA GLOBAL -->
@@ -111,17 +99,8 @@
       </div>
     </div>
 
-    <!-- LAS 8 CAJAS KPI DE IMPRESIÓN (Copia exacta de Index.html líneas 40-49) -->
-    <div class="stats-grid">
-      <div class="stat-box" style="border: 2px dashed var(--accent); background:rgba(0,230,118,0.1);"><div class="stat-title" style="color:var(--accent);">A Imprimir</div><div class="stat-value" id="kpiImpPendiente">0.00m</div></div>
-      <div class="stat-box" style="border: 2px dashed var(--accent-magenta); background:rgba(216,27,96,0.1);"><div class="stat-title" style="color:var(--accent-magenta);">A Calandrar</div><div class="stat-value" id="kpiCalPendienteTop">0.00m</div></div>
-      <div class="stat-box" style="border: 2px dashed var(--accent-orange); background:rgba(255,152,0,0.1);"><div class="stat-title" style="color:var(--accent-orange);">A Cortar Láser</div><div class="stat-value" id="kpiLasPendienteTop">0.00m</div></div>
-      <div class="stat-box" style="border-bottom: 3px solid var(--accent-blue);"><div class="stat-title">Imp Diario</div><div class="stat-value" id="kpiImpHoy">0.00m</div><div id="kpiImpAyerSub" style="font-size:10px; color:#888; margin-top:2px;">Ayer: 0.00m</div></div>
-      <div class="stat-box" style="border-bottom: 3px solid var(--accent);"><div class="stat-title">Imp Semanal</div><div class="stat-value" id="kpiImpSemanal">0.00m</div><div id="kpiImpSemAntSub" style="font-size:10px; color:#888; margin-top:2px;">Sem. Ant: 0.00m</div></div>
-      <div class="stat-box" style="border-bottom: 3px solid var(--accent-orange);"><div class="stat-title">Imp Mensual</div><div class="stat-value" id="kpiImpMensual">0.00m</div></div>
-      <div class="stat-box" style="border-bottom: 3px solid #888;"><div class="stat-title">Este Año</div><div class="stat-value" id="kpiImpAnual">0.00m</div></div>
-      <div class="stat-box" style="border-bottom: 3px solid #fff;"><div class="stat-title">Histórico Total</div><div class="stat-value" id="kpiImpHistorico">0.00m</div></div>
-    </div>
+    <!-- Números de la estación: los mismos seis cuadros en Impresión, Calandrado, Láser y DTF -->
+    <div class="stats-grid" id="kpisImpresion"></div>
 
     <!-- LOS 4 BOTONES DE ROLLO (Copia exacta de Index.html líneas 50-55) -->
     <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 15px;">
@@ -251,14 +230,7 @@
        TAB 2: CALANDRADO (Copia exacta de Index.html líneas 154-201)
        ======================================================================== -->
   <div id="sec-calandrado" class="tab-content">
-    <div class="stats-grid">
-      <div class="stat-box" style="border: 2px dashed var(--danger); background:rgba(255,82,82,0.1);"><div class="stat-title" style="color:var(--danger);">A Calandrar</div><div class="stat-value" id="kpiCalPendiente">0.00m</div></div>
-      <div class="stat-box" style="border-bottom: 3px solid var(--accent-magenta);"><div class="stat-title">Diario</div><div class="stat-value" id="kpiCalHoy">0.00m</div><div id="kpiCalAyerSub" style="font-size:10px; color:#888; margin-top:2px;">Ayer: 0.00m</div></div>
-      <div class="stat-box" style="border-bottom: 3px solid var(--accent-blue);"><div class="stat-title">Semanal</div><div class="stat-value" id="kpiCalSemanal">0.00m</div><div id="kpiCalSemAntSub" style="font-size:10px; color:#888; margin-top:2px;">Sem. Ant: 0.00m</div></div>
-      <div class="stat-box" style="border-bottom: 3px solid var(--accent);"><div class="stat-title">Mensual</div><div class="stat-value" id="kpiCalMensual">0.00m</div></div>
-      <div class="stat-box" style="border-bottom: 3px solid var(--accent-orange);"><div class="stat-title">Este Año</div><div class="stat-value" id="kpiCalAnual">0.00m</div></div>
-      <div class="stat-box" style="border-bottom: 3px solid #fff;"><div class="stat-title">Histórico</div><div class="stat-value" id="kpiCalHistorico">0.00m</div></div>
-    </div>
+    <div class="stats-grid" id="kpisCalandrado"></div>
 
     <div class="card" style="border-top: 4px solid var(--accent-blue);">
       <h2>Hoja de Trabajo - Cola Calandrado</h2>
@@ -308,14 +280,7 @@
        TAB 3: LÁSER & QC (Copia exacta de Index.html líneas 203-287 + Anidados agrupados)
        ======================================================================== -->
   <div id="sec-laser" class="tab-content">
-    <div class="stats-grid">
-      <div class="stat-box" style="border: 2px dashed var(--accent-blue); background:rgba(33,150,243,0.1);"><div class="stat-title" style="color:var(--accent-blue);">Total a Cortar</div><div class="stat-value" id="kpiLasPendiente">0.00m</div></div>
-      <div class="stat-box" style="border-bottom: 3px solid var(--accent-magenta);"><div class="stat-title">Horas Est. Pendientes</div><div class="stat-value" id="kpiLasHoras">0.0 hs</div></div>
-      <div class="stat-box" style="border-bottom: 3px solid var(--accent);"><div class="stat-title">Diario</div><div class="stat-value" id="kpiLasHoy">0.00m</div><div id="kpiLasAyerSub" style="font-size:10px; color:#888; margin-top:2px;">Ayer: 0.00m</div></div>
-      <div class="stat-box" style="border-bottom: 3px solid var(--accent-orange);"><div class="stat-title">Semanal</div><div class="stat-value" id="kpiLasSemanal">0.00m</div><div id="kpiLasSemAntSub" style="font-size:10px; color:#888; margin-top:2px;">Sem. Ant: 0.00m</div></div>
-      <div class="stat-box" style="border-bottom: 3px solid #fff;"><div class="stat-title">Mensual</div><div class="stat-value" id="kpiLasMensual">0.00m</div></div>
-      <div class="stat-box" style="border-bottom: 3px solid #888;"><div class="stat-title">Histórico</div><div class="stat-value" id="kpiLasHistorico">0.00m</div></div>
-    </div>
+    <div class="stats-grid" id="kpisLaser"></div>
 
     <div class="card" style="border-top: 4px solid var(--accent-blue);">
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
@@ -370,7 +335,8 @@
        TAB 4: MÓDULO DTF (Con el mismo estilo exacto de tarjetas oscuras)
        ======================================================================== -->
   <div id="sec-dtf" class="tab-content">
-    <div id="dtfTablero" class="dtf-tablero"></div>
+    <div id="dtfBarraRollo"></div>
+    <div class="stats-grid" id="kpisDtf"></div>
     <!-- Dos pasos separados: lo que se imprime junto (anidado) no siempre es del mismo cliente -->
     <div class="dtf-pasos">
       <button type="button" class="dtf-paso activo" data-dtf-paso="imprimir">🖨️ 1. Imprimir <span id="dtfBadgeImprimir" class="dtf-paso-contador" hidden></span></button>
@@ -446,6 +412,7 @@
     </div>
     </div>
 
+    <div class="grid-panel dtf-una-columna" data-dtf-panel="separar" hidden>
       <div class="card" style="border-top: 3px solid var(--accent-orange);">
         <h2 style="margin-top:0;">Separar lo impreso</h2>
         <p class="dtf-ayuda">Al desenrollar una tirada tocá <b>Separar</b>: aparece cada impresión grande con su cliente. Tocá <b>✓ Separado</b> y pasa sola a la siguiente. Se ven las tiradas de las últimas 2 semanas.</p>
@@ -1023,7 +990,7 @@
   <datalist id="listColores"></datalist>
   <div id="vgToastContainer" style="position:fixed; top:16px; right:16px; z-index:3000; max-width:360px;"></div>
 
-  <script type="module" src="./src/app.js?v=20261023_06"></script>
+  <script type="module" src="./src/app.js?v=20261023_07"></script>
   <script>
     // Registro del Service Worker PWA
     if ('serviceWorker' in navigator) {

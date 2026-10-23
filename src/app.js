@@ -540,63 +540,48 @@ function renderBadgesYTodosLosKPIs() {
   const mencionesSinLeer = STATE.chatMensajes.filter(m => !m.resuelto && Array.isArray(m.menciones) && m.menciones.includes(STATE.usuarioActual)).length;
   setTxt("badgeTabChat", mencionesSinLeer || STATE.chatMensajes.length);
 
-  // KPIs Impresión
-  const impNormales = STATE.impresiones.filter(i => i.accion === "Impresion Normal");
-  const impHoy = sumarMetrosEnVentana(impNormales, "fecha_hora", "metros_impresos", hoyIni);
-  const impAyer = sumarMetrosEnVentana(impNormales, "fecha_hora", "metros_impresos", ayerIni, hoyIni);
-  const impSem = sumarMetrosEnVentana(impNormales, "fecha_hora", "metros_impresos", semActualIni);
-  const impSemAnt = sumarMetrosEnVentana(impNormales, "fecha_hora", "metros_impresos", semAntIni, semActualIni);
-  const impMes = sumarMetrosEnVentana(impNormales, "fecha_hora", "metros_impresos", mesActualIni);
-  const impAnio = sumarMetrosEnVentana(impNormales, "fecha_hora", "metros_impresos", anioActualIni);
-  const impHist = impNormales.reduce((a, b) => a + (Number(b.metros_impresos) || 0), 0);
+  const pendDtfRows = STATE.pendientesDrive.filter(p => p.modulo === "DTF" && p.estado_impreso !== "SI");
+  const plural = (n, una, varias) => `${n} ${n === 1 ? una : varias}`;
+  renderKpisEstacion("kpisImpresion", {
+    pendienteTitulo: "A Imprimir", pendiente: mPendImp, pendienteSub: plural(pendSubRows.length, "archivo", "archivos"),
+    filas: STATE.impresiones.filter(i => i.accion === "Impresion Normal"), campoFecha: "fecha_hora", metrosDe: r => Number(r.metros_impresos) || 0
+  });
+  renderKpisEstacion("kpisCalandrado", {
+    pendienteTitulo: "A Calandrar", pendiente: mPendCal, pendienteSub: plural(pendCalRows.length, "trabajo", "trabajos"),
+    filas: STATE.colaCalandrado.filter(c => String(c.estado).toLowerCase().includes("terminado")), campoFecha: "fecha_terminado", metrosDe: r => Number(r.metros) || 0
+  });
+  renderKpisEstacion("kpisLaser", {
+    pendienteTitulo: "A Cortar", pendiente: mPendLas, pendienteSub: `${plural(pendLasRows.length, "trabajo", "trabajos")} · ≈ ${fmtNum(mPendLas / 30, 1)} hs`,
+    filas: STATE.colaLaser.filter(l => String(l.estado).toLowerCase().includes("terminado")), campoFecha: "fecha_terminado", metrosDe: r => Number(r.metros) || 0
+  });
+  // DTF: metros de film usados en las tiradas (consumido + desperdicio, igual que el saldo del rollo)
+  renderKpisEstacion("kpisDtf", {
+    pendienteTitulo: "A Imprimir", pendiente: pendDtfRows.reduce((a, b) => a + (Number(b.metros_totales) || 0), 0), pendienteSub: plural(pendDtfRows.length, "archivo", "archivos"),
+    filas: STATE.dtfTiradas, campoFecha: "fecha_hora", metrosDe: r => (Number(r.metros_consumidos_rollo) || 0) + (Number(r.metros_desperdicio) || 0)
+  });
+}
 
-  setTxt("kpiImpPendiente", `${fmtNum(mPendImp)}m`);
-  setTxt("kpiCalPendienteTop", `${fmtNum(mPendCal)}m`);
-  setTxt("kpiLasPendienteTop", `${fmtNum(mPendLas)}m`);
-  setTxt("kpiImpHoy", `${fmtNum(impHoy)}m`);
-  setTxt("kpiImpAyerSub", `Ayer: ${fmtNum(impAyer)}m`);
-  setTxt("kpiImpSemanal", `${fmtNum(impSem)}m`);
-  setTxt("kpiImpSemAntSub", `Sem. Ant: ${fmtNum(impSemAnt)}m`);
-  setTxt("kpiImpMensual", `${fmtNum(impMes)}m`);
-  setTxt("kpiImpAnual", `${fmtNum(impAnio)}m`);
-  setTxt("kpiImpHistorico", `${fmtNum(impHist)}m`);
-
-  // KPIs Calandrado
-  const calTerm = STATE.colaCalandrado.filter(c => String(c.estado).toLowerCase().includes("terminado"));
-  const calHoy = sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", hoyIni);
-  const calAyer = sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", ayerIni, hoyIni);
-  const calSem = sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", semActualIni);
-  const calSemAnt = sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", semAntIni, semActualIni);
-  const calMes = sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", mesActualIni);
-  const calAnio = sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", anioActualIni);
-  const calHist = calTerm.reduce((a, b) => a + (Number(b.metros) || 0), 0);
-
-  setTxt("kpiCalPendiente", `${fmtNum(mPendCal)}m`);
-  setTxt("kpiCalHoy", `${fmtNum(calHoy)}m`);
-  setTxt("kpiCalAyerSub", `Ayer: ${fmtNum(calAyer)}m`);
-  setTxt("kpiCalSemanal", `${fmtNum(calSem)}m`);
-  setTxt("kpiCalSemAntSub", `Sem. Ant: ${fmtNum(calSemAnt)}m`);
-  setTxt("kpiCalMensual", `${fmtNum(calMes)}m`);
-  setTxt("kpiCalAnual", `${fmtNum(calAnio)}m`);
-  setTxt("kpiCalHistorico", `${fmtNum(calHist)}m`);
-
-  // KPIs Láser
-  const lasTerm = STATE.colaLaser.filter(l => String(l.estado).toLowerCase().includes("terminado"));
-  const lasHoy = sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", hoyIni);
-  const lasAyer = sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", ayerIni, hoyIni);
-  const lasSem = sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", semActualIni);
-  const lasSemAnt = sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", semAntIni, semActualIni);
-  const lasMes = sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", mesActualIni);
-  const lasHist = lasTerm.reduce((a, b) => a + (Number(b.metros) || 0), 0);
-
-  setTxt("kpiLasPendiente", `${fmtNum(mPendLas)}m`);
-  setTxt("kpiLasHoras", `${fmtNum(mPendLas / 30, 1)} hs`);
-  setTxt("kpiLasHoy", `${fmtNum(lasHoy)}m`);
-  setTxt("kpiLasAyerSub", `Ayer: ${fmtNum(lasAyer)}m`);
-  setTxt("kpiLasSemanal", `${fmtNum(lasSem)}m`);
-  setTxt("kpiLasSemAntSub", `Sem. Ant: ${fmtNum(lasSemAnt)}m`);
-  setTxt("kpiLasMensual", `${fmtNum(lasMes)}m`);
-  setTxt("kpiLasHistorico", `${fmtNum(lasHist)}m`);
+// Los mismos seis cuadros en Impresión, Calandrado, Láser y DTF, para que los operarios vean lo mismo en todas:
+// lo pendiente, diario (con ayer), semanal (con la anterior), mensual (con el anterior), este año e histórico
+function renderKpisEstacion(idCont, { pendienteTitulo, pendiente, pendienteSub, filas, campoFecha, metrosDe }) {
+  const cont = document.getElementById(idCont);
+  if (!cont) return;
+  const { hoyIni, ayerIni, semActualIni, semAntIni, mesActualIni, anioActualIni } = obtenerVentanasTemporales();
+  const mesAntIni = new Date(mesActualIni.getFullYear(), mesActualIni.getMonth() - 1, 1);
+  const suma = (desde, hasta = null) => filas.reduce((a, r) => {
+    const f = new Date(r[campoFecha]);
+    if (isNaN(f.getTime()) || (desde && f < desde) || (hasta && f >= hasta)) return a;
+    return a + metrosDe(r);
+  }, 0);
+  const caja = (clase, titulo, valor, sub = "") => `<div class="stat-box ${clase}"><div class="stat-title">${titulo}</div><div class="stat-value">${fmtNum(valor)}m</div>${sub ? `<div class="kpi-sub">${sub}</div>` : ""}</div>`;
+  cont.innerHTML = [
+    caja("kpi-pendiente", pendienteTitulo, pendiente, pendienteSub),
+    caja("kpi-diario", "Diario", suma(hoyIni), `Ayer: ${fmtNum(suma(ayerIni, hoyIni))}m`),
+    caja("kpi-semanal", "Semanal", suma(semActualIni), `Sem. Ant: ${fmtNum(suma(semAntIni, semActualIni))}m`),
+    caja("kpi-mensual", "Mensual", suma(mesActualIni), `Mes Ant: ${fmtNum(suma(mesAntIni, mesActualIni))}m`),
+    caja("kpi-anual", "Este Año", suma(anioActualIni)),
+    caja("kpi-historico", "Histórico", suma(null))
+  ].join("");
 }
 
 function renderResumenPeriodoBarra() {
@@ -1483,7 +1468,7 @@ function renderModuloLaser() {
 // MÓDULO 4: MÓDULO DTF
 // ============================================================================
 function renderModuloDTF() {
-  const tablero = document.getElementById("dtfTablero");
+  const tablero = document.getElementById("kpisDtf");
   const tbodyPedidos = document.getElementById("tbodyPedidosDTF");
   if (!tablero) return;
 
@@ -1498,7 +1483,7 @@ function renderModuloDTF() {
     selRollo.value = selRollo.dataset.aMano && rollosDtfEnUso().some(r => r.id_rollo_dtf === antes) ? antes : rolloDtfPuesto();
   }
 
-  renderTableroDtf();
+  renderBarraRolloDtf();
   renderColaDtf();
   renderTiradasDtf();
   mostrarPasoDtf(STATE.dtfPaso);
@@ -1647,42 +1632,27 @@ function metricasDtf(desde, hasta = null) {
   };
 }
 
-function renderTableroDtf() {
-  const cont = document.getElementById("dtfTablero");
+// Barra del rollo puesto, igual a la de Impresión: rollo, lo que le queda y los botones de siempre
+function renderBarraRolloDtf() {
+  const cont = document.getElementById("dtfBarraRollo");
   if (!cont) return;
-  const { hoyIni, ayerIni, semActualIni, semAntIni, mesActualIni } = obtenerVentanasTemporales();
-  const mesAntIni = new Date(mesActualIni.getFullYear(), mesActualIni.getMonth() - 1, 1);
-  const mes = (d) => { const n = d.toLocaleDateString("es-AR", { month: "long" }); return n.charAt(0).toUpperCase() + n.slice(1); };
-  const plural = (n, una, varias) => `${n} ${n === 1 ? una : varias}`;
-  const cuadro = (titulo, act, ant, antNombre) => {
-    const dif = ant.metros > 0 ? Math.round((act.metros - ant.metros) * 100 / ant.metros) : null;
-    const chip = dif === null ? (act.metros > 0 ? `<span class="dtf-dif sube">▲ nuevo</span>` : "")
-      : dif > 0 ? `<span class="dtf-dif sube">▲ ${dif}%</span>` : dif < 0 ? `<span class="dtf-dif baja">▼ ${Math.abs(dif)}%</span>` : `<span class="dtf-dif">= igual</span>`;
-    return `
-      <div class="dtf-metrica">
-        <div class="dtf-metrica-titulo">${titulo}</div>
-        <div class="dtf-metrica-valor">${fmtNum(act.metros)}<small> m</small></div>
-        <div class="dtf-metrica-sub">${plural(act.archivos, "archivo", "archivos")} · ${plural(act.tiradas, "tirada", "tiradas")}</div>
-        <div class="dtf-metrica-antes"><span>${antNombre}: <b>${fmtNum(ant.metros)} m</b> · ${plural(ant.archivos, "archivo", "archivos")}</span>${chip}</div>
-      </div>`;
-  };
   const rollos = rollosDtfEnUso();
   const puesto = rollos.find(r => r.id_rollo_dtf === rolloDtfPuesto());
   const otros = rollos.filter(r => r !== puesto);
-  const pct = puesto ? Math.max(0, Math.min(100, Math.round((Number(puesto.metros_restantes_reales) || 0) * 100 / (Number(puesto.metros_iniciales) || 100)))) : 0;
-  cont.innerHTML =
-    cuadro("Hoy", metricasDtf(hoyIni), metricasDtf(ayerIni, hoyIni), "Ayer") +
-    cuadro("Esta semana", metricasDtf(semActualIni), metricasDtf(semAntIni, semActualIni), "Semana pasada") +
-    cuadro(`Este mes · ${mes(mesActualIni)}`, metricasDtf(mesActualIni), metricasDtf(mesAntIni, mesActualIni), mes(mesAntIni)) +
-    `<div class="dtf-metrica dtf-metrica-rollo">
-      <div class="dtf-metrica-titulo">🧻 Rollo puesto${puesto ? ` · ${escHtml(puesto.id_rollo_dtf)}` : ""}</div>
-      ${puesto
-        ? `<div class="dtf-metrica-valor">${fmtNum(puesto.metros_restantes_reales)}<small> m</small></div>
-           <div class="dtf-metrica-sub">quedan de ${fmtNum(puesto.metros_iniciales)} m · ${escHtml(puesto.marca_fabricante)}</div>
-           <div class="dtf-progreso${pct < 15 ? " poco" : ""}"><span style="width:${pct}%"></span></div>`
-        : `<div class="dtf-metrica-sub" style="margin-top:8px;">No hay rollo puesto.</div>`}
-      ${otros.length ? `<div class="dtf-metrica-antes"><span>En stock: ${otros.map(r => `${escHtml(r.id_rollo_dtf)} (${fmtNum(r.metros_restantes_reales)} m)`).join(", ")}</span></div>` : ""}
-      <button type="button" class="btn-secondary btn-dtf-rollo-nuevo" style="margin:10px 0 0;">🧻 Montar rollo nuevo</button>
+  const quedan = puesto ? Number(puesto.metros_restantes_reales) || 0 : 0;
+  const poco = puesto && quedan < (Number(puesto.metros_iniciales) || 100) * 0.15;
+  cont.innerHTML = `
+    <div class="barra-rollo">
+      <div>
+        <strong>Rollo Activo:</strong> <span class="br-valor">${puesto ? escHtml(puesto.id_rollo_dtf) : "ninguno"}</span>${puesto ? ` · ${escHtml(puesto.marca_fabricante)}` : ""}
+        | <strong>Restante:</strong> <span class="br-valor${poco ? " br-poco" : ""}">${fmtNum(quedan)}m</span>${puesto ? ` de ${fmtNum(puesto.metros_iniciales)}m` : ""}
+        ${otros.length ? `| <strong>En stock:</strong> ${otros.map(r => `${escHtml(r.id_rollo_dtf)} (${fmtNum(r.metros_restantes_reales)}m)`).join(", ")}` : ""}
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button type="button" class="btn-secondary btn-dtf-a-mano">+ Archivo Manual</button>
+        <button type="button" class="btn-secondary btn-dtf-rollo-nuevo">+ Rollo Nuevo</button>
+        <button type="button" class="btn-dtf-sync" style="background:var(--accent-blue); color:var(--vg-text-primary); border:none; border-radius:4px; font-weight:bold; cursor:pointer;">Sincronizar</button>
+      </div>
     </div>`;
 }
 
@@ -4950,7 +4920,15 @@ export function inicializarEventosUI() {
   omniClear?.addEventListener("click", () => {
     STATE.busquedaGlobal = "";
     if (omniInput) omniInput.value = "";
+    const barraBusqueda = document.getElementById("vgBarraBusqueda");
+    if (barraBusqueda) barraBusqueda.hidden = true;
     renderTodoRespetandoFormulario();
+  });
+  document.getElementById("btnVgBuscar")?.addEventListener("click", () => {
+    const barraBusqueda = document.getElementById("vgBarraBusqueda");
+    if (!barraBusqueda) return;
+    if (barraBusqueda.hidden) { barraBusqueda.hidden = false; omniInput?.focus(); }
+    else omniClear?.click();
   });
 
   document.getElementById("searchPendientesLocal")?.addEventListener("input", (e) => {
@@ -5459,6 +5437,13 @@ export function inicializarEventosUI() {
     const btnDtfVender = e.target.closest(".btn-dtf-vender");
     if (btnDtfVender) { venderDtf(btnDtfVender.getAttribute("data-clave")); return; }
     if (e.target.closest(".btn-dtf-rollo-nuevo")) { abrirRolloNuevoDtf(); return; }
+    if (e.target.closest(".btn-dtf-sync")) { document.getElementById("btnSyncDriveSandbox")?.click(); return; }
+    if (e.target.closest(".btn-dtf-a-mano")) {
+      mostrarPasoDtf("imprimir");
+      const det = document.querySelector("details.dtf-a-mano");
+      if (det) { det.open = true; det.scrollIntoView({ behavior: "smooth", block: "start" }); }
+      return;
+    }
     const btnMesaQuitar = e.target.closest(".btn-dtf-mesa-quitar");
     if (btnMesaQuitar) { STATE.dtfSeleccion.delete(btnMesaQuitar.getAttribute("data-id")); renderColaDtf(); return; }
     const btnMesaVer = e.target.closest(".btn-dtf-mesa-ver");
