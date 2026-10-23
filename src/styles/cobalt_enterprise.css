@@ -443,14 +443,31 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
 
 /* DTF: pasos Imprimir / Vender, cola con casillas y barra para imprimir */
 .dtf-pasos { display: flex; gap: 8px; margin: 4px 0 14px; flex-wrap: wrap; }
-.dtf-paso { flex: 1; min-width: 150px; padding: 14px; border-radius: 10px; border: 2px solid #333; background: #141414; color: #ccc; font-size: 16px; font-weight: 800; cursor: pointer; }
-.dtf-paso.activo { border-color: var(--accent-blue); color: #fff; background: rgba(59,130,246,0.12); }
-.dtf-paso-contador { display: inline-block; min-width: 22px; padding: 1px 7px; margin-left: 6px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 13px; }
-.dtf-ayuda { font-size: 12px; color: #888; margin: 6px 0 10px; }
+.dtf-paso { flex: 1; min-width: 150px; padding: 14px; border-radius: 10px; border: 2px solid var(--vg-surface-border); background: var(--vg-surface-base); color: var(--vg-text-secondary); font-size: 16px; font-weight: 800; cursor: pointer; }
+.dtf-paso.activo { border-color: var(--accent-blue); color: var(--vg-text-primary); background: var(--vg-brand-glow); }
+.dtf-paso-contador { display: inline-block; min-width: 22px; padding: 1px 7px; margin-left: 6px; border-radius: 999px; background: var(--danger); color: var(--vg-text-primary); font-size: 13px; }
+.dtf-ayuda { font-size: 12px; color: var(--vg-text-secondary); margin: 6px 0 10px; }
 .dtf-archivo { gap: 10px; }
-.dtf-archivo .fname { font-size: 13px; color: #ddd; word-break: break-word; }
+.dtf-archivo .fname { font-size: 13px; color: var(--vg-text-primary); word-break: break-word; }
 .dtf-archivo .fmeters { margin-left: auto; font-weight: 800; color: var(--accent); white-space: nowrap; }
-.dtf-barra-imprimir { position: sticky; bottom: 0; z-index: 5; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; padding: 12px; border-radius: 10px; background: #0b1220; border: 2px solid var(--accent-blue); font-weight: 700; }
+.dtf-barra-imprimir { position: sticky; bottom: 42px; /* arriba del cartel de equipo (vg-equipo) */ z-index: 5; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; padding: 12px; border-radius: 10px; background: var(--vg-bg-app); border: 2px solid var(--accent-blue); font-weight: 700; }
 .dtf-a-mano summary { cursor: pointer; font-weight: 800; padding: 4px 0; }
 .dtf-a-mano[open] summary { margin-bottom: 8px; }
 .dtf-barra-imprimir[hidden], .dtf-paso-contador[hidden], [data-dtf-panel][hidden] { display: none !important; }
+/* DTF paso 2: tarjetas para vender */
+.dtf-una-columna { grid-template-columns: 1fr !important; }
+.dtf-tarjetas { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.dtf-venta { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; border: 1px solid var(--vg-surface-border); background: var(--vg-surface-base); }
+.dtf-venta.a-mano { border-color: var(--accent-orange); }
+.dtf-venta-cab { display: flex; justify-content: space-between; gap: 10px; }
+.dtf-venta-nombre { font-size: 20px; font-weight: 900; color: var(--vg-text-primary); word-break: break-word; }
+.dtf-venta-cliente { font-size: 13px; color: var(--vg-text-secondary); margin-top: 4px; }
+.dtf-venta-totales { text-align: right; white-space: nowrap; }
+.dtf-venta-metros { font-size: 20px; font-weight: 900; color: var(--accent); }
+.dtf-venta-precio { font-size: 16px; font-weight: 800; color: var(--vg-text-primary); margin-top: 4px; }
+.dtf-venta-sub { font-size: 11px; color: var(--vg-text-secondary); }
+.dtf-venta-archivos summary { cursor: pointer; font-size: 12px; color: var(--vg-text-secondary); padding: 4px 0; }
+.dtf-venta-pie { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.dtf-venta-pie button { width: auto; margin: 0; }
+.dtf-link { width: auto; margin: 0 0 0 4px; padding: 0 2px; border: none; background: none; color: var(--accent-blue); font-size: 12px; text-decoration: underline; cursor: pointer; }
+.dtf-quitar { width: auto; margin: 0 0 0 6px; padding: 2px 8px; border: 1px solid var(--vg-surface-border); border-radius: 6px; background: none; color: var(--vg-text-secondary); cursor: pointer; }

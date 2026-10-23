@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261022_01" />
+  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261023_01" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./src/config/conexion.js?v=20261022_04"></script>
   <script src="./src/ver_clave.js?v=20261022_02"></script>
@@ -431,10 +431,18 @@
       </div>
     </div>
 
-    <div class="grid-panel" data-dtf-panel="vender" hidden>
+    <div class="grid-panel dtf-una-columna" data-dtf-panel="vender" hidden>
       <div class="card" style="border-top: 3px solid var(--accent);">
-        <h2>DTF para vender (por cliente)</h2>
-        <div style="overflow-x:auto;"><table><thead><tr><th>Cliente</th><th>Archivos</th><th>Metros</th><th>Venta</th></tr></thead><tbody id="tbodyCuentasClientesDTF"></tbody></table></div>
+        <h2 style="margin-top:0;">Para vender</h2>
+        <p class="dtf-ayuda">Una tarjeta por cliente: lo de la misma carpeta o cliente cae junto aunque sea de días distintos. Para hacer una sola venta con archivos de varias tarjetas, marcalos y tocá <b>Juntar</b>.</p>
+        <div id="dtfTarjetasVender" class="dtf-tarjetas"></div>
+        <div id="dtfBarraJuntar" class="dtf-barra-imprimir" hidden>
+          <span id="dtfResumenJuntar"></span>
+          <span style="display:flex; gap:8px;">
+            <button type="button" id="btnDtfVentaDesmarcar" class="btn-secondary" style="width:auto; margin:0;">Desmarcar</button>
+            <button type="button" id="btnDtfJuntar" class="btn-main" style="width:auto; margin:0;">🔗 Juntar en una venta</button>
+          </span>
+        </div>
       </div>
       <div class="card">
         <h2>Historial de Pedidos DTF</h2>
@@ -958,7 +966,7 @@
   <datalist id="listColores"></datalist>
   <div id="vgToastContainer" style="position:fixed; top:16px; right:16px; z-index:3000; max-width:360px;"></div>
 
-  <script type="module" src="./src/app.js?v=20261022_10"></script>
+  <script type="module" src="./src/app.js?v=20261023_01"></script>
   <script>
     // Registro del Service Worker PWA
     if ('serviceWorker' in navigator) {

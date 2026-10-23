@@ -48,6 +48,9 @@ const STATE = {
   dtfCarpetasCerradas: new Set(),
   dtfPaso: "imprimir",
   dtfFiltroCola: "",
+  dtfPorVender: [], // tarjetas para vender (las arma la base: taller_dtf_por_vender)
+  dtfSelVenta: new Set(),
+  dtfVentasAbiertas: new Set(),
   dtfPedidos: [],
   dtfCuentasClientes: [],
   chatMensajes: [],
@@ -349,6 +352,7 @@ export async function cargarDatosTodo() {
     resDtfRollos,
     resDtfTiradas,
     resDtfPedidos,
+    resDtfPorVender,
     resChat,
     resTelasFicha,
     resTelasVariantes,
@@ -367,6 +371,7 @@ export async function cargarDatosTodo() {
     client.from("v_prod_dtf_rollos_saldos").select("*").order("fecha_montaje", { ascending: false }),
     client.from("prod_dtf_tiradas").select("*").eq("anulado", false).order("fecha_hora", { ascending: false }),
     client.rpc("taller_dtf_pedidos"),
+    client.rpc("taller_dtf_por_vender"),
     client.from("prod_chat_mensajes").select("*").eq("anulado", false).order("created_at", { ascending: false }).limit(150),
     client.from("prod_telas_ficha").select("*").eq("activo", true).eq("anulado", false).order("nombre_comercial", { ascending: true }),
     client.from("prod_telas_variantes").select("*").eq("anulado", false).order("es_predeterminada", { ascending: false }),
@@ -386,6 +391,7 @@ export async function cargarDatosTodo() {
   STATE.dtfRollosSaldos = resDtfRollos.data || [];
   STATE.dtfTiradas = resDtfTiradas.data || [];
   STATE.dtfPedidos = resDtfPedidos.data || [];
+  STATE.dtfPorVender = resDtfPorVender.data || [];
   STATE.chatMensajes = resChat.data || [];
   STATE.telasFicha = resTelasFicha.data || [];
   STATE.telasVariantes = resTelasVariantes.data || [];
@@ -1477,7 +1483,6 @@ function renderModuloLaser() {
 function renderModuloDTF() {
   const kpiWrap = document.getElementById("dtfRollosKpiContainer");
   const tbodyPedidos = document.getElementById("tbodyPedidosDTF");
-  const tbodyCuentas = document.getElementById("tbodyCuentasClientesDTF");
   if (!kpiWrap) return;
 
   const selRollo = document.getElementById("dtfInputRollo");
@@ -1517,19 +1522,7 @@ function renderModuloDTF() {
       `).join("");
   }
 
-  if (tbodyCuentas) {
-    const grupos = gruposDtfPorVender();
-    tbodyCuentas.innerHTML = grupos.length === 0
-      ? `<tr><td colspan="4" style="text-align:center;color:#888;">Todo el DTF de venta ya está vendido.</td></tr>`
-      : grupos.map(g => `
-        <tr>
-          <td><strong>${escHtml(g.nombre)}</strong>${g.cliente_id ? "" : ` <span class="badge danger" title="Al hacer la venta se elige el cliente del sistema">sin cliente</span>`}</td>
-          <td>${g.pedidos.length}</td>
-          <td style="color:var(--accent);font-weight:bold;">${fmtNum(g.metros)}m</td>
-          <td>${puedeVender() ? `<button type="button" class="btn-secondary btn-dtf-vender" data-clave="${escHtml(g.clave)}" style="width:auto;padding:4px 8px;">🧾 Hacer venta</button>` : `<span style="color:#888;font-size:11px;">La hace el mostrador</span>`}</td>
-        </tr>
-      `).join("");
-  }
+  renderVentasDtf();
 }
 
 // ===== DTF paso 1: imprimir en lote =====
@@ -1549,7 +1542,7 @@ function renderColaDtf() {
   [...STATE.dtfSeleccion].forEach(id => { if (!enCola.has(id)) STATE.dtfSeleccion.delete(id); }); // ya impresos o fuera de la fila
   const lista = colaDtf();
   if (!lista.length) {
-    cont.innerHTML = `<div style="padding:15px; text-align:center; color:#888;">${enCola.size ? "No hay archivos con esa búsqueda." : "No hay archivos DTF en la fila. Se revisa sola cada 2 minutos (o tocá Sincronizar)."}</div>`;
+    cont.innerHTML = `<div style="padding:15px; text-align:center; color:var(--vg-text-secondary);">${enCola.size ? "No hay archivos con esa búsqueda." : "No hay archivos DTF en la fila. Se revisa sola cada 2 minutos (o tocá Sincronizar)."}</div>`;
   } else {
     const carpetas = new Map();
     lista.forEach(p => {
@@ -1598,7 +1591,7 @@ function renderTiradasDtf() {
   STATE.dtfPedidos.forEach(d => { if (d.tirada_id) porTirada.set(d.tirada_id, (porTirada.get(d.tirada_id) || 0) + 1); });
   const ultimas = STATE.dtfTiradas.slice(0, 15);
   tbody.innerHTML = ultimas.length === 0
-    ? `<tr><td colspan="5" style="text-align:center;color:#888;">Todavía no hay tiradas.</td></tr>`
+    ? `<tr><td colspan="5" style="text-align:center;color:var(--vg-text-secondary);">Todavía no hay tiradas.</td></tr>`
     : ultimas.map(t => `
       <tr>
         <td><strong>${escHtml(t.codigo_tirada)}</strong>${t.es_anidado ? ` <span class="badge activo">anidado</span>` : ""}</td>
@@ -1615,7 +1608,7 @@ function mostrarPasoDtf(paso) {
   document.querySelectorAll("[data-dtf-panel]").forEach(p => { p.hidden = p.getAttribute("data-dtf-panel") !== paso; });
   const badge = document.getElementById("dtfBadgeVender");
   if (badge) {
-    const n = gruposDtfPorVender().length;
+    const n = STATE.dtfPorVender.length;
     badge.hidden = n === 0;
     badge.textContent = String(n);
   }
@@ -1633,7 +1626,7 @@ function abrirImprimirDtf() {
   capa.innerHTML = `
     <div class="modal-content" style="border-color:var(--accent-blue); max-width:480px; width:100%;">
       <h2 style="margin-top:0;">🖨️ Imprimir ${marcados.length} archivo${marcados.length === 1 ? "" : "s"}</h2>
-      <p style="font-size:13px; color:#aaa; margin:0 0 6px;">${fmtNum(metros)} m de archivos · ${clientes.map(escHtml).join(", ")}</p>
+      <p style="font-size:13px; color:var(--vg-text-secondary); margin:0 0 6px;">${fmtNum(metros)} m de archivos · ${clientes.map(escHtml).join(", ")}</p>
       <label>Rollo de film</label>
       <select data-x="rollo">${STATE.dtfRollosSaldos.map(r => `<option value="${escHtml(r.id_rollo_dtf)}" ${r.id_rollo_dtf === rolloElegido ? "selected" : ""}>${escHtml(r.id_rollo_dtf)} — ${escHtml(r.marca_fabricante)} (${fmtNum(r.metros_restantes_reales)}m disp.)</option>`).join("")}</select>
       <label>Metros que usó del rollo (los del RIP)</label>
@@ -1674,19 +1667,99 @@ function puedeVender() {
   return !!(p && (p.total || (p.permisos || []).includes("ventas")));
 }
 
-// Lo de VENTA que todavía no tiene venta en el sistema, agrupado por cliente
-function gruposDtfPorVender() {
-  const grupos = new Map();
-  STATE.dtfPedidos.filter(d => d.tipo_cargo === "VENTA" && !d.vendido).forEach(d => {
-    const clave = d.cliente_id ? `ID:${d.cliente_id}` : `TXT:${String(d.cliente || "").trim().toUpperCase()}`;
-    if (!grupos.has(clave)) {
-      grupos.set(clave, { clave, cliente_id: d.cliente_id, nombre: d.cliente_sistema || d.cliente || "Sin nombre", texto: d.cliente || "", pedidos: [], metros: 0 });
-    }
-    const g = grupos.get(clave);
-    g.pedidos.push(d.id);
-    g.metros += Number(d.metros_a_vender) || 0;
-  });
-  return [...grupos.values()].sort((a, b) => b.metros - a.metros);
+// ===== DTF paso 2: vender =====
+// Lo impreso para vender llega armado por la base en tarjetas (taller_dtf_por_vender): el nombre limpio de la carpeta
+// ("VMG 22-10-26 [13.2 MTS]" → "VMG"), el cliente elegido o recordado ("llega como") o uno propuesto, y el precio
+// estimado si el usuario puede vender. Se puede juntar archivos de varias tarjetas, sacar uno o volver a como estaba.
+function renderVentasDtf() {
+  const cont = document.getElementById("dtfTarjetasVender");
+  if (!cont) return;
+  const vender = puedeVender();
+  const tarjetas = STATE.dtfPorVender.filter(t => cumpleBusquedaUniversal(t));
+  const vivos = new Set(STATE.dtfPorVender.flatMap(t => t.pedidos.map(p => p.id)));
+  [...STATE.dtfSelVenta].forEach(id => { if (!vivos.has(id)) STATE.dtfSelVenta.delete(id); });
+
+  cont.innerHTML = tarjetas.length === 0
+    ? `<div style="padding:15px; text-align:center; color:var(--vg-text-secondary);">${STATE.dtfPorVender.length ? "No hay ventas con esa búsqueda." : "Todo el DTF de venta ya está vendido."}</div>`
+    : tarjetas.map(t => {
+      const unNombre = t.nombres.length === 1 && t.nombres[0] !== "SIN NOMBRE";
+      const clave = escHtml(t.clave);
+      let cliente;
+      if (t.cliente_id) {
+        cliente = `✓ <strong>${escHtml(t.cliente_nombre)}</strong> <span class="badge activo">${t.cliente_origen === "recordado" ? "recordado" : "elegido"}</span>`
+          + (vender && unNombre && t.cliente_origen === "recordado" ? `<button type="button" class="dtf-link btn-dtf-cliente" data-clave="${clave}">cambiar</button>` : "");
+      } else if (t.sugerido) {
+        cliente = `¿Es <strong>${escHtml(t.sugerido.nombre)}</strong>?`
+          + (vender && unNombre ? ` <button type="button" class="dtf-link btn-dtf-cliente-si" data-clave="${clave}">sí, es este</button> <button type="button" class="dtf-link btn-dtf-cliente" data-clave="${clave}">no, es otro</button>` : "");
+      } else {
+        cliente = `<span class="badge danger">sin cliente</span>`
+          + (vender && unNombre ? `<button type="button" class="dtf-link btn-dtf-cliente" data-clave="${clave}">elegir</button>` : " se elige al vender");
+      }
+      const archivos = t.pedidos.map(p => `
+          <div class="file-item dtf-archivo">
+            ${vender ? `<input type="checkbox" class="chk-dtf-venta" data-id="${p.id}" ${STATE.dtfSelVenta.has(p.id) ? "checked" : ""} />` : ""}
+            ${renderCajaMiniatura(p.file_id, p.nombre_archivo)}
+            <span class="fname">${escHtml(p.nombre_archivo)}${t.nombres.length > 1 ? ` <span class="badge">${escHtml(p.nombre)}</span>` : ""}<br><small style="color:var(--vg-text-secondary);">${fmtDateHora(p.fecha_hora)}</small></span>
+            <span class="fmeters">${fmtNum(p.metros)}m</span>
+            ${vender && t.pedidos.length > 1 ? `<button type="button" class="dtf-quitar btn-dtf-sacar" data-id="${p.id}" title="Sacar de esta venta (queda aparte)">✕</button>` : ""}
+          </div>`).join("");
+      const abierta = STATE.dtfVentasAbiertas.has(t.clave) || t.pedidos.some(p => STATE.dtfSelVenta.has(p.id));
+      return `
+        <div class="dtf-venta${t.a_mano ? " a-mano" : ""}">
+          <div class="dtf-venta-cab">
+            <div>
+              <div class="dtf-venta-nombre">${escHtml(t.nombres.join(" + "))}</div>
+              <div class="dtf-venta-cliente">${cliente}</div>
+            </div>
+            <div class="dtf-venta-totales">
+              <div class="dtf-venta-metros">${fmtNum(t.metros)} m</div>
+              <div class="dtf-venta-sub">${t.archivos} archivo${t.archivos === 1 ? "" : "s"}</div>
+              ${t.total != null ? `<div class="dtf-venta-precio">≈ ${fmtMoney(t.total)}</div><div class="dtf-venta-sub">${fmtMoney(t.precio_metro)} el metro</div>` : ""}
+            </div>
+          </div>
+          <details class="dtf-venta-archivos" data-clave="${clave}" ${abierta ? "open" : ""}><summary>Ver archivos</summary>${archivos}</details>
+          <div class="dtf-venta-pie">
+            ${vender && t.a_mano ? `<button type="button" class="btn-secondary btn-dtf-automatico" data-clave="${clave}">↩ Volver a como estaba</button>` : ""}
+            ${vender ? `<button type="button" class="btn-main btn-dtf-vender" data-clave="${clave}">🧾 Hacer venta</button>` : `<span style="color:var(--vg-text-secondary);font-size:11px;">La venta la hace el mostrador</span>`}
+          </div>
+        </div>`;
+    }).join("");
+
+  const marcados = STATE.dtfPorVender.flatMap(t => t.pedidos.filter(p => STATE.dtfSelVenta.has(p.id)).map(p => ({ p, t })));
+  const barra = document.getElementById("dtfBarraJuntar");
+  if (barra) barra.hidden = marcados.length === 0;
+  const resumen = document.getElementById("dtfResumenJuntar");
+  if (resumen) {
+    const deTarjetas = new Set(marcados.map(x => x.t.clave)).size;
+    resumen.textContent = `${marcados.length} archivo${marcados.length === 1 ? "" : "s"} · ${fmtNum(marcados.reduce((a, x) => a + (Number(x.p.metros) || 0), 0))} m · de ${deTarjetas} tarjeta${deTarjetas === 1 ? "" : "s"}`;
+  }
+}
+
+async function agruparDtf(accion, pedidos) {
+  const { error } = await sb().rpc("taller_dtf_agrupar", { p: { pedidos, accion } });
+  if (error) { toast("Error: " + error.message, "error"); return; }
+  STATE.dtfSelVenta.clear();
+  toast(accion === "juntar" ? "🔗 Listo: quedaron juntos en una venta." : accion === "sacar" ? "Listo: ese archivo quedó en una venta aparte." : "Listo: volvió a como lo arma el sistema.");
+  await cargarDatosTodo();
+}
+
+// "Llega como": lo que llegue con ese nombre queda a nombre de ese cliente (se cambia también en Contactos del sistema)
+async function recordarClienteDtf(nombre, cli) {
+  const { error } = await sb().rpc("cliente_alias_guardar", { p_alias: nombre, p_cliente: cli.id, p_origen: "taller_dtf" });
+  if (error) { toast("No se pudo recordar el cliente: " + error.message, "warn"); return false; }
+  return true;
+}
+
+async function elegirClienteDtf(clave, directo = false) {
+  const t = STATE.dtfPorVender.find(x => x.clave === clave);
+  if (!t || t.nombres.length !== 1) return;
+  const nombre = t.nombres[0];
+  const cli = directo && t.sugerido ? t.sugerido : await elegirClienteSistema("", { soloRecordar: nombre });
+  if (!cli) return;
+  if (await recordarClienteDtf(nombre, cli)) {
+    toast(`✅ Lo que llegue como «${nombre}» es de ${cli.nombre}.`);
+    await cargarDatosTodo();
+  }
 }
 
 // Clientes del sistema (solo nombre y código)
@@ -1701,35 +1774,47 @@ function etiquetaCliente(c) {
   return `${c.nombre}${c.negocio ? ` (${c.negocio})` : ""} · ${c.id}`;
 }
 
-// Cuadro para elegir el cliente del sistema. Devuelve { id, nombre } o null.
-function elegirClienteSistema(textoInicial = "") {
+// Cuadro para elegir el cliente del sistema. Devuelve { id, nombre, recordar } o null.
+// op.sugerido: el que propone el sistema (va arriba). op.recordar: nombre con que llega, para ofrecer recordarlo.
+// op.soloRecordar: el cuadro es solo para decir de quién es lo que llega con ese nombre.
+function elegirClienteSistema(textoInicial = "", op = {}) {
   return new Promise((resolve) => {
     const capa = document.createElement("div");
     capa.className = "modal-overlay open";
+    const llega = op.soloRecordar || op.recordar;
     capa.innerHTML = `
       <div class="modal-content" style="border-color:var(--accent-blue); max-width:460px; width:100%;">
-        <h2 style="margin-top:0;">¿Qué cliente del sistema es?</h2>
-        <p style="font-size:12px;color:#888;margin:0 0 8px;">El pedido dice: <strong>${escHtml(textoInicial || "sin nombre")}</strong>. Buscalo por nombre o código.</p>
-        <input type="text" autocomplete="off" value="${escHtml(textoInicial)}" />
+        <h2 style="margin-top:0;">${op.soloRecordar ? `¿De quién es «${escHtml(op.soloRecordar)}»?` : "¿Qué cliente del sistema es?"}</h2>
+        ${op.soloRecordar
+          ? `<p style="font-size:12px;color:var(--vg-text-secondary);margin:0 0 8px;">Lo que llegue como <strong>${escHtml(op.soloRecordar)}</strong> va a quedar a nombre del cliente que elijas (también lo vas a ver en Contactos del sistema).</p>`
+          : `<p style="font-size:12px;color:var(--vg-text-secondary);margin:0 0 8px;">El pedido dice: <strong>${escHtml(llega || textoInicial || "sin nombre")}</strong>. Buscalo por nombre o código.</p>`}
+        ${op.sugerido ? `<button type="button" class="btn-main" data-sug="1" style="margin:0 0 10px;">✓ Es ${escHtml(op.sugerido.nombre)}</button>` : ""}
+        <input type="text" autocomplete="off" value="${escHtml(textoInicial)}" placeholder="Buscar otro cliente…" />
         <div data-x="resultados" style="max-height:260px;overflow-y:auto;margin-top:8px;"></div>
+        ${op.recordar && !op.soloRecordar ? `<label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:10px;"><input type="checkbox" data-x="recordar" checked style="width:18px;height:18px;margin:0;" /> Recordar: lo que llegue como «${escHtml(op.recordar)}» es de este cliente</label>` : ""}
         <button type="button" class="btn-secondary" data-x="cancelar" style="margin-top:10px;">Cancelar</button>
       </div>`;
     document.body.appendChild(capa);
-    const inp = capa.querySelector("input");
+    const inp = capa.querySelector("input[type='text']");
     const res = capa.querySelector("[data-x='resultados']");
     let lista = [];
     let espera = null;
-    const cerrar = (valor) => { capa.remove(); resolve(valor); };
+    const cerrar = (valor) => {
+      const rec = capa.querySelector("[data-x='recordar']");
+      capa.remove();
+      resolve(valor && Object.assign({}, valor, { recordar: !!(rec && rec.checked) }));
+    };
     const buscar = async () => {
       lista = await buscarClientesSistema(inp.value);
       res.innerHTML = lista.length === 0
-        ? `<div style="color:#888;font-size:12px;padding:6px;">${inp.value.trim().length < 2 ? "Escribí al menos 2 letras." : "No hay clientes con ese nombre. Si es nuevo, cargalo en Contactos del sistema."}</div>`
+        ? (inp.value.trim().length < 2 && op.sugerido ? "" : `<div style="color:var(--vg-text-secondary);font-size:12px;padding:6px;">${inp.value.trim().length < 2 ? "Escribí al menos 2 letras." : "No hay clientes con ese nombre. Si es nuevo, cargalo en Contactos del sistema."}</div>`)
         : lista.map((c, i) => `<button type="button" class="btn-secondary" data-i="${i}" style="display:block;width:100%;text-align:left;margin:4px 0;">${escHtml(etiquetaCliente(c))}</button>`).join("");
     };
     inp.addEventListener("input", () => { clearTimeout(espera); espera = setTimeout(buscar, 250); });
     capa.addEventListener("click", (e) => {
       const b = e.target.closest("[data-i]");
       if (b) { const c = lista[Number(b.dataset.i)]; cerrar({ id: c.id, nombre: c.nombre }); return; }
+      if (e.target.closest("[data-sug]")) { cerrar({ id: op.sugerido.id, nombre: op.sugerido.nombre }); return; }
       if (e.target.closest("[data-x='cancelar']") || e.target === capa) cerrar(null);
     });
     inp.focus();
@@ -1738,13 +1823,17 @@ function elegirClienteSistema(textoInicial = "") {
 }
 
 async function venderDtf(clave) {
-  const g = gruposDtfPorVender().find(x => x.clave === clave);
-  if (!g) return;
-  const cli = g.cliente_id ? { id: g.cliente_id, nombre: g.nombre } : await elegirClienteSistema(g.texto);
+  const t = STATE.dtfPorVender.find(x => x.clave === clave);
+  if (!t) return;
+  const nombre = t.nombres.length === 1 && t.nombres[0] !== "SIN NOMBRE" ? t.nombres[0] : null;
+  const cli = t.cliente_id ? { id: t.cliente_id, nombre: t.cliente_nombre }
+    : await elegirClienteSistema("", { sugerido: t.sugerido, recordar: nombre });
   if (!cli) return;
-  if (!confirm(`¿Hacer la venta de ${fmtNum(g.metros)} m de DTF (${g.pedidos.length} archivo/s) a ${cli.nombre}?\nEl precio sale de la lista de precios: escala por metros y lo que viene pagando ese cliente.`)) return;
-  const { data, error } = await sb().rpc("taller_dtf_vender", { p: { cliente_id: cli.id, pedidos: g.pedidos } });
+  const estimado = t.total != null ? `\nPrecio estimado: ${fmtMoney(t.total)} (${fmtMoney(t.precio_metro)} el metro).` : "";
+  if (!confirm(`¿Hacer la venta de ${fmtNum(t.metros)} m de DTF (${t.archivos} archivo/s) a ${cli.nombre}?${estimado}\nEl precio sale de la lista de precios: escala por metros y lo que viene pagando ese cliente.`)) return;
+  const { data, error } = await sb().rpc("taller_dtf_vender", { p: { cliente_id: cli.id, pedidos: t.pedidos.map(p => p.id) } });
   if (error) { toast("Error: " + error.message, "error"); return; }
+  if (cli.recordar && nombre) await recordarClienteDtf(nombre, cli);
   toast(`🧾 Venta ${data.numero_comprobante}: ${fmtNum(data.metros)} m a ${fmtMoney(data.precio_metro)} = ${fmtMoney(data.total)}.`);
   await cargarDatosTodo();
   const erp = window.VG_CONEXION?.erpUrl;
@@ -2411,7 +2500,7 @@ function renderModuloFinanzasYMantenimiento() {
   const totalImp = STATE.impresiones
     .filter(i => i.accion === "Impresion Normal")
     .reduce((a, b) => a + (Number(b.metros_impresos) || 0), 0);
-  const dtfSinVender = gruposDtfPorVender().reduce((a, g) => a + g.metros, 0);
+  const dtfSinVender = STATE.dtfPorVender.reduce((a, g) => a + (Number(g.metros) || 0), 0);
 
   setTxt("finTotalImpMts", `${fmtNum(totalImp)}m`);
   setTxt("finTotalDtfFacturado", `${fmtNum(dtfSinVender)}m`);
@@ -4378,6 +4467,26 @@ export function inicializarEventosUI() {
   document.getElementById("btnDtfLimpiarSeleccion")?.addEventListener("click", () => { STATE.dtfSeleccion.clear(); renderColaDtf(); });
   document.querySelectorAll("[data-dtf-paso]").forEach(b => b.addEventListener("click", () => mostrarPasoDtf(b.getAttribute("data-dtf-paso"))));
 
+  // DTF paso 2: marcar archivos para juntarlos en una venta
+  const tarjetasDtf = document.getElementById("dtfTarjetasVender");
+  tarjetasDtf?.addEventListener("change", (e) => {
+    const chk = e.target.closest(".chk-dtf-venta");
+    if (!chk) return;
+    if (chk.checked) STATE.dtfSelVenta.add(chk.getAttribute("data-id")); else STATE.dtfSelVenta.delete(chk.getAttribute("data-id"));
+    renderVentasDtf();
+  });
+  tarjetasDtf?.addEventListener("toggle", (e) => {
+    const d = e.target.closest && e.target.closest("details[data-clave]");
+    if (!d) return;
+    if (d.open) STATE.dtfVentasAbiertas.add(d.getAttribute("data-clave")); else STATE.dtfVentasAbiertas.delete(d.getAttribute("data-clave"));
+  }, true);
+  document.getElementById("btnDtfVentaDesmarcar")?.addEventListener("click", () => { STATE.dtfSelVenta.clear(); renderVentasDtf(); });
+  document.getElementById("btnDtfJuntar")?.addEventListener("click", () => {
+    const ids = [...STATE.dtfSelVenta];
+    if (ids.length < 2) { toast("Para juntar marcá al menos dos archivos.", "warn"); return; }
+    agruparDtf("juntar", ids);
+  });
+
   document.getElementById("btnRegistrarPedidoDTF")?.addEventListener("click", async () => {
     const cliente = document.getElementById("dtfInputCliente")?.value.trim() || "CLIENTE DTF";
     const archivo = document.getElementById("dtfInputArchivo")?.value.trim() || "Archivo DTF.png";
@@ -4675,6 +4784,16 @@ export function inicializarEventosUI() {
 
     const btnDtfVender = e.target.closest(".btn-dtf-vender");
     if (btnDtfVender) { venderDtf(btnDtfVender.getAttribute("data-clave")); return; }
+    const btnDtfCli = e.target.closest(".btn-dtf-cliente, .btn-dtf-cliente-si");
+    if (btnDtfCli) { elegirClienteDtf(btnDtfCli.getAttribute("data-clave"), btnDtfCli.classList.contains("btn-dtf-cliente-si")); return; }
+    const btnDtfSacar = e.target.closest(".btn-dtf-sacar");
+    if (btnDtfSacar) { agruparDtf("sacar", [btnDtfSacar.getAttribute("data-id")]); return; }
+    const btnDtfAuto = e.target.closest(".btn-dtf-automatico");
+    if (btnDtfAuto) {
+      const t = STATE.dtfPorVender.find(x => x.clave === btnDtfAuto.getAttribute("data-clave"));
+      if (t) agruparDtf("automatico", t.pedidos.map(p => p.id));
+      return;
+    }
 
     const btnTelaFicha = e.target.closest(".btn-tela-ficha") || e.target.closest(".btn-ver-ficha-tela");
     if (btnTelaFicha) {
