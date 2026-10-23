@@ -619,3 +619,35 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
 #vgBarraBusqueda[hidden] { display: none; }
 /* En el celular los botones de arriba van abajo del logo (no lo tapan) */
 @media (max-width: 700px) { .vg-cabecera-acciones { position: static !important; justify-content: center; flex-wrap: wrap; margin-top: 8px; } }
+/* Alertas y recordatorios del taller */
+.alertas-lista { display: flex; flex-direction: column; gap: 10px; }
+.alerta-fila { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px; border-radius: 10px; border: 1px solid var(--vg-surface-border); background: var(--vg-surface-base); }
+.alerta-fila.pausada { opacity: .55; }
+.alerta-fila.pendiente { border-color: var(--accent-orange); }
+.alerta-fila-titulo { font-size: 16px; font-weight: 800; color: var(--vg-text-primary); }
+.alerta-fila-sub { margin-top: 2px; font-size: 12px; color: var(--vg-text-secondary); }
+.alerta-hoy { margin-top: 4px; font-size: 13px; font-weight: 700; }
+.alerta-hoy.ok { color: var(--vg-status-ready); }
+.alerta-hoy.pend { color: var(--accent-orange); }
+.alerta-historial { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+.alerta-dia { min-width: 34px; padding: 2px 4px; border-radius: 6px; text-align: center; font-size: 10px; line-height: 1.25; border: 1px solid var(--vg-surface-border); color: var(--vg-text-secondary); }
+.alerta-dia b { display: block; font-size: 13px; }
+.alerta-dia.ok { border-color: var(--vg-status-ready); color: var(--vg-status-ready); }
+.alerta-dia.falta { border-color: var(--danger); color: var(--danger); }
+.alerta-acciones { display: flex; gap: 8px; }
+.alerta-acciones button { width: auto; margin: 0; padding: 6px 12px; }
+.alerta-dias-elegir { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+.alerta-dias-elegir button { width: 46px; margin: 0; padding: 8px 0; border-radius: 8px; border: 2px solid var(--vg-surface-border); background: var(--vg-surface-base); color: var(--vg-text-secondary); font-weight: 800; cursor: pointer; }
+.alerta-dias-elegir button.si { border-color: var(--accent-blue); background: var(--vg-brand-glow); color: var(--vg-text-primary); }
+.alerta-atajos { display: flex; gap: 12px; flex-wrap: wrap; }
+.alerta-cartel { position: fixed; inset: 0; z-index: 2500; display: flex; align-items: center; justify-content: center; padding: 16px; background: color-mix(in srgb, var(--vg-bg-app) 85%, transparent); }
+.alerta-cartel-caja { width: 100%; max-width: 560px; max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 20px; border-radius: 16px; border: 3px solid var(--accent-orange); background: var(--vg-bg-app); animation: alerta-latido 1.6s ease-in-out infinite; }
+@keyframes alerta-latido { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-orange) 45%, transparent); } 50% { box-shadow: 0 0 0 14px transparent; } }
+@media (prefers-reduced-motion: reduce) { .alerta-cartel-caja { animation: none; } }
+.alerta-cartel-encabezado { font-size: 13px; font-weight: 900; letter-spacing: 1px; color: var(--accent-orange); text-transform: uppercase; }
+.alerta-cartel-item { padding: 12px; border-radius: 12px; border: 1px solid var(--vg-surface-border); background: var(--vg-surface-base); }
+.alerta-cartel-titulo { font-size: clamp(22px, 5vw, 32px); font-weight: 900; line-height: 1.15; color: var(--vg-text-primary); }
+.alerta-cartel-detalle { margin-top: 6px; font-size: 15px; color: var(--vg-text-secondary); }
+.alerta-cartel-botones { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.alerta-cartel-botones button { flex: 1; min-width: 140px; margin: 0; }
+.alerta-cartel-botones .alerta-ok { min-height: 54px; font-size: 18px; font-weight: 900; background: var(--vg-status-ready); border-color: var(--vg-status-ready); color: var(--vg-text-primary); }

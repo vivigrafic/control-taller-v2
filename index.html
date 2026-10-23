@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261023_06" />
+  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261023_07" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./src/config/conexion.js?v=20261022_04"></script>
   <script src="./src/ver_clave.js?v=20261022_02"></script>
@@ -78,7 +78,7 @@
     <button type="button" class="tab-btn" data-tab="dtf">4. MÓDULO DTF</button>
     <button type="button" class="tab-btn" data-tab="telas">5. 🧵 TELAS &amp; FICHAS</button>
     <button type="button" class="tab-btn" data-tab="finanzas">6. FINANZAS</button>
-    <button type="button" class="tab-btn" data-tab="cierre">7. MANT. / CIERRE</button>
+    <button type="button" class="tab-btn" data-tab="cierre">7. MANT. / CIERRE <span id="badgeTabAlertas" class="badge danger" hidden></span></button>
     <button type="button" class="tab-btn" data-tab="metricas">8. MÉTRICAS (BI)</button>
     <button type="button" class="tab-btn" data-tab="chat">9. 💬 CHAT (<span id="badgeTabChat">0</span>)</button>
   </div>
@@ -537,6 +537,15 @@
        TAB 6: MANTENIMIENTO Y CIERRE (Copia exacta de Index.html líneas 474-509)
        ======================================================================== -->
   <div id="sec-cierre" class="tab-content">
+    <div class="card" style="border-top: 4px solid var(--accent-orange);">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+        <h2 style="margin:0; border:none; padding:0;">⏰ Alertas y recordatorios</h2>
+        <button type="button" id="btnAlertaNueva" class="btn-main" style="width:auto; margin:0;">+ Nueva alerta</button>
+      </div>
+      <p class="dtf-ayuda">Aparecen en la pantalla del taller los días y desde la hora que elijas, con un sonido, hasta que alguien toque <b>✓ Hecho</b>. Queda anotado quién lo hizo, y abajo se ve si se hizo los últimos días.</p>
+      <div id="listaAlertas" class="alertas-lista"></div>
+    </div>
+
     <div class="card" style="border-top: 4px solid var(--danger);">
       <h2 style="color:var(--danger);">Bitácora de Fallas e Historial Técnico</h2>
       <div style="overflow-x: auto;">
@@ -990,7 +999,7 @@
   <datalist id="listColores"></datalist>
   <div id="vgToastContainer" style="position:fixed; top:16px; right:16px; z-index:3000; max-width:360px;"></div>
 
-  <script type="module" src="./src/app.js?v=20261023_07"></script>
+  <script type="module" src="./src/app.js?v=20261023_08"></script>
   <script>
     // Registro del Service Worker PWA
     if ('serviceWorker' in navigator) {

@@ -50,6 +50,8 @@ const STATE = {
   dtfMesaVistos: new Set(), // archivos que ya están en la mesa (los nuevos entran con animación)
   dtfPaso: "imprimir",
   dtfFiltroCola: "",
+  alertas: [], // alertas y recordatorios programados (prod_alertas)
+  alertasHechas: [], // quién las hizo y cuándo (últimos 40 días)
   dtfPorVender: [], // tarjetas para vender (las arma la base: taller_dtf_por_vender)
   dtfSelVenta: new Set(),
   dtfVentasAbiertas: new Set(),
@@ -360,7 +362,9 @@ export async function cargarDatosTodo() {
     resTelasVariantes,
     resTelasParametros,
     resHistorialAnchos,
-    resTelasSistema
+    resTelasSistema,
+    resAlertas,
+    resAlertasHechas
   ] = await Promise.all([
     client.from("v_prod_rollos_papel_saldos").select("*").order("fecha_montaje", { ascending: false }),
     client.from("v_prod_bloques_impresion").select("*"),
@@ -379,7 +383,9 @@ export async function cargarDatosTodo() {
     client.from("prod_telas_variantes").select("*").eq("anulado", false).order("es_predeterminada", { ascending: false }),
     client.from("prod_telas_parametros").select("*").eq("anulado", false),
     client.from("prod_historial_anchos_tela").select("*").eq("anulado", false).order("fecha", { ascending: false }).limit(200),
-    client.rpc("taller_telas_sistema")
+    client.rpc("taller_telas_sistema"),
+    client.from("prod_alertas").select("*").order("created_at", { ascending: true }),
+    client.from("prod_alertas_hechas").select("*").gte("fecha", new Date(Date.now() - 40 * 864e5).toLocaleDateString("sv-SE"))
   ]);
 
   STATE.rollosPapelSaldos = resRollosSaldos.data || [];
@@ -400,6 +406,8 @@ export async function cargarDatosTodo() {
   STATE.telasParametros = resTelasParametros.data || [];
   STATE.historialAnchosTelas = resHistorialAnchos.data || [];
   STATE.telasSistema = resTelasSistema.data || [];
+  STATE.alertas = resAlertas.data || [];
+  STATE.alertasHechas = resAlertasHechas.data || [];
 
   renderTodoRespetandoFormulario();
   avisarErroresVigia();
@@ -431,7 +439,7 @@ function suscribirRealtime() {
       recarga = setTimeout(cargarDatosTodo, 400); // varios cambios juntos → una sola recarga
   };
   ["prod_rollos_papel", "prod_impresiones", "prod_cola_calandrado", "prod_cola_laser", "prod_pendientes_drive", "prod_fallas_reposiciones",
-   "prod_dtf_rollos", "prod_dtf_tiradas", "prod_dtf_pedidos", "prod_chat_mensajes"].forEach(t => {
+   "prod_dtf_rollos", "prod_dtf_tiradas", "prod_dtf_pedidos", "prod_chat_mensajes", "prod_alertas", "prod_alertas_hechas"].forEach(t => {
     canal.on("postgres_changes", { event: "*", schema: "public", table: t }, (payload) => alCambiar({ ...payload, table: t }));
   });
   canal.subscribe();
@@ -512,6 +520,7 @@ function renderTodoRespetandoFormulario() {
   renderModuloFinanzasYMantenimiento();
   renderModuloMetricasBI();
   renderModuloChat();
+  renderAlertas();
 
   if (STATE.busquedaGlobal.trim().length > 0) {
     renderResultadosOmnisearch();
@@ -3250,6 +3259,220 @@ function renderModuloMetricasBI() {
 }
 
 // ============================================================================
+// ALERTAS Y RECORDATORIOS (ej.: miércoles y sábados, cabezal de blanco de la DTF en remojo)
+// Aparecen en la pantalla el día y desde la hora programados hasta que alguien toca "✓ Hecho" (se va de todas las
+// pantallas). "Recordame en 15 min" la esconde solo en este equipo. Se crean y pausan en Mant./Cierre.
+// ============================================================================
+const DIAS_ALERTA = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+const hoyAlerta = () => new Date().toLocaleDateString("sv-SE"); // AAAA-MM-DD en la hora de esta compu
+const horaAlerta = (a) => (a.hora ? String(a.hora).slice(0, 5) : "");
+const alertasMostradas = new Set();
+
+function textoDiasAlerta(dias) {
+  const d = [...(dias || [])].map(Number).sort();
+  if (d.length === 7) return "Todos los días";
+  if (d.join() === "1,2,3,4,5,6") return "Lunes a sábado";
+  if (d.join() === "1,2,3,4,5") return "Lunes a viernes";
+  return d.map(x => DIAS_ALERTA[x]).join(", ");
+}
+
+function alertaHechaHoy(a) {
+  return STATE.alertasHechas.find(h => h.alerta_id === a.id && h.fecha === hoyAlerta());
+}
+
+// Las que tocan ahora: activas, hoy es uno de sus días, ya pasó la hora, nadie las hizo y no se pospusieron en este equipo
+function alertasPendientes() {
+  const ahora = new Date();
+  const hhmm = ahora.toTimeString().slice(0, 5);
+  return STATE.alertas.filter(a => {
+    if (!a.activo || !(a.dias || []).map(Number).includes(ahora.getDay())) return false;
+    if (horaAlerta(a) && hhmm < horaAlerta(a)) return false;
+    if (alertaHechaHoy(a)) return false;
+    let hasta = 0;
+    try { hasta = Number(localStorage.getItem(`vg_alerta_posponer_${a.id}_${hoyAlerta()}`)) || 0; } catch (e) {}
+    return Date.now() >= hasta;
+  });
+}
+
+function sonarAlerta() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.35, 0.7].forEach(t => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.frequency.value = 880;
+      o.connect(g); g.connect(ctx.destination);
+      g.gain.setValueAtTime(0.0001, ctx.currentTime + t);
+      g.gain.exponentialRampToValueAtTime(0.35, ctx.currentTime + t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t + 0.25);
+      o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.3);
+    });
+    setTimeout(() => ctx.close(), 1500);
+  } catch (e) { /* sin sonido */ }
+}
+
+// El cartel en el centro de la pantalla (se revisa cada 30 segundos y cuando cambian los datos)
+function revisarAlertas() {
+  const pend = alertasPendientes();
+  let capa = document.getElementById("vgAlertaCartel");
+  if (!pend.length) { if (capa) capa.remove(); return; }
+  const nuevas = pend.filter(a => !alertasMostradas.has(a.id));
+  if (!capa) {
+    capa = document.createElement("div");
+    capa.id = "vgAlertaCartel";
+    capa.className = "alerta-cartel";
+    document.body.appendChild(capa);
+    capa.addEventListener("click", async (e) => {
+      const ok = e.target.closest("[data-alerta-ok]");
+      const despues = e.target.closest("[data-alerta-despues]");
+      if (despues) {
+        try { localStorage.setItem(`vg_alerta_posponer_${despues.getAttribute("data-alerta-despues")}_${hoyAlerta()}`, String(Date.now() + 15 * 60e3)); } catch (err) {}
+        revisarAlertas();
+        return;
+      }
+      if (!ok) return;
+      ok.disabled = true;
+      ok.textContent = "⏳ Guardando…";
+      const { data, error } = await sb().rpc("taller_alerta_hecha", { p: { alerta: ok.getAttribute("data-alerta-ok"), quien: STATE.usuarioActual } });
+      if (error) { ok.disabled = false; ok.textContent = "✓ Hecho"; toast("Error: " + error.message, "error"); return; }
+      toast(data.ya_estaba ? `Ya lo había marcado ${data.hecha_por}.` : "✓ Anotado. ¡Gracias!");
+      await cargarDatosTodo();
+    });
+  }
+  capa.innerHTML = `
+    <div class="alerta-cartel-caja" role="alertdialog" aria-live="assertive">
+      <div class="alerta-cartel-encabezado">⏰ Recordatorio${pend.length > 1 ? `s (${pend.length})` : ""}</div>
+      ${pend.map(a => `
+        <div class="alerta-cartel-item">
+          <div class="alerta-cartel-titulo">${escHtml(a.titulo)}</div>
+          ${a.detalle ? `<div class="alerta-cartel-detalle">${escHtml(a.detalle)}</div>` : ""}
+          <div class="alerta-fila-sub">${a.sector && a.sector !== "Todos" ? `Para: ${escHtml(a.sector)} · ` : ""}${textoDiasAlerta(a.dias)}${horaAlerta(a) ? ` · desde las ${horaAlerta(a)}` : ""}</div>
+          <div class="alerta-cartel-botones">
+            <button type="button" class="btn-main alerta-ok" data-alerta-ok="${a.id}">✓ Hecho</button>
+            <button type="button" class="btn-secondary" data-alerta-despues="${a.id}">⏰ Recordame en 15 min</button>
+          </div>
+        </div>`).join("")}
+    </div>`;
+  if (nuevas.length) sonarAlerta();
+  pend.forEach(a => alertasMostradas.add(a.id));
+}
+
+// Últimos días en que tocaba la alerta: ✓ hecha, ✗ no se hizo (hoy: pendiente o todavía no es la hora)
+function historialAlerta(a, cuantos = 8) {
+  const dias = (a.dias || []).map(Number);
+  const desde = new Date(a.created_at); desde.setHours(0, 0, 0, 0);
+  const res = [];
+  for (let k = 0; k < 40 && res.length < cuantos; k++) {
+    const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() - k);
+    if (d < desde) break;
+    if (!dias.includes(d.getDay())) continue;
+    const f = d.toLocaleDateString("sv-SE");
+    const hecha = STATE.alertasHechas.find(h => h.alerta_id === a.id && h.fecha === f);
+    res.push({ f, dia: DIAS_ALERTA[d.getDay()], num: d.getDate(), hecha, hoy: k === 0 });
+  }
+  return res.reverse();
+}
+
+function renderAlertas() {
+  const pendientes = alertasPendientes();
+  const badge = document.getElementById("badgeTabAlertas");
+  if (badge) { badge.hidden = pendientes.length === 0; badge.textContent = `⏰ ${pendientes.length}`; }
+  revisarAlertas();
+  const cont = document.getElementById("listaAlertas");
+  if (!cont) return;
+  const hhmm = new Date().toTimeString().slice(0, 5);
+  cont.innerHTML = STATE.alertas.length === 0
+    ? `<div style="padding:15px; text-align:center; color:var(--vg-text-secondary);">Todavía no hay alertas. Tocá <b>+ Nueva alerta</b>.</div>`
+    : STATE.alertas.map(a => {
+      const tocaHoy = (a.dias || []).map(Number).includes(new Date().getDay());
+      const hecha = alertaHechaHoy(a);
+      const hoy = !a.activo ? `<div class="alerta-hoy">⏸ Pausada</div>`
+        : !tocaHoy ? `<div class="alerta-hoy">Hoy no toca</div>`
+        : hecha ? `<div class="alerta-hoy ok">✓ Hecha hoy por ${escHtml(hecha.hecha_por || "")} a las ${new Date(hecha.hecha_at).toTimeString().slice(0, 5)}</div>`
+        : horaAlerta(a) && hhmm < horaAlerta(a) ? `<div class="alerta-hoy">Hoy desde las ${horaAlerta(a)}</div>`
+        : `<div class="alerta-hoy pend">⏳ Pendiente de hoy</div>`;
+      const hist = historialAlerta(a).map(x => `<span class="alerta-dia ${x.hecha ? "ok" : x.hoy ? "" : "falta"}" title="${x.f}${x.hecha ? ` · ${escHtml(x.hecha.hecha_por || "")}` : x.hoy ? "" : " · no se hizo"}">${x.dia} ${x.num}<b>${x.hecha ? "✓" : x.hoy ? "·" : "✗"}</b></span>`).join("");
+      return `
+        <div class="alerta-fila${a.activo ? "" : " pausada"}${a.activo && tocaHoy && !hecha && !(horaAlerta(a) && hhmm < horaAlerta(a)) ? " pendiente" : ""}">
+          <div style="flex:1; min-width:240px;">
+            <div class="alerta-fila-titulo">${escHtml(a.titulo)}</div>
+            <div class="alerta-fila-sub">${textoDiasAlerta(a.dias)}${horaAlerta(a) ? ` · desde las ${horaAlerta(a)}` : " · desde que empieza el día"}${a.sector && a.sector !== "Todos" ? ` · ${escHtml(a.sector)}` : ""}${a.detalle ? ` · ${escHtml(a.detalle)}` : ""}</div>
+            ${hoy}
+            ${hist ? `<div class="alerta-historial">${hist}</div>` : ""}
+          </div>
+          <div class="alerta-acciones">
+            <button type="button" class="btn-secondary btn-alerta-editar" data-id="${a.id}">✏️ Editar</button>
+            <button type="button" class="btn-secondary btn-alerta-pausar" data-id="${a.id}">${a.activo ? "⏸ Pausar" : "▶️ Activar"}</button>
+          </div>
+        </div>`;
+    }).join("");
+}
+
+function abrirAlerta(id = null) {
+  const a = id ? STATE.alertas.find(x => x.id === id) : null;
+  let dias = new Set((a ? a.dias : [0, 1, 2, 3, 4, 5, 6]).map(Number));
+  const capa = document.createElement("div");
+  capa.className = "modal-overlay open";
+  capa.style.zIndex = "2600";
+  capa.innerHTML = `
+    <div class="modal-content" style="border-color:var(--accent-orange); max-width:480px; width:100%;">
+      <h2 style="margin-top:0;">${a ? "✏️ Editar alerta" : "⏰ Nueva alerta"}</h2>
+      <label>¿Qué hay que hacer?</label>
+      <input type="text" data-x="titulo" value="${a ? escHtml(a.titulo) : ""}" placeholder="Ej.: Dejar el cabezal de blanco de la DTF en remojo" />
+      <label>Detalle (opcional)</label>
+      <input type="text" data-x="detalle" value="${a ? escHtml(a.detalle || "") : ""}" placeholder="Ej.: con el líquido especial, en el recipiente azul" />
+      <label>Días</label>
+      <div class="alerta-dias-elegir" data-x="dias">${[1, 2, 3, 4, 5, 6, 0].map(d => `<button type="button" data-dia="${d}">${DIAS_ALERTA[d]}</button>`).join("")}</div>
+      <div class="alerta-atajos">
+        <button type="button" class="dtf-link" data-atajo="0,1,2,3,4,5,6">Todos los días</button>
+        <button type="button" class="dtf-link" data-atajo="1,2,3,4,5,6">Lunes a sábado</button>
+        <button type="button" class="dtf-link" data-atajo="1,2,3,4,5">Lunes a viernes</button>
+      </div>
+      <label>Desde qué hora aparece (vacío: desde que empieza el día)</label>
+      <input type="time" data-x="hora" value="${a ? horaAlerta(a) : ""}" />
+      <label>Para</label>
+      <select data-x="sector">${["Todos", "Impresión", "Calandrado", "Láser", "DTF"].map(x => `<option ${(a ? a.sector : "Todos") === x ? "selected" : ""}>${x}</option>`).join("")}</select>
+      <div style="display:flex; gap:8px; margin-top:14px;">
+        <button type="button" class="btn-secondary" data-x="cancelar">Cancelar</button>
+        <button type="button" class="btn-main" data-x="ok" style="margin:0;">Guardar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(capa);
+  const $ = (x) => capa.querySelector(`[data-x="${x}"]`);
+  const pintarDias = () => capa.querySelectorAll("[data-dia]").forEach(b => b.classList.toggle("si", dias.has(Number(b.getAttribute("data-dia")))));
+  pintarDias();
+  capa.addEventListener("click", async (e) => {
+    const d = e.target.closest("[data-dia]");
+    if (d) { const n = Number(d.getAttribute("data-dia")); if (dias.has(n)) dias.delete(n); else dias.add(n); pintarDias(); return; }
+    const at = e.target.closest("[data-atajo]");
+    if (at) { dias = new Set(at.getAttribute("data-atajo").split(",").map(Number)); pintarDias(); return; }
+    if (e.target === capa || e.target.closest("[data-x='cancelar']")) { capa.remove(); return; }
+    const ok = e.target.closest("[data-x='ok']");
+    if (!ok) return;
+    if ($("titulo").value.trim().length < 3) { toast("Escribí qué hay que hacer.", "warn"); return; }
+    if (!dias.size) { toast("Elegí al menos un día.", "warn"); return; }
+    ok.disabled = true;
+    const { error } = await sb().rpc("taller_alerta_guardar", { p: {
+      id: a ? a.id : null, titulo: $("titulo").value.trim(), detalle: $("detalle").value.trim(), dias: [...dias],
+      hora: $("hora").value || null, sector: $("sector").value, activo: a ? a.activo : true } });
+    if (error) { ok.disabled = false; toast("Error: " + error.message, "error"); return; }
+    capa.remove();
+    toast(a ? "✓ Alerta guardada." : "✓ Alerta creada.");
+    await cargarDatosTodo();
+  });
+  $("titulo").focus();
+}
+
+async function pausarAlerta(id) {
+  const a = STATE.alertas.find(x => x.id === id);
+  if (!a) return;
+  const { error } = await sb().rpc("taller_alerta_guardar", { p: { id: a.id, titulo: a.titulo, detalle: a.detalle, dias: a.dias, hora: horaAlerta(a) || null, sector: a.sector, activo: !a.activo } });
+  if (error) { toast("Error: " + error.message, "error"); return; }
+  toast(a.activo ? "⏸ Alerta pausada." : "▶️ Alerta activada.");
+  await cargarDatosTodo();
+}
+
+// ============================================================================
 // MÓDULO 8: CHAT INTERNO DE TALLER
 // ============================================================================
 function renderModuloChat() {
@@ -4924,6 +5147,15 @@ export function inicializarEventosUI() {
     if (barraBusqueda) barraBusqueda.hidden = true;
     renderTodoRespetandoFormulario();
   });
+  document.getElementById("btnAlertaNueva")?.addEventListener("click", () => abrirAlerta());
+  document.getElementById("listaAlertas")?.addEventListener("click", (e) => {
+    const ed = e.target.closest(".btn-alerta-editar");
+    if (ed) { abrirAlerta(ed.getAttribute("data-id")); return; }
+    const pa = e.target.closest(".btn-alerta-pausar");
+    if (pa) pausarAlerta(pa.getAttribute("data-id"));
+  });
+  setInterval(() => { renderAlertas(); }, 30000);
+
   document.getElementById("btnVgBuscar")?.addEventListener("click", () => {
     const barraBusqueda = document.getElementById("vgBarraBusqueda");
     if (!barraBusqueda) return;
