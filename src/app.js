@@ -2090,14 +2090,53 @@ function elegirClienteSistema(textoInicial = "", op = {}) {
           ? `<p style="font-size:12px;color:var(--vg-text-secondary);margin:0 0 8px;">Lo que llegue como <strong>${escHtml(op.soloRecordar)}</strong> va a quedar a nombre del cliente que elijas (también lo vas a ver en Contactos del sistema).</p>`
           : `<p style="font-size:12px;color:var(--vg-text-secondary);margin:0 0 8px;">El pedido dice: <strong>${escHtml(llega || textoInicial || "sin nombre")}</strong>. Buscalo por nombre o código.</p>`}
         ${op.sugerido ? `<button type="button" class="btn-main" data-sug="1" style="margin:0 0 10px;">✓ Es ${escHtml(op.sugerido.nombre)}</button>` : ""}
-        <input type="text" autocomplete="off" value="${escHtml(textoInicial)}" placeholder="Buscar otro cliente…" />
-        <div data-x="resultados" style="max-height:260px;overflow-y:auto;margin-top:8px;"></div>
+        <div data-x="zona-buscar">
+          <input type="text" autocomplete="off" value="${escHtml(textoInicial)}" placeholder="Buscar otro cliente…" />
+          <div data-x="resultados" style="max-height:260px;overflow-y:auto;margin-top:8px;"></div>
+          <button type="button" class="btn-secondary" data-x="nuevo" style="margin-top:6px; border-style:dashed;"></button>
+        </div>
+        <div data-x="zona-nuevo" hidden>
+          <label>Nombre del cliente nuevo</label>
+          <input type="text" data-x="nc-nombre" autocomplete="off" />
+          <label>WhatsApp (opcional)</label>
+          <input type="text" inputmode="tel" data-x="nc-wa" autocomplete="off" placeholder="11 2345 6789" />
+          <label>Negocio o marca (opcional)</label>
+          <input type="text" data-x="nc-negocio" autocomplete="off" />
+          <div style="display:flex; gap:8px; margin-top:10px;">
+            <button type="button" class="btn-secondary" data-x="nc-volver">← Volver a buscar</button>
+            <button type="button" class="btn-main" data-x="nc-crear" style="margin:0;">Crear y elegir</button>
+          </div>
+        </div>
         ${op.recordar && !op.soloRecordar ? `<label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:10px;"><input type="checkbox" data-x="recordar" checked style="width:18px;height:18px;margin:0;" /> Recordar: lo que llegue como «${escHtml(op.recordar)}» es de este cliente</label>` : ""}
         <button type="button" class="btn-secondary" data-x="cancelar" style="margin-top:10px;">Cancelar</button>
       </div>`;
     document.body.appendChild(capa);
-    const inp = capa.querySelector("input[type='text']");
+    const inp = capa.querySelector("[data-x='zona-buscar'] input[type='text']");
     const res = capa.querySelector("[data-x='resultados']");
+    const btnNuevo = capa.querySelector("[data-x='nuevo']");
+    const zonaBuscar = capa.querySelector("[data-x='zona-buscar']");
+    const zonaNuevo = capa.querySelector("[data-x='zona-nuevo']");
+    const pintarNuevo = () => { const t = inp.value.trim(); btnNuevo.textContent = t.length >= 2 ? `➕ Cliente nuevo: «${t}»` : "➕ Cargar un cliente nuevo"; };
+    // Alta de un cliente nuevo (la base avisa si ya hay uno con ese nombre)
+    const crearCliente = async (forzar) => {
+      const nombre = capa.querySelector("[data-x='nc-nombre']").value.trim();
+      if (nombre.length < 2) { toast("Escribí el nombre del cliente.", "warn"); return; }
+      const ok = capa.querySelector("[data-x='nc-crear']");
+      ok.disabled = true;
+      const { data, error } = await sb().rpc("cliente_crear", { p: {
+        nombre, whatsapp: capa.querySelector("[data-x='nc-wa']").value, negocio: capa.querySelector("[data-x='nc-negocio']").value,
+        origen: "el taller (DTF)", forzar: !!forzar } });
+      ok.disabled = false;
+      if (error && /^YA_EXISTE/.test(error.message)) {
+        const msg = error.message.replace(/^YA_EXISTE:\s*/, "");
+        if (confirm(`${msg}\n\n¿Es otra persona con el mismo nombre?\nAceptar: crear el cliente nuevo igual.\nCancelar: volver y elegir el que ya está.`)) { crearCliente(true); return; }
+        zonaNuevo.hidden = true; zonaBuscar.hidden = false; inp.value = nombre; pintarNuevo(); buscar(); inp.focus();
+        return;
+      }
+      if (error) { toast("Error: " + error.message, "error"); return; }
+      toast(`✅ Cliente nuevo: ${data.nombre} (${data.id}). Ya está en Contactos del sistema.`);
+      cerrar({ id: data.id, nombre: data.nombre });
+    };
     let lista = [];
     let espera = null;
     const cerrar = (valor) => {
@@ -2108,16 +2147,25 @@ function elegirClienteSistema(textoInicial = "", op = {}) {
     const buscar = async () => {
       lista = await buscarClientesSistema(inp.value);
       res.innerHTML = lista.length === 0
-        ? (inp.value.trim().length < 2 && op.sugerido ? "" : `<div style="color:var(--vg-text-secondary);font-size:12px;padding:6px;">${inp.value.trim().length < 2 ? "Escribí al menos 2 letras." : "No hay clientes con ese nombre. Si es nuevo, cargalo en Contactos del sistema."}</div>`)
+        ? (inp.value.trim().length < 2 && op.sugerido ? "" : `<div style="color:var(--vg-text-secondary);font-size:12px;padding:6px;">${inp.value.trim().length < 2 ? "Escribí al menos 2 letras." : "No hay clientes con ese nombre. Si es nuevo, cargalo acá abajo."}</div>`)
         : lista.map((c, i) => `<button type="button" class="btn-secondary" data-i="${i}" style="display:block;width:100%;text-align:left;margin:4px 0;">${escHtml(etiquetaCliente(c))}</button>`).join("");
     };
-    inp.addEventListener("input", () => { clearTimeout(espera); espera = setTimeout(buscar, 250); });
+    inp.addEventListener("input", () => { pintarNuevo(); clearTimeout(espera); espera = setTimeout(buscar, 250); });
     capa.addEventListener("click", (e) => {
+      if (e.target.closest("[data-x='nuevo']")) {
+        capa.querySelector("[data-x='nc-nombre']").value = (inp.value.trim() || llega || "").toUpperCase();
+        zonaBuscar.hidden = true; zonaNuevo.hidden = false;
+        capa.querySelector("[data-x='nc-nombre']").focus();
+        return;
+      }
+      if (e.target.closest("[data-x='nc-volver']")) { zonaNuevo.hidden = true; zonaBuscar.hidden = false; inp.focus(); return; }
+      if (e.target.closest("[data-x='nc-crear']")) { crearCliente(false); return; }
       const b = e.target.closest("[data-i]");
       if (b) { const c = lista[Number(b.dataset.i)]; cerrar({ id: c.id, nombre: c.nombre }); return; }
       if (e.target.closest("[data-sug]")) { cerrar({ id: op.sugerido.id, nombre: op.sugerido.nombre }); return; }
       if (e.target.closest("[data-x='cancelar']") || e.target === capa) cerrar(null);
     });
+    pintarNuevo();
     inp.focus();
     buscar();
   });
