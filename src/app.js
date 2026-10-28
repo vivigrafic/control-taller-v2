@@ -367,7 +367,8 @@ export async function cargarDatosTodo() {
     resTelasSistema,
     resAlertas,
     resAlertasHechas,
-    resSinRegistrar
+    resSinRegistrar,
+    resFilaEnlaces
   ] = await Promise.all([
     client.from("v_prod_rollos_papel_saldos").select("*").order("fecha_montaje", { ascending: false }),
     client.from("v_prod_bloques_impresion").select("*"),
@@ -391,7 +392,9 @@ export async function cargarDatosTodo() {
     client.from("prod_alertas_hechas").select("*").gte("fecha", new Date(Date.now() - 40 * 864e5).toLocaleDateString("sv-SE")),
     // Archivos que se movieron a IMPRESOS sin marcarse impresos (los encuentra el ayudante de Google): quedan para confirmar
     client.from("prod_pendientes_drive").select("id, modulo, cliente, nombre_archivo, metros_totales, file_id, fuera_fila_at, fuera_fila_carpeta")
-      .eq("anulado", true).eq("fuera_fila_donde", "impresos").is("fuera_fila_resuelto", null).neq("estado_impreso", "SI").order("fuera_fila_at")
+      .eq("anulado", true).eq("fuera_fila_donde", "impresos").is("fuera_fila_resuelto", null).neq("estado_impreso", "SI").order("fuera_fila_at"),
+    // Las tarjetas del Kanban de los archivos de la fila (para mostrar "T0003" en cada carpeta)
+    client.rpc("fila_enlaces", { p: {} })
   ]);
 
   STATE.rollosPapelSaldos = resRollosSaldos.data || [];
@@ -415,6 +418,7 @@ export async function cargarDatosTodo() {
   STATE.alertas = resAlertas.data || [];
   STATE.alertasHechas = resAlertasHechas.data || [];
   STATE.sinRegistrar = resSinRegistrar.data || [];
+  STATE.filaTarjetas = Object.fromEntries(((resFilaEnlaces.data && resFilaEnlaces.data.tarjetas) || []).map(t => [t.id, t]));
 
   renderTodoRespetandoFormulario();
   avisarErroresVigia();
@@ -816,7 +820,7 @@ function renderPendientesDriveSublimacion() {
       <div class="folder-header" data-folder-cli="${escHtml(cliente)}" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
         <span>
           <input type="checkbox" class="chk-folder-all" data-folder-cli="${escHtml(cliente)}" ${todosMarcados ? "checked" : ""} style="margin-right:10px; width:16px; height:16px; cursor:pointer;" title="Seleccionar todo" />
-          📁 <strong>${escHtml(cliente)}</strong> (${archivos.length})
+          📁 <strong>${escHtml(cliente)}</strong> (${archivos.length}) ${chipTarjetaCarpeta(cliente, "SUBLIMACION", archivos)}
         </span>
         <span style="cursor:pointer; font-weight:bold; color:var(--accent);">${fmtNum(totalMtsCarpeta)}m ${abierta ? "▼" : "►"}</span>
       </div>
@@ -1564,7 +1568,7 @@ function renderColaDtf() {
       return `
         <div class="folder-header dtf-carpeta" data-carpeta="${escHtml(cli)}">
           <span><input type="checkbox" class="chk-dtf-carpeta" data-carpeta="${escHtml(cli)}" ${marcados === archivos.length ? "checked" : ""} style="margin-right:10px; width:18px; height:18px;" title="Marcar toda la carpeta" />
-            📁 <strong>${escHtml(cli)}</strong> (${archivos.length}${marcados && marcados < archivos.length ? `, ${marcados} marcados` : ""})</span>
+            📁 <strong>${escHtml(cli)}</strong> (${archivos.length}${marcados && marcados < archivos.length ? `, ${marcados} marcados` : ""}) ${chipTarjetaCarpeta(cli, "DTF", archivos)}</span>
           <span style="font-weight:bold; color:var(--accent);">${fmtNum(metros)}m ${cerrada ? "►" : "▼"}</span>
         </div>
         <div class="folder-content" style="display:${cerrada ? "none" : "block"};">
@@ -1811,6 +1815,106 @@ async function llamarTaller(funcion, p, exito) {
   await cargarDatosTodo();
   return data;
 }
+
+// ===== Archivos de la fila ↔ tarjetas del Kanban =====
+// La base los enlaza sola cuando está segura (número de tarjeta, el mismo archivo que en la carpeta de la tarjeta, número de
+// cliente, "llega como" o nombre exacto). Lo que queda sin tarjeta se enlaza acá a mano: fila_enlazar_manual.
+const ESTADO_TARJETA = { "col-consultas": "Consultas", "col-diseno": "En diseño", "col-impresion": "En impresión", "col-calandrado": "En calandrado",
+  "col-laser": "En corte", "col-control": "Control", "col-listo": "Listo" };
+
+function nombreLimpioFila(t) {
+  return String(t || "").replace(/\[[^\]]*\]/g, " ").replace(/\([^)]*\)/g, " ").replace(/\d{1,2}-\d{1,2}-\d{2,4}/g, " ")
+    .replace(/[\d.,]+\s*(mts?|metros?|m)\b/gi, " ").replace(/[\s\-_]+/g, " ").trim();
+}
+const claveNombre = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+// "🗂️ T0003" si todos los archivos de la carpeta son de la misma tarjeta; "⚠️ sin tarjeta · Enlazar" si falta alguno
+function chipTarjetaCarpeta(carpeta, modulo, archivos) {
+  const ids = [...new Set(archivos.map(a => a.trabajo_id || ""))];
+  const datos = `data-tarjeta-carpeta="${escHtml(carpeta)}" data-tarjeta-modulo="${modulo}"`;
+  if (ids.length === 1 && ids[0]) {
+    const t = (STATE.filaTarjetas || {})[ids[0]];
+    return `<button type="button" class="chip-tarjeta" ${datos} title="${escHtml(t ? `${t.cliente} · ${t.titulo}` : "Tarjeta del Kanban")}. Tocá para cambiarla.">🗂️ ${escHtml(t ? t.codigo : "Tarjeta")}</button>`;
+  }
+  const sin = archivos.filter(a => !a.trabajo_id).length;
+  return `<button type="button" class="chip-tarjeta sin" ${datos} title="Estos archivos no están enlazados a ninguna tarjeta del Kanban">⚠️ ${sin === archivos.length ? "sin tarjeta" : `${sin} sin tarjeta`} · Enlazar</button>`;
+}
+
+async function abrirEnlazarTarjeta(carpeta, modulo) {
+  const archivos = STATE.pendientesDrive.filter(p => (p.cliente || "SIN CLIENTE") === carpeta && p.modulo === modulo && p.estado_impreso !== "SI");
+  if (!archivos.length) return;
+  const clienteFila = (archivos.find(a => a.cliente_id) || {}).cliente_id || null;
+  const { data, error } = await sb().rpc("fila_tarjetas_para", { p: { texto: carpeta, cliente_id: clienteFila } });
+  if (error) { toast("Error: " + error.message, "error"); return; }
+  const tarjetas = data || [];
+  const actual = archivos.every(a => a.trabajo_id && a.trabajo_id === archivos[0].trabajo_id) ? archivos[0].trabajo_id : null;
+  const elegida = actual || (tarjetas[0] && tarjetas[0].puntaje >= 60 ? tarjetas[0].id : "");
+  const limpio = nombreLimpioFila(carpeta);
+  const capa = document.createElement("div");
+  capa.className = "modal-overlay open";
+  capa.innerHTML = `
+    <div class="modal-content enlace-tarjeta">
+      <h2 style="margin-top:0;">🗂️ ¿De qué tarjeta es?</h2>
+      <p class="dtf-ayuda" style="margin:0 0 8px;">📁 <b>${escHtml(carpeta)}</b> · ${archivos.length} archivo${archivos.length === 1 ? "" : "s"}. La que más se parece ya viene elegida.</p>
+      <div class="enlace-archivos">${archivos.map(a => `<label><input type="checkbox" data-id="${a.id}" checked /> ${escHtml(a.nombre_archivo)}${a.trabajo_id && a.trabajo_id !== actual ? ` <small>(${escHtml(((STATE.filaTarjetas || {})[a.trabajo_id] || {}).codigo || "otra tarjeta")})</small>` : ""}</label>`).join("")}</div>
+      <input type="search" data-x="buscar" placeholder="🔎 Buscar tarjeta o cliente…" />
+      <div class="enlace-lista">${tarjetas.length ? tarjetas.map(t => `
+        <label class="enlace-op" data-texto="${escHtml(claveNombre(`${t.codigo} ${t.cliente} ${t.titulo}`))}">
+          <input type="radio" name="enlace-tarjeta" value="${t.id}" data-cliente="${escHtml(t.cliente || "")}" ${t.id === elegida ? "checked" : ""} />
+          <span><b>${escHtml(t.codigo)}</b> ${escHtml(t.cliente || "")} · ${escHtml(t.titulo || "")}
+            <small>${escHtml(ESTADO_TARJETA[t.estado] || t.estado || "")}${t.motivo ? ` · <em>${escHtml(t.motivo)}</em>` : ""}${t.id === actual ? " · es la de ahora" : ""}</small></span>
+        </label>`).join("") : `<p class="dtf-ayuda">No hay tarjetas abiertas en el Kanban.</p>`}</div>
+      <label class="dtf-motivo" data-x="rec-caja" hidden><input type="checkbox" data-x="recordar" checked /> <span data-x="rec-texto"></span></label>
+      <div style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap;">
+        <button type="button" class="btn-secondary" data-x="cancelar">Cancelar</button>
+        ${archivos.some(a => a.trabajo_id) ? `<button type="button" class="btn-secondary" data-x="sacar">Sacar de la tarjeta</button>` : ""}
+        <button type="button" class="btn-main" data-x="ok" style="margin:0; flex:1;">Enlazar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(capa);
+  const q = (x) => capa.querySelector(`[data-x='${x}']`);
+  const radio = () => capa.querySelector("input[name='enlace-tarjeta']:checked");
+  // Recordar el nombre de la carpeta como "llega como" del cliente, si no es el mismo nombre
+  const pintarRecordar = () => {
+    const cli = radio() ? radio().getAttribute("data-cliente") : "";
+    const ofrecer = limpio && cli && claveNombre(limpio) !== claveNombre(cli);
+    q("rec-caja").hidden = !ofrecer;
+    if (ofrecer) q("rec-texto").textContent = `Recordar que «${limpio.toUpperCase()}» es ${cli} (la próxima vez se enlaza solo)`;
+  };
+  pintarRecordar();
+  capa.addEventListener("change", (e) => { if (e.target.name === "enlace-tarjeta") pintarRecordar(); });
+  q("buscar").addEventListener("input", (e) => {
+    const t = claveNombre(e.target.value);
+    capa.querySelectorAll(".enlace-op").forEach(op => { op.hidden = !!t && !op.getAttribute("data-texto").includes(t); });
+  });
+  const ids = () => [...capa.querySelectorAll(".enlace-archivos input:checked")].map(c => c.getAttribute("data-id"));
+  capa.addEventListener("click", async (e) => {
+    if (e.target === capa || e.target.closest("[data-x='cancelar']")) { capa.remove(); return; }
+    if (e.target.closest("[data-x='sacar']")) {
+      if (!ids().length) { toast("Marcá los archivos.", "warn"); return; }
+      const p = { ids: ids(), trabajo_id: null };
+      capa.remove();
+      await llamarTaller("fila_enlazar_manual", p, "Listo: quedaron sin tarjeta");
+      return;
+    }
+    if (e.target.closest("[data-x='ok']")) {
+      if (!ids().length) { toast("Marcá los archivos.", "warn"); return; }
+      if (!radio()) { toast("Elegí la tarjeta.", "warn"); return; }
+      const p = { ids: ids(), trabajo_id: radio().value, recordar: !q("rec-caja").hidden && q("recordar").checked };
+      capa.remove();
+      await llamarTaller("fila_enlazar_manual", p, (d) => `✅ Enlazado a ${d.codigo}${(d.recordados || []).length ? `. Recordado: ${d.recordados.join(", ")}` : ""}`);
+    }
+  });
+}
+
+// El aviso de la carpeta se toca sin abrir ni cerrar la carpeta
+document.addEventListener("click", (e) => {
+  const chip = e.target.closest(".chip-tarjeta");
+  if (!chip) return;
+  e.stopPropagation();
+  e.preventDefault();
+  abrirEnlazarTarjeta(chip.getAttribute("data-tarjeta-carpeta"), chip.getAttribute("data-tarjeta-modulo"));
+}, true);
 
 // Punto 3: metros de un archivo impreso (los que quedaron en 0 o con la medida mal)
 async function abrirMetrosPedidoDtf(id) {
