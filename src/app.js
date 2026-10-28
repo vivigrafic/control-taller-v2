@@ -1719,7 +1719,8 @@ function renderTiradasDtf() {
     const estado = b.cierre === "corte" ? "✂️ cortado" : b.cierre === "fin_dia" ? "🌙 cerrado (fin del día)" : b.rollo === puesto ? "▶ en curso" : "";
     const cab = `<tr class="dtf-bloque-cab"><td colspan="7">🔄 ROLLO ${escHtml(b.rollo)} · BLOQUE ${b.numero} · <b>${fmtNum(usado)} m impresos</b> en ${imp.length} tirada${imp.length === 1 ? "" : "s"}`
       + ` · archivos ${fmtNum(deArchivos)} m${desp > 0 ? ` · desperdicio ${fmtNum(desp)} m` : ""}${estado ? ` · ${estado}` : ""}</td></tr>`;
-    return cab + b.filas.map(t => {
+    // Lo más nuevo arriba también dentro de cada bloque (solo en el registro de DTF)
+    return cab + [...b.filas].reverse().map(t => {
       const ev = eventoDtf(t);
       const nota = escHtml(String(t.observaciones || "").replace(/^AVANCE DE FILM:\s*/, ""));
       if (ev === "corte" || ev === "fin_dia" || ev === "cambio_film") {
