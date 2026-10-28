@@ -664,3 +664,23 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
 .dtf-motivo { display: flex; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid var(--vg-surface-border); border-radius: 8px; cursor: pointer; font-size: 14px; }
 .dtf-motivo input { width: auto; margin: 0; }
 .grid-panel[hidden] { display: none !important; }
+
+/* DTF: registro por bloques (corte, fin del día, cambio de film) y acciones de cada tirada */
+.dtf-bloque-cab td { background: color-mix(in srgb, var(--accent-blue) 22%, transparent); color: var(--vg-text-primary); font-weight: 700; font-size: 12px; letter-spacing: .3px; }
+.dtf-evento td { font-size: 12px; }
+.dtf-evento-corte td { background: color-mix(in srgb, var(--accent-magenta) 14%, transparent); }
+.dtf-evento-fin_dia td { background: color-mix(in srgb, var(--accent-blue) 10%, transparent); }
+.dtf-evento-cambio_film td { background: color-mix(in srgb, var(--vg-status-ready) 12%, transparent); }
+.dtf-tirada-acciones { white-space: nowrap; }
+.dtf-tirada-acciones button { background: transparent; border: 1px solid var(--vg-surface-border); border-radius: 6px; padding: 3px 6px; margin: 0 2px 0 0; cursor: pointer; width: auto; font-size: 13px; }
+.dtf-tirada-acciones button:hover { border-color: var(--accent-blue); }
+.dtf-sin-metros { background: transparent; border: 1px solid var(--accent-orange); color: var(--accent-orange); border-radius: 6px; padding: 4px 8px; font-weight: 700; cursor: pointer; width: auto; margin: 0; white-space: nowrap; }
+
+/* Impresos sin registrar (se movieron a IMPRESOS sin marcarse impresos) */
+.sin-registrar { border-top: 3px solid var(--accent-orange); margin-bottom: 14px; }
+.sin-registrar-cab { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sin-registrar-cab h2 { margin: 0; border: none; padding: 0; color: var(--accent-orange); }
+.sin-registrar-lista { max-height: 320px; overflow-y: auto; margin: 6px 0; }
+.sin-registrar-pie { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--vg-text-secondary); }
+.sin-registrar-pie button { width: auto; margin: 0; }
+.sin-registrar-pie button:disabled { opacity: .45; cursor: default; }

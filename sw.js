@@ -3,7 +3,7 @@
 // Versión: 20261022_02 (PIN optativo y DTF por Ventas del sistema)
 // ============================================================================
 
-const CACHE_NAME = "vvgrafic-taller-cache-v26";
+const CACHE_NAME = "vvgrafic-taller-cache-v27";
 const STATIC_ASSETS = [
   "./",
   "./index.html",

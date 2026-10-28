@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261028_01" />
+  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261029_01" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./src/config/conexion.js?v=20261022_04"></script>
   <script src="./src/ver_clave.js?v=20261022_02"></script>
@@ -98,6 +98,8 @@
         <button type="button" id="btnSyncDriveSandbox" style="background:var(--accent-blue); color:#fff; border:none; padding:8px 15px; border-radius:4px; font-weight:bold; cursor:pointer;">Sincronizar</button>
       </div>
     </div>
+
+    <div id="impSinRegistrar"></div>
 
     <!-- Números de la estación: los mismos seis cuadros en Impresión, Calandrado, Láser y DTF -->
     <div class="stats-grid" id="kpisImpresion"></div>
@@ -336,6 +338,7 @@
        ======================================================================== -->
   <div id="sec-dtf" class="tab-content">
     <div id="dtfBarraRollo"></div>
+    <div id="dtfSinRegistrar"></div>
     <div class="stats-grid" id="kpisDtf"></div>
     <!-- Dos pasos separados: lo que se imprime junto (anidado) no siempre es del mismo cliente -->
     <div class="dtf-pasos">
@@ -377,8 +380,8 @@
     </div>
     <div class="card dtf-tiradas-card" style="border-top: 3px solid var(--accent);">
       <h2 style="margin:0; border:none; padding:0;">Últimas tiradas</h2>
-      <p class="dtf-ayuda">Cada impresión con sus archivos, y los avances de film sin imprimir (errores, calibraciones…).</p>
-      <div style="overflow-x:auto; margin-top:10px;"><table class="dtf-tiradas"><thead><tr><th>Fecha</th><th>Tirada</th><th>Rollo</th><th>Metros</th><th>Archivos impresos</th><th>Observación</th></tr></thead><tbody id="tbodyTiradasDTF"></tbody></table></div>
+      <p class="dtf-ayuda">Por bloques, como en sublimación: cada <b>✂️ corte</b>, <b>🌙 fin del día</b> o <b>🔄 cambio de film</b> cierra el bloque. Cada tirada se puede editar ✏️, anotar 📝 o anular 🗑️, y los metros de cada archivo se corrigen con su ✏️.</p>
+      <div style="overflow-x:auto; margin-top:10px;"><table class="dtf-tiradas"><thead><tr><th>Fecha</th><th>Tirada</th><th>Rollo</th><th>Metros</th><th>Archivos impresos</th><th>Observación</th><th></th></tr></thead><tbody id="tbodyTiradasDTF"></tbody></table></div>
     </div>
     <div class="grid-panel" hidden>
       <div>
@@ -1000,7 +1003,7 @@
   <datalist id="listColores"></datalist>
   <div id="vgToastContainer" style="position:fixed; top:16px; right:16px; z-index:3000; max-width:360px;"></div>
 
-  <script type="module" src="./src/app.js?v=20261028_01"></script>
+  <script type="module" src="./src/app.js?v=20261029_01"></script>
   <script>
     // Registro del Service Worker PWA
     if ('serviceWorker' in navigator) {

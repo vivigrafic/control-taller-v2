@@ -56,6 +56,8 @@ const STATE = {
   dtfSelVenta: new Set(),
   dtfVentasAbiertas: new Set(),
   dtfPedidos: [],
+  sinRegistrar: [], // archivos que se movieron a IMPRESOS sin marcarse impresos (para confirmar)
+  sinRegSel: new Set(),
   dtfCuentasClientes: [],
   chatMensajes: [],
   telasFicha: [],
@@ -364,7 +366,8 @@ export async function cargarDatosTodo() {
     resHistorialAnchos,
     resTelasSistema,
     resAlertas,
-    resAlertasHechas
+    resAlertasHechas,
+    resSinRegistrar
   ] = await Promise.all([
     client.from("v_prod_rollos_papel_saldos").select("*").order("fecha_montaje", { ascending: false }),
     client.from("v_prod_bloques_impresion").select("*"),
@@ -385,7 +388,10 @@ export async function cargarDatosTodo() {
     client.from("prod_historial_anchos_tela").select("*").eq("anulado", false).order("fecha", { ascending: false }).limit(200),
     client.rpc("taller_telas_sistema"),
     client.from("prod_alertas").select("*").order("created_at", { ascending: true }),
-    client.from("prod_alertas_hechas").select("*").gte("fecha", new Date(Date.now() - 40 * 864e5).toLocaleDateString("sv-SE"))
+    client.from("prod_alertas_hechas").select("*").gte("fecha", new Date(Date.now() - 40 * 864e5).toLocaleDateString("sv-SE")),
+    // Archivos que se movieron a IMPRESOS sin marcarse impresos (los encuentra el ayudante de Google): quedan para confirmar
+    client.from("prod_pendientes_drive").select("id, modulo, cliente, nombre_archivo, metros_totales, file_id, fuera_fila_at, fuera_fila_carpeta")
+      .eq("anulado", true).eq("fuera_fila_donde", "impresos").is("fuera_fila_resuelto", null).neq("estado_impreso", "SI").order("fuera_fila_at")
   ]);
 
   STATE.rollosPapelSaldos = resRollosSaldos.data || [];
@@ -408,6 +414,7 @@ export async function cargarDatosTodo() {
   STATE.telasSistema = resTelasSistema.data || [];
   STATE.alertas = resAlertas.data || [];
   STATE.alertasHechas = resAlertasHechas.data || [];
+  STATE.sinRegistrar = resSinRegistrar.data || [];
 
   renderTodoRespetandoFormulario();
   avisarErroresVigia();
@@ -512,6 +519,7 @@ function renderTodoRespetandoFormulario() {
   }
   renderRolloActivoYSobrantes();
   renderPendientesDriveSublimacion();
+  renderSinRegistrar();
   renderTablaImpresionesConBloques();
   renderModuloCalandrado();
   renderModuloLaser();
@@ -819,7 +827,7 @@ function renderPendientesDriveSublimacion() {
             <label class="file-item" style="${checked ? "border-color:var(--accent-blue);" : ""}">
               <input type="checkbox" class="chk-pend-sub" data-id="${p.id}" ${checked ? "checked" : ""} />
               <div class="file-info">
-                <span class="fname">${p.prioridad_maxima ? "🚨 " : ""}${escHtml(p.nombre_archivo)}${avisoMedida(p)}</span>
+                <span class="fname">${p.prioridad_maxima ? "🚨 " : ""}${escHtml(p.nombre_archivo)}${avisoMedida(p)}${p.fuera_fila_resuelto === "a_la_cola" ? ` <span class="badge danger" title="Se movió a IMPRESOS sin marcarlo: cargalo como impreso con su tela y su ruta">ya está en IMPRESOS: registralo</span>` : ""}</span>
               </div>
               <div class="fmeters">${fmtNum(p.metros_totales)}m</div>
             </label>
@@ -1591,31 +1599,321 @@ function avisoMedida(p) {
   return ` <span class="badge danger" title="Se usa la medida real de la imagen">📏 ${delNombre ? `el nombre dice ${fmtNum(delNombre)} m · ` : ""}mide ${fmtNum(p.metros_dpi_real)} m</span>`;
 }
 
+// ===== DTF: registro de tiradas por bloques (como en sublimación) =====
+// Las tiradas de cada rollo, en orden, se cortan en bloques con cada corte de film o fin del día; un cambio de film o un
+// rollo nuevo empieza otro. Los avances de film quedan dentro del bloque. Cada tirada se puede editar, anotar o anular.
+function eventoDtf(t) {
+  if (t.evento) return t.evento;
+  return String(t.codigo_tirada || "").startsWith("AVF-") || String(t.observaciones || "").startsWith("AVANCE DE FILM") ? "avance" : null;
+}
+
+function armarBloquesDtf(tiradas) {
+  const asc = [...tiradas].sort((a, b) => (new Date(a.fecha_hora) - new Date(b.fecha_hora)) || String(a.codigo_tirada).localeCompare(String(b.codigo_tirada)));
+  const bloques = [];
+  const abierto = new Map();
+  const cuantos = new Map();
+  const ultimo = new Map();
+  asc.forEach(t => {
+    const ev = eventoDtf(t);
+    let b = abierto.get(t.id_rollo_dtf);
+    // Un corte o fin del día sin nada impreso desde el cierre anterior va al bloque anterior (no arma uno vacío)
+    if (!b && (ev === "corte" || ev === "fin_dia") && ultimo.get(t.id_rollo_dtf)) {
+      const ant = ultimo.get(t.id_rollo_dtf);
+      ant.filas.push(t);
+      ant.cierre = ev;
+      return;
+    }
+    if (!b || ev === "cambio_film") {
+      const n = (cuantos.get(t.id_rollo_dtf) || 0) + 1;
+      cuantos.set(t.id_rollo_dtf, n);
+      b = { rollo: t.id_rollo_dtf, numero: n, filas: [], cierre: null };
+      bloques.push(b);
+      abierto.set(t.id_rollo_dtf, b);
+      ultimo.set(t.id_rollo_dtf, b);
+    }
+    b.filas.push(t);
+    if (ev === "corte" || ev === "fin_dia") { b.cierre = ev; abierto.delete(t.id_rollo_dtf); }
+  });
+  return bloques;
+}
+
 function renderTiradasDtf() {
   const tbody = document.getElementById("tbodyTiradasDTF");
   if (!tbody) return;
   const porTirada = new Map();
   STATE.dtfPedidos.forEach(d => { if (!d.tirada_id) return; if (!porTirada.has(d.tirada_id)) porTirada.set(d.tirada_id, []); porTirada.get(d.tirada_id).push(d); });
-  const ultimas = STATE.dtfTiradas.slice(0, 25);
   const cargo = (c) => c && c !== "VENTA" ? ` <span class="badge danger">${escHtml(c === "REPOSICION" ? "repo" : c.toLowerCase())}</span>` : "";
-  tbody.innerHTML = ultimas.length === 0
-    ? `<tr><td colspan="6" style="text-align:center;color:var(--vg-text-secondary);">Todavía no hay tiradas.</td></tr>`
-    : ultimas.map(t => {
-      const avance = String(t.codigo_tirada || "").startsWith("AVF-") || String(t.observaciones || "").startsWith("AVANCE DE FILM");
-      const ped = (porTirada.get(t.id) || []).slice().sort((a, b) => String(a.cliente).localeCompare(String(b.cliente)) || String(a.nombre_archivo).localeCompare(String(b.nombre_archivo)));
-      const lista = ped.map(d => `<div class="dtf-tirada-arch"><span>${escHtml(d.nombre_archivo)}${cargo(d.tipo_cargo)}</span><b>${fmtNum(d.metros_archivo)}m</b></div>`).join("");
-      const archivos = avance ? `<span class="badge danger">sin imprimir</span>`
+  // Los bloques más nuevos primero, hasta unas 60 tiradas
+  const todos = armarBloquesDtf(STATE.dtfTiradas);
+  const ver = [];
+  let filas = 0;
+  for (let i = todos.length - 1; i >= 0 && filas < 60; i--) { ver.push(todos[i]); filas += todos[i].filas.length; }
+  ver.sort((a, b) => new Date(b.filas[b.filas.length - 1].fecha_hora) - new Date(a.filas[a.filas.length - 1].fecha_hora));
+  if (!ver.length) { tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--vg-text-secondary);">Todavía no hay tiradas.</td></tr>`; return; }
+
+  const acciones = (t) => `<td class="dtf-tirada-acciones">
+      <button type="button" class="btn-dtf-t-editar" data-id="${t.id}" title="Editar (rollo, metros)">✏️</button>
+      <button type="button" class="btn-dtf-t-nota" data-id="${t.id}" title="Nota">📝</button>
+      <button type="button" class="btn-dtf-t-anular" data-id="${t.id}" title="Anular">🗑️</button></td>`;
+  const puesto = rolloDtfPuesto();
+  tbody.innerHTML = ver.map(b => {
+    const imp = b.filas.filter(t => !eventoDtf(t));
+    const usado = imp.reduce((a, t) => a + (Number(t.metros_consumidos_rollo) || 0), 0);
+    const desp = b.filas.reduce((a, t) => a + (Number(t.metros_desperdicio) || 0), 0);
+    const deArchivos = imp.flatMap(t => porTirada.get(t.id) || []).reduce((a, d) => a + (Number(d.metros_archivo) || 0), 0);
+    const estado = b.cierre === "corte" ? "✂️ cortado" : b.cierre === "fin_dia" ? "🌙 cerrado (fin del día)" : b.rollo === puesto ? "▶ en curso" : "";
+    const cab = `<tr class="dtf-bloque-cab"><td colspan="7">🔄 ROLLO ${escHtml(b.rollo)} · BLOQUE ${b.numero} · <b>${fmtNum(usado)} m impresos</b> en ${imp.length} tirada${imp.length === 1 ? "" : "s"}`
+      + ` · archivos ${fmtNum(deArchivos)} m${desp > 0 ? ` · desperdicio ${fmtNum(desp)} m` : ""}${estado ? ` · ${estado}` : ""}</td></tr>`;
+    return cab + b.filas.map(t => {
+      const ev = eventoDtf(t);
+      const nota = escHtml(String(t.observaciones || "").replace(/^AVANCE DE FILM:\s*/, ""));
+      if (ev === "corte" || ev === "fin_dia" || ev === "cambio_film") {
+        const titulo = ev === "corte" ? "✂️ CORTE DE FILM" : ev === "fin_dia" ? "🌙 FIN DEL DÍA" : "🔄 CAMBIO DE FILM";
+        return `<tr class="dtf-evento dtf-evento-${ev}"><td style="white-space:nowrap;">${fmtDateHora(t.fecha_hora)}</td>
+          <td colspan="5"><strong>${titulo}</strong>${Number(t.metros_desperdicio) > 0 ? ` (${fmtNum(t.metros_desperdicio)} m de desperdicio)` : ""}${nota ? ` — ${nota}` : ""}</td>${acciones(t)}</tr>`;
+      }
+      const ped = (porTirada.get(t.id) || []).slice().sort((a, c) => String(a.cliente).localeCompare(String(c.cliente)) || String(a.nombre_archivo).localeCompare(String(c.nombre_archivo)));
+      const lista = ped.map(d => `<div class="dtf-tirada-arch"><span>${escHtml(d.nombre_archivo)}${cargo(d.tipo_cargo)}${d.vendido ? ` <span class="badge activo">vendido</span>` : ""}</span>`
+        + `<b>${fmtNum(d.metros_archivo)}m${d.vendido ? "" : ` <button type="button" class="dtf-link btn-dtf-metros" data-id="${d.id}" title="Corregir los metros de este archivo">✏️</button>`}</b></div>`).join("");
+      const archivos = ev === "avance" ? `<span class="badge danger">sin imprimir</span>`
         : ped.length > 4 ? `<details><summary>${ped.length} archivos · ${escHtml([...new Set(ped.map(d => nombreLimpioDtf(d.cliente)))].join(", "))}</summary>${lista}</details>` : (lista || "—");
       return `
-      <tr class="${avance ? "dtf-tirada-avance" : ""}">
+      <tr class="${ev === "avance" ? "dtf-tirada-avance" : ""}">
         <td style="white-space:nowrap;">${fmtDateHora(t.fecha_hora)}</td>
-        <td><strong>${escHtml(t.codigo_tirada)}</strong>${avance ? ` <span class="badge danger">avance de film</span>` : t.es_anidado ? ` <span class="badge activo">anidado</span>` : ""}</td>
+        <td><strong>${escHtml(t.codigo_tirada)}</strong>${ev === "avance" ? ` <span class="badge danger">avance de film</span>` : t.es_anidado ? ` <span class="badge activo">anidado</span>` : ""}</td>
         <td>${escHtml(t.id_rollo_dtf)}</td>
         <td style="white-space:nowrap;">${fmtNum((Number(t.metros_consumidos_rollo) || 0) + (Number(t.metros_desperdicio) || 0))}m</td>
         <td class="dtf-tirada-archivos">${archivos}</td>
-        <td>${escHtml(String(t.observaciones || "").replace(/^AVANCE DE FILM:\s*/, ""))}</td>
+        <td>${nota}</td>
+        ${acciones(t)}
       </tr>`;
     }).join("");
+  }).join("");
+}
+
+// Ventana simple del taller, con el estilo de las demás. campos: { nombre, etiqueta, tipo (text|number|check), valor,
+// opciones: [{ valor, titulo }], placeholder, ayuda, texto (para check) }. Devuelve los valores, o null si se cancela.
+// validar(valores) puede devolver un texto de error.
+function campoVentanaTaller(c, i) {
+  let control;
+  if (c.tipo === "check") {
+    control = `<label class="dtf-motivo" style="margin-top:8px;"><input type="checkbox" data-i="${i}" ${c.valor ? "checked" : ""}/> ${escHtml(c.texto || c.etiqueta)}</label>`;
+  } else if (c.opciones) {
+    const ops = c.opciones.map(o => `<option value="${escHtml(o.valor)}" ${String(o.valor) === String(c.valor ?? "") ? "selected" : ""}>${escHtml(o.titulo)}</option>`).join("");
+    control = `<label>${escHtml(c.etiqueta)}</label><select data-i="${i}">${ops}</select>`;
+  } else {
+    const num = c.tipo === "number" ? `type="number" step="0.01" min="0" inputmode="decimal"` : `type="text"`;
+    control = `<label>${escHtml(c.etiqueta)}</label><input ${num} data-i="${i}" value="${escHtml(c.valor ?? "")}" placeholder="${escHtml(c.placeholder || "")}" />`;
+  }
+  return control + (c.ayuda ? `<small style="display:block; color:var(--vg-text-secondary); margin:2px 0 6px;">${escHtml(c.ayuda)}</small>` : "");
+}
+
+function ventanaTaller({ titulo, texto = "", campos = [], aceptar = "Aceptar", color = "var(--accent-blue)", validar = null }) {
+  return new Promise(resolve => {
+    const capa = document.createElement("div");
+    capa.className = "modal-overlay open";
+    capa.innerHTML = `
+      <div class="modal-content" style="border-color:${color}; max-width:460px; width:100%;">
+        <h2 style="margin-top:0;">${escHtml(titulo)}</h2>
+        ${texto ? `<p style="margin:0 0 8px; font-size:13px; color:var(--vg-text-secondary);">${texto}</p>` : ""}
+        ${campos.map((c, i) => campoVentanaTaller(c, i)).join("")}
+        <div style="display:flex; gap:8px; margin-top:14px;">
+          <button type="button" class="btn-secondary" data-x="cancelar">Cancelar</button>
+          <button type="button" class="btn-main" data-x="ok" style="margin:0;">${escHtml(aceptar)}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(capa);
+    const leer = () => {
+      const r = {};
+      campos.forEach((c, i) => {
+        const el = capa.querySelector(`[data-i="${i}"]`);
+        r[c.nombre] = c.tipo === "check" ? el.checked : c.tipo === "number" ? Number(String(el.value).replace(",", ".")) : el.value.trim();
+      });
+      return r;
+    };
+    const primero = capa.querySelector("input:not([type=checkbox]), select");
+    setTimeout(() => primero && primero.focus(), 50);
+    const ok = () => {
+      const r = leer();
+      const error = validar ? validar(r) : null;
+      if (error) { toast(error, "warn"); return; }
+      capa.remove();
+      resolve(r);
+    };
+    capa.addEventListener("click", (e) => {
+      if (e.target === capa || e.target.closest("[data-x='cancelar']")) { capa.remove(); resolve(null); return; }
+      if (e.target.closest("[data-x='ok']")) ok();
+    });
+    capa.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.tagName === "INPUT") ok(); if (e.key === "Escape") { capa.remove(); resolve(null); } });
+  });
+}
+
+async function llamarTaller(funcion, p, exito) {
+  const { data, error } = await sb().rpc(funcion, { p });
+  if (error) { toast("Error: " + error.message, "error"); return null; }
+  if (exito) toast(typeof exito === "function" ? exito(data) : exito);
+  await cargarDatosTodo();
+  return data;
+}
+
+// Punto 3: metros de un archivo impreso (los que quedaron en 0 o con la medida mal)
+async function abrirMetrosPedidoDtf(id) {
+  const d = STATE.dtfPedidos.find(x => x.id === id) || STATE.dtfPorVender.flatMap(t => t.pedidos).find(x => x.id === id);
+  if (!d) return;
+  const actual = Number(d.metros_archivo ?? d.metros) || 0;
+  const r = await ventanaTaller({
+    titulo: "Metros del archivo", texto: escHtml(d.nombre_archivo), aceptar: "Guardar",
+    campos: [{ nombre: "metros", etiqueta: "Metros", tipo: "number", valor: actual || "", placeholder: "Ej: 1.5",
+      ayuda: d.metros_dpi_real ? `Medido con la imagen: ${fmtNum(d.metros_dpi_real)} m` : "Es lo que se cobra si es para vender" }],
+    validar: (v) => (v.metros > 0 ? null : "Poné los metros (más de 0).")
+  });
+  if (!r) return;
+  await llamarTaller("taller_dtf_pedido_metros", { id, metros: r.metros }, `Listo: ${fmtNum(r.metros)} m`);
+}
+
+// Punto 1: editar, anotar o anular una tirada
+function opcionesRollosDtf() {
+  return STATE.dtfRollosSaldos.map(r => ({ valor: r.id_rollo_dtf, titulo: `${r.id_rollo_dtf} · ${r.estado} (quedan ${fmtNum(r.metros_restantes_reales)} m)` }));
+}
+async function abrirEditarTiradaDtf(id) {
+  const t = STATE.dtfTiradas.find(x => x.id === id);
+  if (!t) return;
+  const ev = eventoDtf(t);
+  const campos = [{ nombre: "id_rollo_dtf", etiqueta: "Rollo de film", opciones: opcionesRollosDtf(), valor: t.id_rollo_dtf }];
+  if (!ev) campos.push({ nombre: "metros_consumidos", etiqueta: "Metros usados del rollo", tipo: "number", valor: Number(t.metros_consumidos_rollo) || 0,
+    ayuda: "Lo que se descontó del rollo en esta tirada (los metros de cada archivo se corrigen con el ✏️ de cada uno)" });
+  else campos.push({ nombre: "metros_desperdicio", etiqueta: "Metros de desperdicio", tipo: "number", valor: Number(t.metros_desperdicio) || 0 });
+  campos.push({ nombre: "observaciones", etiqueta: "Nota", valor: t.observaciones || "" });
+  const r = await ventanaTaller({ titulo: `Editar ${t.codigo_tirada}`, aceptar: "Guardar", campos,
+    validar: (v) => ((v.metros_consumidos ?? 0) < 0 || (v.metros_desperdicio ?? 0) < 0 ? "Los metros no pueden ser negativos." : null) });
+  if (!r) return;
+  await llamarTaller("taller_dtf_tirada_editar", { id, ...r }, (d) => (d.cambios && d.cambios.length ? `${t.codigo_tirada}: ${d.cambios.join(", ")}` : "Sin cambios"));
+}
+async function abrirNotaTiradaDtf(id) {
+  const t = STATE.dtfTiradas.find(x => x.id === id);
+  if (!t) return;
+  const r = await ventanaTaller({ titulo: `Nota de ${t.codigo_tirada}`, aceptar: "Guardar",
+    campos: [{ nombre: "observaciones", etiqueta: "Nota", valor: t.observaciones || "", placeholder: "Qué pasó, para quién era…" }] });
+  if (!r) return;
+  await llamarTaller("taller_dtf_tirada_editar", { id, observaciones: r.observaciones }, "Nota guardada");
+}
+async function abrirAnularTiradaDtf(id) {
+  const t = STATE.dtfTiradas.find(x => x.id === id);
+  if (!t) return;
+  const ped = STATE.dtfPedidos.filter(d => d.tirada_id === id);
+  if (ped.some(d => d.vendido)) { toast("Tiene archivos vendidos: primero anulá la venta en el sistema.", "warn"); return; }
+  const r = await ventanaTaller({
+    titulo: `Anular ${t.codigo_tirada}`, color: "var(--danger)", aceptar: "Anular",
+    texto: ped.length ? `Sus ${ped.length} archivo${ped.length === 1 ? "" : "s"} se anulan y los que vinieron de la fila vuelven a la cola para imprimirse de nuevo. El rollo recupera los metros. Queda en la bitácora.`
+      : "Se saca del registro y el rollo recupera los metros. Queda en la bitácora.",
+    campos: [{ nombre: "motivo", etiqueta: "Motivo", placeholder: "Ej: se cargó dos veces" }],
+    validar: (v) => (v.motivo.length >= 3 ? null : "Escribí por qué se anula.")
+  });
+  if (!r) return;
+  await llamarTaller("taller_dtf_tirada_anular", { id, motivo: r.motivo }, (d) => `${t.codigo_tirada} anulada${d.a_la_fila ? ` · ${d.a_la_fila} archivo(s) vuelven a la fila` : ""}`);
+}
+
+// Punto 2: corte de film, fin del día y cambio de film (cierran el bloque)
+async function abrirEventoDtf(tipo) {
+  const rollo = rolloDtfPuesto();
+  if (!rollo) { toast("No hay rollo de film puesto.", "warn"); return; }
+  const r = await ventanaTaller({
+    titulo: tipo === "corte" ? "✂️ Corte de film" : "🌙 Fin del día", aceptar: tipo === "corte" ? "Cortar" : "Cerrar el día",
+    texto: tipo === "corte" ? `Cierra el bloque del rollo <b>${escHtml(rollo)}</b>: lo que se imprima después va en un bloque nuevo.`
+      : `Cierra el bloque del rollo <b>${escHtml(rollo)}</b>. Mañana se empieza un bloque nuevo en el mismo rollo.`,
+    campos: [{ nombre: "metros", etiqueta: "Metros de film que se pierden (si se pierde algo)", tipo: "number", valor: 0 },
+             { nombre: "observaciones", etiqueta: "Nota (opcional)", placeholder: "Ej: corte para entregar a VMG" }],
+    validar: (v) => (v.metros < 0 ? "Los metros no pueden ser negativos." : null)
+  });
+  if (!r) return;
+  await llamarTaller("taller_dtf_evento", { tipo, id_rollo_dtf: rollo, metros: r.metros, observaciones: r.observaciones },
+    tipo === "corte" ? "✂️ Corte anotado: empieza un bloque nuevo" : "🌙 Día cerrado");
+}
+async function abrirCambioFilmDtf() {
+  const puesto = rolloDtfPuesto();
+  const enStock = rollosDtfEnUso().filter(r => r.id_rollo_dtf !== puesto);
+  if (!enStock.length) { toast("No hay otro rollo en stock: usá + Rollo Nuevo.", "warn"); return; }
+  const actual = STATE.dtfRollosSaldos.find(r => r.id_rollo_dtf === puesto);
+  const r = await ventanaTaller({
+    titulo: "🔄 Cambiar el film", aceptar: "Poner este rollo",
+    texto: puesto ? `Ahora está puesto <b>${escHtml(puesto)}</b>. Empieza un bloque nuevo con el que pongas.` : "",
+    campos: [{ nombre: "id_rollo_dtf", etiqueta: "Rollo que se pone", opciones: enStock.map(x => ({ valor: x.id_rollo_dtf, titulo: `${x.id_rollo_dtf} (quedan ${fmtNum(x.metros_restantes_reales)} m)` })) },
+             ...(puesto ? [{ nombre: "anterior", etiqueta: `El rollo ${puesto} queda`, opciones: [{ valor: "stock", titulo: "En stock (le queda film)" }, { valor: "terminado", titulo: "Terminado" }],
+               valor: actual && Number(actual.metros_restantes_reales) < 2 ? "terminado" : "stock" }] : []),
+             { nombre: "observaciones", etiqueta: "Nota (opcional)" }]
+  });
+  if (!r) return;
+  await llamarTaller("taller_dtf_cambio_film", r, `Rollo puesto: ${r.id_rollo_dtf}`);
+}
+
+// Punto 4: lo que se movió a IMPRESOS sin marcarse impreso (lo encuentra el ayudante de Google)
+function renderSinRegistrar() {
+  [["DTF", "dtfSinRegistrar"], ["SUBLIMACION", "impSinRegistrar"]].forEach(([modulo, idCont]) => {
+    const cont = document.getElementById(idCont);
+    if (!cont) return;
+    const lista = STATE.sinRegistrar.filter(p => String(p.modulo).toUpperCase() === modulo);
+    [...STATE.sinRegSel].forEach(id => { if (!STATE.sinRegistrar.some(p => p.id === id)) STATE.sinRegSel.delete(id); });
+    if (!lista.length) { cont.innerHTML = ""; return; }
+    const marcados = lista.filter(p => STATE.sinRegSel.has(p.id));
+    const metros = marcados.reduce((a, p) => a + (Number(p.metros_totales) || 0), 0);
+    const dis = marcados.length ? "" : "disabled";
+    cont.innerHTML = `
+      <div class="card sin-registrar">
+        <div class="sin-registrar-cab">
+          <h2>⚠️ Impresos sin registrar (${lista.length})</h2>
+          <label class="dtf-marcar-todas"><input type="checkbox" class="chk-sinreg-todos" data-modulo="${modulo}" ${marcados.length === lista.length ? "checked" : ""}/> Marcar todos</label>
+        </div>
+        <p class="dtf-ayuda">Se movieron a IMPRESOS sin marcarlos impresos en el taller, así que no estaban para vender.
+          ${modulo === "DTF" ? "Marcá los que se imprimieron juntos y confirmalos: pasan a <b>Vender</b>." : "Mandalos a la cola y cargalos como impresos con su tela y su ruta."}
+          Si no se imprimieron (o ya se cobraron por otro lado), descartalos.</p>
+        <div class="sin-registrar-lista">${lista.map(p => `
+          <label class="file-item">
+            <input type="checkbox" class="chk-sinreg" data-id="${p.id}" ${STATE.sinRegSel.has(p.id) ? "checked" : ""}/>
+            <span class="fname">${escHtml(p.nombre_archivo)}<br><small style="color:var(--vg-text-secondary);">${escHtml(p.fuera_fila_carpeta || "IMPRESOS")} · se movió ${fmtDateHora(p.fuera_fila_at)}</small></span>
+            <span class="fmeters">${fmtNum(p.metros_totales)}m</span>
+          </label>`).join("")}</div>
+        <div class="sin-registrar-pie">
+          <span>${marcados.length ? `${marcados.length} marcado${marcados.length === 1 ? "" : "s"} · ${fmtNum(metros)} m` : "Marcá los archivos"}</span>
+          <span style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button type="button" class="btn-secondary btn-sinreg" data-accion="descartado" data-modulo="${modulo}" ${dis}>✗ No se imprimieron</button>
+            <button type="button" class="btn-main btn-sinreg" data-accion="${modulo === "DTF" ? "impreso" : "a_la_cola"}" data-modulo="${modulo}" ${dis} style="margin:0;">${modulo === "DTF" ? "✓ Se imprimieron" : "↩ A la cola para registrarlos"}</button>
+          </span>
+        </div>
+      </div>`;
+  });
+}
+
+async function resolverSinRegistrar(accion, modulo) {
+  const lista = STATE.sinRegistrar.filter(p => String(p.modulo).toUpperCase() === modulo && STATE.sinRegSel.has(p.id));
+  if (!lista.length) return;
+  const ids = lista.map(p => p.id);
+  const metros = lista.reduce((a, p) => a + (Number(p.metros_totales) || 0), 0);
+  let p = { ids, accion };
+  if (accion === "descartado") {
+    const r = await ventanaTaller({ titulo: "No se imprimieron", color: "var(--danger)", aceptar: "Descartar",
+      texto: `${lista.length} archivo${lista.length === 1 ? "" : "s"}: salen de esta lista y quedan anotados como no impresos.`,
+      campos: [{ nombre: "motivo", etiqueta: "Motivo (opcional)", placeholder: "Ej: ya se cobró por Don Gestión" }] });
+    if (!r) return;
+    p.motivo = r.motivo;
+  } else if (accion === "impreso") {
+    const puesto = rolloDtfPuesto();
+    const masViejo = Math.min(...lista.map(x => new Date(x.fuera_fila_at).getTime() || Date.now()));
+    const reciente = Date.now() - masViejo < 24 * 3600e3;
+    const r = await ventanaTaller({
+      titulo: "✓ Se imprimieron", aceptar: "Registrar la tirada",
+      texto: `${lista.length} archivo${lista.length === 1 ? "" : "s"} · ${fmtNum(metros)} m. Queda una tirada con la fecha en que se movieron, y pasan a <b>Vender</b>.`,
+      campos: [{ nombre: "id_rollo_dtf", etiqueta: "Rollo en el que se imprimieron", opciones: opcionesRollosDtf(), valor: puesto },
+               { nombre: "descontar", tipo: "check", texto: "Descontar los metros del rollo", valor: reciente },
+               { nombre: "metros_rip", etiqueta: "Metros usados del rollo (si se descuenta)", tipo: "number", valor: Math.round(metros * 100) / 100,
+                 ayuda: "Si ese rollo ya se terminó o ya se descontó, dejá sin marcar \"Descontar\"." }],
+      validar: (v) => (v.descontar && !(v.metros_rip > 0) ? "Poné los metros usados del rollo, o no descuentes." : null)
+    });
+    if (!r) return;
+    p = { ...p, ...r };
+  }
+  const data = await llamarTaller("taller_sin_registrar_resolver", p,
+    accion === "impreso" ? (d) => `Tirada ${d.codigo}: ${d.archivos} archivo(s) pasan a Vender` : accion === "a_la_cola" ? "Vuelven a la cola: cargalos como impresos" : "Descartados");
+  if (data) ids.forEach(id => STATE.sinRegSel.delete(id));
 }
 
 // Avanzar film sin imprimir (error, calibración, film manchado…): descuenta del rollo y queda en las últimas tiradas
@@ -1793,7 +2091,10 @@ function renderBarraRolloDtf() {
         ${otros.length ? `| <strong>En stock:</strong> ${otros.map(r => `${escHtml(r.id_rollo_dtf)} (${fmtNum(r.metros_restantes_reales)}m)`).join(", ")}` : ""}
       </div>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button type="button" class="btn-secondary btn-dtf-evento" data-tipo="corte" title="Se corta el film impreso: cierra el bloque">✂️ Corte</button>
+        <button type="button" class="btn-secondary btn-dtf-evento" data-tipo="fin_dia" title="Cierra el bloque del día; mañana empieza otro en el mismo rollo">🌙 Fin del día</button>
         <button type="button" class="btn-secondary btn-dtf-avance" title="Errores, calibración, film manchado…: descuenta del rollo sin imprimir">↪️ Avanzar film</button>
+        <button type="button" class="btn-secondary btn-dtf-cambio-film" title="Poner otro rollo de los que hay en stock">🔄 Cambiar film</button>
         <button type="button" class="btn-secondary btn-dtf-rollo-nuevo">+ Rollo Nuevo</button>
         <button type="button" class="btn-dtf-sync" style="background:var(--accent-blue); color:var(--vg-text-primary); border:none; border-radius:4px; font-weight:bold; cursor:pointer;">Sincronizar</button>
       </div>
@@ -2063,7 +2364,9 @@ function renderVentasDtf() {
             ${vender ? `<input type="checkbox" class="chk-dtf-venta" data-id="${p.id}" ${STATE.dtfSelVenta.has(p.id) ? "checked" : ""} />` : ""}
             ${renderCajaMiniatura(p.file_id, p.nombre_archivo)}
             <span class="fname">${escHtml(p.nombre_archivo)}${t.nombres.length > 1 ? ` <span class="badge">${escHtml(p.nombre)}</span>` : ""}${p.separado ? ` <span class="badge activo">✓ separado</span>` : ""}<br><small style="color:var(--vg-text-secondary);">${fmtDateHora(p.fecha_hora)}</small></span>
-            <span class="fmeters">${fmtNum(p.metros)}m</span>
+            ${Number(p.metros) > 0
+              ? `<span class="fmeters">${fmtNum(p.metros)}m <button type="button" class="dtf-link btn-dtf-metros" data-id="${p.id}" title="Corregir los metros">✏️</button></span>`
+              : `<button type="button" class="btn-dtf-metros dtf-sin-metros" data-id="${p.id}" title="Este archivo no tiene metros: poné cuántos son">⚠️ poner metros</button>`}
             ${vender && t.pedidos.length > 1 ? `<button type="button" class="dtf-quitar btn-dtf-sacar" data-id="${p.id}" title="Sacar de esta venta (queda aparte)">✕</button>` : ""}
           </div>`).join("");
       const abierta = STATE.dtfVentasAbiertas.has(t.clave) || t.pedidos.some(p => STATE.dtfSelVenta.has(p.id));
@@ -2073,6 +2376,7 @@ function renderVentasDtf() {
             <div>
               <div class="dtf-venta-nombre">${escHtml(t.nombres.join(" + "))}</div>
               <div class="dtf-venta-cliente">${cliente}</div>
+              ${t.pedidos.some(p => !(Number(p.metros) > 0)) ? `<div class="dtf-venta-falta">⚠️ ${t.pedidos.filter(p => !(Number(p.metros) > 0)).length} archivo(s) sin metros: tocá "poner metros" antes de vender</div>` : ""}
               ${t.falta_metros > 0
                 ? `<div class="dtf-venta-falta">⏳ Impreso ${fmtNum(t.metros)} de ${fmtNum(t.metros + t.falta_metros)} m · faltan ${fmtNum(t.falta_metros)} m (${t.falta_archivos} archivo${t.falta_archivos === 1 ? "" : "s"} en la fila)</div>`
                 : (t.a_mano ? "" : `<div class="dtf-venta-completo">✓ No queda nada en la fila</div>`)}
@@ -5488,6 +5792,18 @@ export function inicializarEventosUI() {
   document.getElementById("btnDtfSepDesmarcar")?.addEventListener("click", () => { STATE.dtfSelTiradas.clear(); renderSepararDtf(); });
   document.getElementById("btnDtfSepMarcar")?.addEventListener("click", separarTiradasMarcadas);
 
+  // Impresos sin registrar: marcar cuáles se confirman o se descartan (en Impresión y en DTF)
+  document.addEventListener("change", (e) => {
+    const chk = e.target.closest && e.target.closest(".chk-sinreg, .chk-sinreg-todos");
+    if (!chk) return;
+    if (chk.classList.contains("chk-sinreg-todos")) {
+      STATE.sinRegistrar.filter(p => String(p.modulo).toUpperCase() === chk.getAttribute("data-modulo"))
+        .forEach(p => { if (chk.checked) STATE.sinRegSel.add(p.id); else STATE.sinRegSel.delete(p.id); });
+    } else if (chk.checked) STATE.sinRegSel.add(chk.getAttribute("data-id"));
+    else STATE.sinRegSel.delete(chk.getAttribute("data-id"));
+    renderSinRegistrar();
+  });
+
   // DTF paso 2: marcar archivos para juntarlos en una venta
   const tarjetasDtf = document.getElementById("dtfTarjetasVender");
   tarjetasDtf?.addEventListener("change", (e) => {
@@ -5807,6 +6123,19 @@ export function inicializarEventosUI() {
     if (btnDtfVender) { venderDtf(btnDtfVender.getAttribute("data-clave")); return; }
     if (e.target.closest(".btn-dtf-rollo-nuevo")) { abrirRolloNuevoDtf(); return; }
     if (e.target.closest(".btn-dtf-avance")) { abrirAvanceFilmDtf(); return; }
+    const btnDtfEvento = e.target.closest(".btn-dtf-evento");
+    if (btnDtfEvento) { abrirEventoDtf(btnDtfEvento.getAttribute("data-tipo")); return; }
+    if (e.target.closest(".btn-dtf-cambio-film")) { abrirCambioFilmDtf(); return; }
+    const btnDtfMetros = e.target.closest(".btn-dtf-metros");
+    if (btnDtfMetros) { e.preventDefault(); abrirMetrosPedidoDtf(btnDtfMetros.getAttribute("data-id")); return; }
+    const btnTEditar = e.target.closest(".btn-dtf-t-editar");
+    if (btnTEditar) { abrirEditarTiradaDtf(btnTEditar.getAttribute("data-id")); return; }
+    const btnTNota = e.target.closest(".btn-dtf-t-nota");
+    if (btnTNota) { abrirNotaTiradaDtf(btnTNota.getAttribute("data-id")); return; }
+    const btnTAnular = e.target.closest(".btn-dtf-t-anular");
+    if (btnTAnular) { abrirAnularTiradaDtf(btnTAnular.getAttribute("data-id")); return; }
+    const btnSinReg = e.target.closest(".btn-sinreg");
+    if (btnSinReg) { resolverSinRegistrar(btnSinReg.getAttribute("data-accion"), btnSinReg.getAttribute("data-modulo")); return; }
     const btnSinVenta = e.target.closest(".btn-dtf-sin-venta");
     if (btnSinVenta) { abrirSinVentaDtf(btnSinVenta.getAttribute("data-clave")); return; }
     if (e.target.closest(".btn-dtf-sync")) { document.getElementById("btnSyncDriveSandbox")?.click(); return; }
