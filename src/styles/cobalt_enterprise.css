@@ -684,3 +684,14 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
 .sin-registrar-pie { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--vg-text-secondary); }
 .sin-registrar-pie button { width: auto; margin: 0; }
 .sin-registrar-pie button:disabled { opacity: .45; cursor: default; }
+
+/* Reimpresión y rollo terminado en el medio (al registrar una impresión) */
+.imp-reimpresion { margin: 8px 0; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--accent-orange); font-size: 13px; color: var(--vg-text-primary); }
+.imp-partes { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.imp-partes[hidden] { display: none; }
+.imp-parte { display: grid; grid-template-columns: 1fr 150px 110px; gap: 6px; align-items: center; padding: 6px 8px; border: 1px solid var(--vg-surface-border); border-radius: 8px; }
+.imp-parte-nombre { font-size: 12px; word-break: break-word; }
+.imp-parte-nombre small { display: block; color: var(--vg-text-secondary); }
+.imp-parte select, .imp-parte input { margin: 0; }
+.imp-parte input[hidden] { display: none; }
+@media (max-width: 560px) { .imp-parte { grid-template-columns: 1fr; } }

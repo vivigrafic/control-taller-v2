@@ -550,7 +550,7 @@ function renderBadgesYTodosLosKPIs() {
   const pendCalRows = STATE.colaCalandrado.filter(c => !String(c.estado).toLowerCase().includes("terminado"));
   const pendLasRows = STATE.colaLaser.filter(l => !String(l.estado).toLowerCase().includes("terminado"));
 
-  const mPendImp = pendSubRows.reduce((a, b) => a + (Number(b.metros_totales) || 0), 0);
+  const mPendImp = pendSubRows.reduce((a, b) => a + faltaMetros(b), 0);
   const mPendCal = pendCalRows.reduce((a, b) => a + (Number(b.metros) || 0), 0);
   const mPendLas = pendLasRows.reduce((a, b) => a + (Number(b.metros) || 0), 0);
 
@@ -573,7 +573,7 @@ function renderBadgesYTodosLosKPIs() {
   });
   // DTF: metros de film usados en las tiradas (consumido + desperdicio, igual que el saldo del rollo)
   renderKpisEstacion("kpisDtf", {
-    pendienteTitulo: "A Imprimir", pendiente: pendDtfRows.reduce((a, b) => a + (Number(b.metros_totales) || 0), 0), pendienteSub: plural(pendDtfRows.length, "archivo", "archivos"),
+    pendienteTitulo: "A Imprimir", pendiente: pendDtfRows.reduce((a, b) => a + faltaMetros(b), 0), pendienteSub: plural(pendDtfRows.length, "archivo", "archivos"),
     filas: STATE.dtfTiradas, campoFecha: "fecha_hora", metrosDe: r => (Number(r.metros_consumidos_rollo) || 0) + (Number(r.metros_desperdicio) || 0)
   });
 }
@@ -780,7 +780,7 @@ function renderPendientesDriveSublimacion() {
   let sumaSeleccionados = 0;
   STATE.pendientesDrive.forEach(p => {
     if (STATE.impForm.archivosSeleccionadosIds.has(p.id)) {
-      sumaSeleccionados += Number(p.metros_totales) || 0;
+      sumaSeleccionados += faltaMetros(p);
     }
   });
   const badgeSel = document.getElementById("impSumaSeleccionadosBadge");
@@ -809,7 +809,7 @@ function renderPendientesDriveSublimacion() {
   let html = "";
   for (const [cliente, archivos] of carpetas.entries()) {
     const abierta = STATE.carpetasPendientesAbiertas.has(cliente);
-    const totalMtsCarpeta = archivos.reduce((a, b) => a + (Number(b.metros_totales) || 0), 0);
+    const totalMtsCarpeta = archivos.reduce((a, b) => a + faltaMetros(b), 0);
     const todosMarcados = archivos.every(a => STATE.impForm.archivosSeleccionadosIds.has(a.id));
 
     html += `
@@ -827,9 +827,9 @@ function renderPendientesDriveSublimacion() {
             <label class="file-item" style="${checked ? "border-color:var(--accent-blue);" : ""}">
               <input type="checkbox" class="chk-pend-sub" data-id="${p.id}" ${checked ? "checked" : ""} />
               <div class="file-info">
-                <span class="fname">${p.prioridad_maxima ? "🚨 " : ""}${escHtml(p.nombre_archivo)}${avisoMedida(p)}${p.fuera_fila_resuelto === "a_la_cola" ? ` <span class="badge danger" title="Se movió a IMPRESOS sin marcarlo: cargalo como impreso con su tela y su ruta">ya está en IMPRESOS: registralo</span>` : ""}</span>
+                <span class="fname">${p.prioridad_maxima ? "🚨 " : ""}${escHtml(p.nombre_archivo)}${avisosFila(p)}${p.fuera_fila_resuelto === "a_la_cola" ? ` <span class="badge danger" title="Se movió a IMPRESOS sin marcarlo: cargalo como impreso con su tela y su ruta">ya está en IMPRESOS: registralo</span>` : ""}</span>
               </div>
-              <div class="fmeters">${fmtNum(p.metros_totales)}m</div>
+              <div class="fmeters">${fmtNum(faltaMetros(p))}m</div>
             </label>
           `;
         }).join("")}
@@ -887,7 +887,7 @@ function aplicarAutodeteccionAlSeleccionarArchivos() {
   }
 
   STATE.impForm.dirty = true;
-  const sumaMts = seleccionados.reduce((a, b) => a + (Number(b.metros_totales) || 0), 0);
+  const sumaMts = seleccionados.reduce((a, b) => a + faltaMetros(b), 0); // lo que falta (si salió a medias, solo el resto)
   STATE.impForm.metrosLote = Number(sumaMts.toFixed(2));
 
   const catObj = {
@@ -1545,7 +1545,7 @@ function renderColaDtf() {
   const enLaCola = STATE.pendientesDrive.filter(p => p.modulo === "DTF" && p.estado_impreso !== "SI");
   const totalCola = document.getElementById("dtfTotalCola");
   if (totalCola) totalCola.innerHTML = enLaCola.length
-    ? `En la cola: ${enLaCola.length} archivo${enLaCola.length === 1 ? "" : "s"} · <span>${fmtNum(enLaCola.reduce((a, p) => a + (Number(p.metros_totales) || 0), 0))} m</span>`
+    ? `En la cola: ${enLaCola.length} archivo${enLaCola.length === 1 ? "" : "s"} · <span>${fmtNum(enLaCola.reduce((a, p) => a + faltaMetros(p), 0))} m</span>`
     : "";
   const lista = colaDtf();
   if (!lista.length) {
@@ -1559,7 +1559,7 @@ function renderColaDtf() {
     });
     cont.innerHTML = [...carpetas.entries()].map(([cli, archivos]) => {
       const cerrada = !STATE.dtfCarpetasAbiertas.has(cli) && !STATE.dtfFiltroCola.trim();
-      const metros = archivos.reduce((a, b) => a + (Number(b.metros_totales) || 0), 0);
+      const metros = archivos.reduce((a, b) => a + faltaMetros(b), 0);
       const marcados = archivos.filter(a => STATE.dtfSeleccion.has(a.id)).length;
       return `
         <div class="folder-header dtf-carpeta" data-carpeta="${escHtml(cli)}">
@@ -1574,8 +1574,8 @@ function renderColaDtf() {
             <label class="file-item dtf-archivo" style="${STATE.dtfSeleccion.has(p.id) ? "border-color:var(--accent-blue);" : ""}">
               <input type="checkbox" class="chk-dtf-pend" data-id="${p.id}" ${STATE.dtfSeleccion.has(p.id) ? "checked" : ""} />
               ${renderCajaMiniatura(p.file_id, p.nombre_archivo)}
-              <span class="fname">${p.prioridad_maxima ? "🚨 " : ""}${escHtml(p.nombre_archivo)}${cargo ? ` <span class="badge danger">${escHtml(cargo)}</span>` : ""}${avisoMedida(p)}</span>
-              <span class="fmeters">${fmtNum(p.metros_totales)}m</span>
+              <span class="fname">${p.prioridad_maxima ? "🚨 " : ""}${escHtml(p.nombre_archivo)}${cargo ? ` <span class="badge danger">${escHtml(cargo)}</span>` : ""}${avisosFila(p)}</span>
+              <span class="fmeters">${fmtNum(faltaMetros(p))}m</span>
             </label>`;
           }).join("")}
         </div>`;
@@ -1587,9 +1587,64 @@ function renderColaDtf() {
   const resumen = document.getElementById("dtfResumenSeleccion");
   if (resumen) {
     const clientes = new Set(marcados.map(p => p.cliente || "SIN CLIENTE")).size;
-    resumen.textContent = `${marcados.length} archivo${marcados.length === 1 ? "" : "s"} · ${fmtNum(marcados.reduce((a, b) => a + (Number(b.metros_totales) || 0), 0))} m · ${clientes} cliente${clientes === 1 ? "" : "s"}`;
+    resumen.textContent = `${marcados.length} archivo${marcados.length === 1 ? "" : "s"} · ${fmtNum(marcados.reduce((a, b) => a + faltaMetros(b), 0))} m · ${clientes} cliente${clientes === 1 ? "" : "s"}`;
   }
   renderMesaDtf();
+}
+
+// Lo que falta imprimir de un archivo: si salió a medias porque se terminó el rollo, solo el resto
+function faltaMetros(p) {
+  return Math.max((Number(p.metros_totales) || 0) - (Number(p.metros_impresos_parcial) || 0), 0);
+}
+
+// El rollo se terminó en el medio: cómo salió cada archivo en este rollo (completo, una parte con sus metros, o nada).
+// Devuelve [{ s, estado, metros }] o null si se cancela. metros: lo que salió (en completo, lo que faltaba).
+function preguntarComoSalio(archivos, material) {
+  return new Promise(resolve => {
+    const capa = document.createElement("div");
+    capa.className = "modal-overlay open";
+    capa.innerHTML = `
+      <div class="modal-content" style="border-color:var(--accent-orange); max-width:540px; width:100%;">
+        <h2 style="margin-top:0;">✂️ Se terminó el rollo de ${escHtml(material)}</h2>
+        <p class="dtf-ayuda" style="margin:0 0 8px;">Marcá cómo salió cada archivo en este rollo. Lo que salió a medias queda en la cola con lo que falta, para imprimirlo en el rollo nuevo.</p>
+        <div class="imp-partes">${archivos.map(p => `
+          <div class="imp-parte" data-id="${p.id}">
+            <span class="imp-parte-nombre">${escHtml(p.nombre_archivo)}<small>falta ${fmtNum(faltaMetros(p))} m</small></span>
+            <select data-c="estado"><option value="completo">Salió completo</option><option value="parte">Salió una parte</option><option value="nada">No salió</option></select>
+            <input type="number" step="0.01" min="0" data-c="metros" placeholder="m que salieron" hidden />
+          </div>`).join("")}</div>
+        <div style="display:flex; gap:8px; margin-top:14px;">
+          <button type="button" class="btn-secondary" data-x="cancelar">Cancelar</button>
+          <button type="button" class="btn-main" data-x="ok" style="margin:0;">Seguir</button>
+        </div>
+      </div>`;
+    document.body.appendChild(capa);
+    capa.addEventListener("change", (e) => {
+      if (e.target.matches("[data-c='estado']")) e.target.closest(".imp-parte").querySelector("[data-c='metros']").hidden = e.target.value !== "parte";
+    });
+    capa.addEventListener("click", (e) => {
+      if (e.target === capa || e.target.closest("[data-x='cancelar']")) { capa.remove(); resolve(null); return; }
+      if (!e.target.closest("[data-x='ok']")) return;
+      const r = [...capa.querySelectorAll(".imp-parte")].map(div => {
+        const s = archivos.find(p => p.id === div.dataset.id);
+        const estado = div.querySelector("[data-c='estado']").value;
+        const metros = estado === "completo" ? faltaMetros(s) : estado === "parte" ? Number(String(div.querySelector("[data-c='metros']").value).replace(",", ".")) || 0 : 0;
+        return { s, estado, metros };
+      });
+      const mal = r.find(x => x.estado === "parte" && (!(x.metros > 0) || x.metros >= faltaMetros(x.s)));
+      if (mal) { toast(`"${mal.s.nombre_archivo}": poné los metros que salieron (más de 0 y menos de ${fmtNum(faltaMetros(mal.s))}).`, "warn"); return; }
+      capa.remove();
+      resolve(r);
+    });
+  });
+}
+
+// Avisos de la cola: medida distinta del nombre, ya impreso antes (volvió a la fila) o salió a medias
+function avisosFila(p) {
+  let h = avisoMedida(p);
+  if (p.ya_impreso_at) h += ` <span class="badge danger" title="Alguien lo volvió a poner en la fila: al imprimirlo se pregunta si es reposición o se cobra">⚠️ ya se imprimió el ${new Date(p.ya_impreso_at).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" })}</span>`;
+  if (Number(p.metros_impresos_parcial) > 0) h += ` <span class="badge danger" title="${escHtml(p.parcial_detalle || "")}">✂️ falta ${fmtNum(faltaMetros(p))} de ${fmtNum(p.metros_totales)} m (ya salieron ${fmtNum(p.metros_impresos_parcial)} m)</span>`;
+  return h;
 }
 
 // La imagen mide distinto de lo que dice el nombre del archivo (la medida real ya es la que se usa)
@@ -2043,7 +2098,7 @@ function mostrarPasoDtf(paso) {
   if (badgeImp) {
     const cola = STATE.pendientesDrive.filter(p => p.modulo === "DTF" && p.estado_impreso !== "SI");
     badgeImp.hidden = cola.length === 0;
-    badgeImp.textContent = `${cola.length} · ${fmtNum(cola.reduce((a, p) => a + (Number(p.metros_totales) || 0), 0))} m`;
+    badgeImp.textContent = `${cola.length} · ${fmtNum(cola.reduce((a, p) => a + faltaMetros(p), 0))} m`;
   }
   const badgeSep = document.getElementById("dtfBadgeSeparar");
   if (badgeSep) {
@@ -2117,7 +2172,7 @@ function renderMesaDtf() {
   const mesa = document.getElementById("dtfMesa");
   if (!mesa) return;
   const marcados = [...STATE.dtfSeleccion].map(id => STATE.pendientesDrive.find(p => p.id === id)).filter(Boolean);
-  const metros = marcados.reduce((a, p) => a + (Number(p.metros_totales) || 0), 0);
+  const metros = marcados.reduce((a, p) => a + faltaMetros(p), 0);
   const clientes = [...new Set(marcados.map(p => nombreLimpioDtf(p.cliente)))];
   const resumen = document.getElementById("dtfMesaResumen");
   if (resumen) resumen.textContent = marcados.length ? `${marcados.length} archivo${marcados.length === 1 ? "" : "s"} · ${clientes.length} cliente${clientes.length === 1 ? "" : "s"} · ${fmtNum(metros)} m` : "";
@@ -2155,9 +2210,9 @@ function renderMesaDtf() {
     STATE.dtfMesaVistos = new Set();
     return;
   }
-  const max = Math.max(...marcados.map(p => Number(p.metros_totales) || 0), 0.01);
+  const max = Math.max(...marcados.map(p => faltaMetros(p)), 0.01);
   mesa.innerHTML = marcados.map((p, k) => {
-    const m = Number(p.metros_totales) || 0;
+    const m = faltaMetros(p);
     const cliente = nombreLimpioDtf(p.cliente);
     const nueva = !STATE.dtfMesaVistos.has(p.id);
     const cargo = p.es_repo_muestra ? String(p.es_repo_muestra).toUpperCase() : "";
@@ -2272,21 +2327,41 @@ function abrirRolloNuevoDtf() {
 function abrirImprimirDtf() {
   const marcados = STATE.pendientesDrive.filter(p => STATE.dtfSeleccion.has(p.id));
   if (!marcados.length) return;
-  const metros = marcados.reduce((a, b) => a + (Number(b.metros_totales) || 0), 0);
+  const metros = marcados.reduce((a, b) => a + faltaMetros(b), 0);
   const clientes = [...new Set(marcados.map(p => p.cliente || "SIN CLIENTE"))];
   const rolloElegido = rolloDtfPuesto();
+  const reimpresos = marcados.filter(p => p.ya_impreso_at);
   const capa = document.createElement("div");
   capa.className = "modal-overlay open";
   capa.innerHTML = `
-    <div class="modal-content" style="border-color:var(--accent-blue); max-width:480px; width:100%;">
+    <div class="modal-content" style="border-color:var(--accent-blue); max-width:540px; width:100%;">
       <h2 style="margin-top:0;">🖨️ Imprimir ${marcados.length} archivo${marcados.length === 1 ? "" : "s"}</h2>
       <p style="font-size:13px; color:var(--vg-text-secondary); margin:0 0 6px;">${fmtNum(metros)} m de archivos · ${clientes.map(escHtml).join(", ")}</p>
+      ${reimpresos.length ? `
+      <div class="imp-reimpresion">
+        <b>⚠️ ${reimpresos.length === 1 ? "Este archivo ya se había impreso" : `${reimpresos.length} archivos ya se habían impreso`}:</b>
+        ${reimpresos.map(p => escHtml(p.nombre_archivo)).join(", ")}. ¿Cómo va esta vez?
+        <div class="dtf-motivos">
+          <label class="dtf-motivo"><input type="radio" name="dtf-reimp" value="REPOSICION" /> Es una reposición (falla, error nuestro): <b>sin cargo</b></label>
+          <label class="dtf-motivo"><input type="radio" name="dtf-reimp" value="VENTA" /> El cliente pidió más copias: <b>se cobra otra vez</b></label>
+        </div>
+      </div>` : ""}
       <label>Rollo de film</label>
       <select data-x="rollo">${rollosDtfEnUso().map(r => `<option value="${escHtml(r.id_rollo_dtf)}" ${r.id_rollo_dtf === rolloElegido ? "selected" : ""}>${escHtml(r.id_rollo_dtf)} — ${escHtml(r.marca_fabricante)} (${fmtNum(r.metros_restantes_reales)}m disp.)</option>`).join("")}</select>
       <label>Metros que usó del rollo (los del RIP)</label>
       <input type="number" step="0.01" min="0" data-x="rip" placeholder="${fmtNum(metros)} (si lo dejás vacío)" />
       <label>Observación</label>
       <input type="text" data-x="obs" placeholder="Opcional…" />
+      <label class="dtf-motivo" style="margin-top:10px;"><input type="checkbox" data-x="cortado" /> ⚠️ El rollo se terminó en el medio de la impresión</label>
+      <div data-x="partes" class="imp-partes" hidden>
+        <p class="dtf-ayuda" style="margin:6px 0;">Marcá cómo salió cada archivo en este rollo. Lo que salió a medias queda en la cola con lo que falta (se cobra una sola vez, cuando sale la última parte). Este rollo queda <b>terminado</b>.</p>
+        ${marcados.map(p => `
+          <div class="imp-parte" data-id="${p.id}">
+            <span class="imp-parte-nombre">${escHtml(p.nombre_archivo)}<small>falta ${fmtNum(faltaMetros(p))} m</small></span>
+            <select data-c="estado"><option value="completo">Salió completo</option><option value="parte">Salió una parte</option><option value="nada">No salió</option></select>
+            <input type="number" step="0.01" min="0" data-c="metros" placeholder="m que salieron" hidden />
+          </div>`).join("")}
+      </div>
       <div style="display:flex; gap:8px; margin-top:14px;">
         <button type="button" class="btn-secondary" data-x="cancelar">Cancelar</button>
         <button type="button" class="btn-main" data-x="ok" style="margin:0;">✓ Ya se imprimió</button>
@@ -2294,23 +2369,40 @@ function abrirImprimirDtf() {
     </div>`;
   document.body.appendChild(capa);
   const cerrar = () => capa.remove();
+  const q = (x) => capa.querySelector(`[data-x='${x}']`);
+  capa.addEventListener("change", (e) => {
+    if (e.target === q("cortado")) q("partes").hidden = !e.target.checked;
+    if (e.target.matches("[data-c='estado']")) e.target.closest(".imp-parte").querySelector("[data-c='metros']").hidden = e.target.value !== "parte";
+  });
   capa.addEventListener("click", async (e) => {
     if (e.target === capa || e.target.closest("[data-x='cancelar']")) { cerrar(); return; }
     const ok = e.target.closest("[data-x='ok']");
     if (!ok) return;
-    const rollo = capa.querySelector("[data-x='rollo']").value;
+    const rollo = q("rollo").value;
     if (!rollo) { toast("Elegí el rollo de film (o cargá uno con + Rollo 100m).", "warn"); return; }
+    const reimp = capa.querySelector("input[name='dtf-reimp']:checked");
+    if (reimpresos.length && !reimp) { toast("Elegí si la reimpresión es reposición o se cobra.", "warn"); return; }
+    const cortado = q("cortado").checked;
+    let partes = null;
+    if (cortado) {
+      partes = [...capa.querySelectorAll(".imp-parte")].map(div => ({ id: div.dataset.id, estado: div.querySelector("[data-c='estado']").value,
+        metros: Number(String(div.querySelector("[data-c='metros']").value).replace(",", ".")) || null }));
+      if (partes.some(x => x.estado === "parte" && !(x.metros > 0))) { toast("Poné cuántos metros salieron de los que salieron a medias.", "warn"); return; }
+      if (!partes.some(x => x.estado !== "nada")) { toast("No salió ningún archivo: no hay nada que registrar.", "warn"); return; }
+    }
     ok.disabled = true;
     ok.textContent = "⏳ Guardando…";
     const { data, error } = await sb().rpc("taller_dtf_imprimir", { p: {
       pendientes: marcados.map(p => p.id), id_rollo_dtf: rollo,
-      metros_rip: capa.querySelector("[data-x='rip']").value || null,
-      observaciones: capa.querySelector("[data-x='obs']").value.trim()
+      metros_rip: q("rip").value || null,
+      observaciones: q("obs").value.trim(),
+      cargo_reimpresion: reimp ? reimp.value : null,
+      partes, rollo_terminado: cortado
     } });
     if (error) { ok.disabled = false; ok.textContent = "✓ Ya se imprimió"; toast("Error: " + error.message, "error"); return; }
     cerrar();
     STATE.dtfSeleccion.clear();
-    toast(`✅ Tirada ${data.codigo}: ${data.archivos} archivo(s), ${fmtNum(data.metros)} m. Pasan a IMPRESOS y a Vender.`);
+    toast(`✅ Tirada ${data.codigo}: ${data.archivos} archivo(s) completos${data.partes ? `, ${data.partes} a medias (quedan en la cola con lo que falta)` : ""}. ${cortado ? "Poné el rollo nuevo: 🔄 Cambiar film o + Rollo Nuevo." : "Pasan a IMPRESOS y a Vender."}`);
     await cargarDatosTodo();
   });
 }
@@ -3585,7 +3677,7 @@ function renderModuloMetricasBI() {
   const pendCal = STATE.colaCalandrado.filter(c => !String(c.estado).toLowerCase().includes("terminado"));
   const pendLas = STATE.colaLaser.filter(l => !String(l.estado).toLowerCase().includes("terminado"));
 
-  const qImp = pendSub.reduce((a, b) => a + (Number(b.metros_totales) || 0), 0);
+  const qImp = pendSub.reduce((a, b) => a + faltaMetros(b), 0);
   const qCal = pendCal.reduce((a, b) => a + (Number(b.metros) || 0), 0);
   const qLas = pendLas.reduce((a, b) => a + (Number(b.metros) || 0), 0);
 
@@ -3636,7 +3728,7 @@ function renderModuloMetricasBI() {
   setTxt("biDtfSemAnt", fmtNum(metricasDtf(semAntIni, semActualIni).metros));
   setTxt("biDtfMes", fmtNum(metricasDtf(mesActualIni).metros));
   setTxt("biDtfMesAnt", fmtNum(metricasDtf(mesAntIni, mesActualIni).metros));
-  const qDtf = STATE.pendientesDrive.filter(p => p.modulo === "DTF" && p.estado_impreso !== "SI").reduce((a, b) => a + (Number(b.metros_totales) || 0), 0);
+  const qDtf = STATE.pendientesDrive.filter(p => p.modulo === "DTF" && p.estado_impreso !== "SI").reduce((a, b) => a + faltaMetros(b), 0);
   setTxt("radarQDtf", `${fmtNum(qDtf, 0)}m`);
   const elTopDtf = document.getElementById("dashTopClientesDtf");
   if (elTopDtf) {
@@ -4026,15 +4118,29 @@ async function procesarImpresionLote() {
   const fechaManVal = document.getElementById("impInput_fechaManual")?.value;
   const fechaIso = fechaManVal ? new Date(fechaManVal).toISOString() : new Date().toISOString();
 
-  const nombresUnidos = seleccionados.length > 0
-    ? seleccionados.map(s => s.nombre_archivo).join(" | ")
+  // Si el rollo de papel se terminó en el medio: cómo salió cada archivo. Lo que salió a medias queda en la cola con lo
+  // que falta (taller_fila_parcial) y lo que no salió sigue como estaba.
+  const chkCortado = document.getElementById("impInput_rolloCortado");
+  const cortado = !!(chkCortado && chkCortado.checked && seleccionados.length > 0);
+  let salieron = seleccionados.map(s => ({ s, estado: "completo", metros: faltaMetros(s) }));
+  if (cortado) {
+    const r = await preguntarComoSalio(seleccionados, "papel");
+    if (!r) return;
+    salieron = r.filter(x => x.estado !== "nada");
+    if (!salieron.length) { toast("No salió ningún archivo: no hay nada que registrar.", "warn"); return; }
+  }
+  const impresos = salieron.map(x => x.s);
+
+  const nombresUnidos = impresos.length > 0
+    ? impresos.map(s => s.nombre_archivo).join(" | ")
     : (disenoInput || "TRABAJO MANUAL");
 
-  const metrosTotales = metrosManualInput > 0
+  // Con el rollo cortado manda lo que salió (el campo de metros se completa solo con el total de lo marcado)
+  const metrosTotales = metrosManualInput > 0 && !cortado
     ? metrosManualInput
-    : seleccionados.reduce((acc, s) => acc + (Number(s.metros_totales) || 0), 0);
+    : salieron.reduce((acc, x) => acc + (Number(x.metros) || 0), 0);
 
-  const fileIdsUnidos = seleccionados.map(s => s.file_id || s.id).join(",");
+  const fileIdsUnidos = impresos.map(s => s.file_id || s.id).join(",");
 
   const tela = document.getElementById("impInput_tela")?.value.trim() || STATE.impForm.tela;
   const perfil = document.getElementById("impInput_perfil")?.value.trim() || STATE.impForm.perfil;
@@ -4087,8 +4193,17 @@ async function procesarImpresionLote() {
     });
   }
 
-  for (const s of seleccionados) {
-    await sb().from("prod_pendientes_drive").update({ estado_impreso: "SI" }).eq("id", s.id);
+  for (const x of salieron) {
+    if (x.estado === "parte") {
+      const { error: errP } = await sb().rpc("taller_fila_parcial", { p: { id: x.s.id, metros: x.metros, rollo: infoRollo.idBase } });
+      if (errP) toast(`Error con ${x.s.nombre_archivo}: ${errP.message}`, "error");
+    } else {
+      await sb().from("prod_pendientes_drive").update({ estado_impreso: "SI" }).eq("id", x.s.id);
+    }
+  }
+  if (cortado) {
+    chkCortado.checked = false;
+    toast("✂️ Lo que salió a medias quedó en la cola con lo que falta. Cargá el rollo nuevo de papel.", "warn");
   }
 
   // Los archivos los mueve a IMPRESOS el vigía de Google (cada minuto) al ver estado_impreso = SI. No hay dirección
