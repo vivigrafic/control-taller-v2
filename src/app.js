@@ -1820,7 +1820,7 @@ async function llamarTaller(funcion, p, exito) {
 // La base los enlaza sola cuando está segura (número de tarjeta, el mismo archivo que en la carpeta de la tarjeta, número de
 // cliente, "llega como" o nombre exacto). Lo que queda sin tarjeta se enlaza acá a mano: fila_enlazar_manual.
 const ESTADO_TARJETA = { "col-consultas": "Consultas", "col-diseno": "En diseño", "col-impresion": "En impresión", "col-calandrado": "En calandrado",
-  "col-laser": "En corte", "col-control": "Control", "col-listo": "Listo" };
+  "col-laser": "En corte", "col-control": "Control", "col-listo": "Listo", "col-listo-dtf": "Listo DTF" };
 
 function nombreLimpioFila(t) {
   return String(t || "").replace(/\[[^\]]*\]/g, " ").replace(/\([^)]*\)/g, " ").replace(/\d{1,2}-\d{1,2}-\d{2,4}/g, " ")
