@@ -651,3 +651,16 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
 .alerta-cartel-botones { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
 .alerta-cartel-botones button { flex: 1; min-width: 140px; margin: 0; }
 .alerta-cartel-botones .alerta-ok { min-height: 54px; font-size: 18px; font-weight: 900; background: var(--vg-status-ready); border-color: var(--vg-status-ready); color: var(--vg-text-primary); }
+
+/* DTF: últimas tiradas con sus archivos, avance de film y motivos */
+.dtf-tiradas-card { margin-top: 16px; }
+.dtf-tiradas td { vertical-align: top; }
+.dtf-tirada-archivos { min-width: 260px; }
+.dtf-tirada-arch { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; padding: 2px 0; border-bottom: 1px dashed var(--vg-surface-border); }
+.dtf-tirada-arch b { white-space: nowrap; }
+.dtf-tirada-archivos summary { cursor: pointer; font-size: 12px; color: var(--vg-text-secondary); }
+.dtf-tirada-avance td { background: color-mix(in srgb, var(--accent-orange) 8%, transparent); }
+.dtf-motivos { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 6px; }
+.dtf-motivo { display: flex; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid var(--vg-surface-border); border-radius: 8px; cursor: pointer; font-size: 14px; }
+.dtf-motivo input { width: auto; margin: 0; }
+.grid-panel[hidden] { display: none !important; }

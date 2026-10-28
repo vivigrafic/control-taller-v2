@@ -819,7 +819,7 @@ function renderPendientesDriveSublimacion() {
             <label class="file-item" style="${checked ? "border-color:var(--accent-blue);" : ""}">
               <input type="checkbox" class="chk-pend-sub" data-id="${p.id}" ${checked ? "checked" : ""} />
               <div class="file-info">
-                <span class="fname">${p.prioridad_maxima ? "🚨 " : ""}${escHtml(p.nombre_archivo)}</span>
+                <span class="fname">${p.prioridad_maxima ? "🚨 " : ""}${escHtml(p.nombre_archivo)}${avisoMedida(p)}</span>
               </div>
               <div class="fmeters">${fmtNum(p.metros_totales)}m</div>
             </label>
@@ -1566,7 +1566,7 @@ function renderColaDtf() {
             <label class="file-item dtf-archivo" style="${STATE.dtfSeleccion.has(p.id) ? "border-color:var(--accent-blue);" : ""}">
               <input type="checkbox" class="chk-dtf-pend" data-id="${p.id}" ${STATE.dtfSeleccion.has(p.id) ? "checked" : ""} />
               ${renderCajaMiniatura(p.file_id, p.nombre_archivo)}
-              <span class="fname">${p.prioridad_maxima ? "🚨 " : ""}${escHtml(p.nombre_archivo)}${cargo ? ` <span class="badge danger">${escHtml(cargo)}</span>` : ""}</span>
+              <span class="fname">${p.prioridad_maxima ? "🚨 " : ""}${escHtml(p.nombre_archivo)}${cargo ? ` <span class="badge danger">${escHtml(cargo)}</span>` : ""}${avisoMedida(p)}</span>
               <span class="fmeters">${fmtNum(p.metros_totales)}m</span>
             </label>`;
           }).join("")}
@@ -1584,22 +1584,157 @@ function renderColaDtf() {
   renderMesaDtf();
 }
 
+// La imagen mide distinto de lo que dice el nombre del archivo (la medida real ya es la que se usa)
+function avisoMedida(p) {
+  if (!p.discrepancia_medida || !p.metros_dpi_real) return "";
+  const delNombre = (Number(p.medida_unitaria) || 0) * (Number(p.repeticiones) || 1);
+  return ` <span class="badge danger" title="Se usa la medida real de la imagen">📏 ${delNombre ? `el nombre dice ${fmtNum(delNombre)} m · ` : ""}mide ${fmtNum(p.metros_dpi_real)} m</span>`;
+}
+
 function renderTiradasDtf() {
   const tbody = document.getElementById("tbodyTiradasDTF");
   if (!tbody) return;
   const porTirada = new Map();
-  STATE.dtfPedidos.forEach(d => { if (d.tirada_id) porTirada.set(d.tirada_id, (porTirada.get(d.tirada_id) || 0) + 1); });
-  const ultimas = STATE.dtfTiradas.slice(0, 15);
+  STATE.dtfPedidos.forEach(d => { if (!d.tirada_id) return; if (!porTirada.has(d.tirada_id)) porTirada.set(d.tirada_id, []); porTirada.get(d.tirada_id).push(d); });
+  const ultimas = STATE.dtfTiradas.slice(0, 25);
+  const cargo = (c) => c && c !== "VENTA" ? ` <span class="badge danger">${escHtml(c === "REPOSICION" ? "repo" : c.toLowerCase())}</span>` : "";
   tbody.innerHTML = ultimas.length === 0
-    ? `<tr><td colspan="5" style="text-align:center;color:var(--vg-text-secondary);">Todavía no hay tiradas.</td></tr>`
-    : ultimas.map(t => `
-      <tr>
-        <td><strong>${escHtml(t.codigo_tirada)}</strong>${t.es_anidado ? ` <span class="badge activo">anidado</span>` : ""}</td>
-        <td>${fmtDateHora(t.fecha_hora)}</td>
-        <td>${porTirada.get(t.id) || 0}</td>
-        <td>${fmtNum(t.metros_consumidos_rollo)}m</td>
+    ? `<tr><td colspan="6" style="text-align:center;color:var(--vg-text-secondary);">Todavía no hay tiradas.</td></tr>`
+    : ultimas.map(t => {
+      const avance = String(t.codigo_tirada || "").startsWith("AVF-") || String(t.observaciones || "").startsWith("AVANCE DE FILM");
+      const ped = (porTirada.get(t.id) || []).slice().sort((a, b) => String(a.cliente).localeCompare(String(b.cliente)) || String(a.nombre_archivo).localeCompare(String(b.nombre_archivo)));
+      const lista = ped.map(d => `<div class="dtf-tirada-arch"><span>${escHtml(d.nombre_archivo)}${cargo(d.tipo_cargo)}</span><b>${fmtNum(d.metros_archivo)}m</b></div>`).join("");
+      const archivos = avance ? `<span class="badge danger">sin imprimir</span>`
+        : ped.length > 4 ? `<details><summary>${ped.length} archivos · ${escHtml([...new Set(ped.map(d => nombreLimpioDtf(d.cliente)))].join(", "))}</summary>${lista}</details>` : (lista || "—");
+      return `
+      <tr class="${avance ? "dtf-tirada-avance" : ""}">
+        <td style="white-space:nowrap;">${fmtDateHora(t.fecha_hora)}</td>
+        <td><strong>${escHtml(t.codigo_tirada)}</strong>${avance ? ` <span class="badge danger">avance de film</span>` : t.es_anidado ? ` <span class="badge activo">anidado</span>` : ""}</td>
         <td>${escHtml(t.id_rollo_dtf)}</td>
-      </tr>`).join("");
+        <td style="white-space:nowrap;">${fmtNum((Number(t.metros_consumidos_rollo) || 0) + (Number(t.metros_desperdicio) || 0))}m</td>
+        <td class="dtf-tirada-archivos">${archivos}</td>
+        <td>${escHtml(String(t.observaciones || "").replace(/^AVANCE DE FILM:\s*/, ""))}</td>
+      </tr>`;
+    }).join("");
+}
+
+// Avanzar film sin imprimir (error, calibración, film manchado…): descuenta del rollo y queda en las últimas tiradas
+function abrirAvanceFilmDtf() {
+  const rollos = rollosDtfEnUso();
+  if (!rollos.length) { toast("No hay rollo de film puesto.", "warn"); return; }
+  const puesto = rolloDtfPuesto();
+  const motivos = ["Error de impresión", "Calibración", "Film manchado o arrugado", "Prueba de cabezales", "Otro"];
+  const capa = document.createElement("div");
+  capa.className = "modal-overlay open";
+  capa.innerHTML = `
+    <div class="modal-content" style="border-color:var(--accent-orange); max-width:440px; width:100%;">
+      <h2 style="margin-top:0;">↪️ Avanzar film sin imprimir</h2>
+      <p style="margin:0 0 8px; font-size:13px; color:var(--vg-text-secondary);">Se descuenta del rollo como desperdicio y queda anotado con el motivo.</p>
+      <label>Rollo</label>
+      <select data-x="rollo">${rollos.map(r => `<option value="${escHtml(r.id_rollo_dtf)}" ${r.id_rollo_dtf === puesto ? "selected" : ""}>${escHtml(r.id_rollo_dtf)} (quedan ${fmtNum(r.metros_restantes_reales)} m)</option>`).join("")}</select>
+      <label>Metros que se avanzaron</label>
+      <input type="number" step="0.01" min="0.01" data-x="metros" placeholder="Ej: 0.5" />
+      <label>Motivo</label>
+      <div class="dtf-motivos">${motivos.map((m, i) => `<label class="dtf-motivo"><input type="radio" name="motivo-avance" value="${escHtml(m)}" ${i === 0 ? "checked" : ""}/> ${escHtml(m)}</label>`).join("")}</div>
+      <label>Detalle (opcional)</label>
+      <input type="text" data-x="obs" placeholder="Qué pasó" />
+      <div style="display:flex; gap:8px; margin-top:14px;">
+        <button type="button" class="btn-secondary" data-x="cancelar">Cancelar</button>
+        <button type="button" class="btn-main" data-x="ok" style="margin:0;">✓ Descontar del rollo</button>
+      </div>
+    </div>`;
+  document.body.appendChild(capa);
+  const $ = (x) => capa.querySelector(`[data-x="${x}"]`);
+  setTimeout(() => $("metros").focus(), 50);
+  capa.addEventListener("click", async (e) => {
+    if (e.target === capa || e.target.closest("[data-x='cancelar']")) { capa.remove(); return; }
+    const ok = e.target.closest("[data-x='ok']");
+    if (!ok) return;
+    const metros = Number(String($("metros").value).replace(",", "."));
+    if (!(metros > 0)) { toast("Poné cuántos metros se avanzaron.", "warn"); $("metros").focus(); return; }
+    ok.disabled = true;
+    const motivo = capa.querySelector("input[name='motivo-avance']:checked")?.value || "Otro";
+    const { data, error } = await sb().rpc("taller_dtf_avance", { p: { id_rollo_dtf: $("rollo").value, metros, motivo, observaciones: $("obs").value.trim() } });
+    if (error) { ok.disabled = false; toast("Error: " + error.message, "error"); return; }
+    capa.remove();
+    toast(`↪️ ${data.codigo}: ${fmtNum(data.metros)} m descontados del rollo (${motivo}).`);
+    await cargarDatosTodo();
+  });
+}
+
+// Archivos impresos que no se venden (prueba, muestra, error, consumo interno): salen de Vender con el motivo
+function abrirSinVentaDtf(clave) {
+  const t = STATE.dtfPorVender.find(x => x.clave === clave);
+  if (!t) return;
+  const marcados = t.pedidos.filter(p => STATE.dtfSelVenta.has(p.id));
+  const pedidos = marcados.length ? marcados : t.pedidos;
+  const motivos = [["PRUEBA", "Prueba"], ["MUESTRA", "Muestra"], ["ERROR", "Error / falla"], ["INTERNO", "Consumo interno"]];
+  const capa = document.createElement("div");
+  capa.className = "modal-overlay open";
+  capa.innerHTML = `
+    <div class="modal-content" style="border-color:var(--accent-orange); max-width:460px; width:100%;">
+      <h2 style="margin-top:0;">🚫 No se vende</h2>
+      <p style="margin:0 0 8px;">${pedidos.length} archivo${pedidos.length === 1 ? "" : "s"} de <strong>${escHtml(t.nombres.join(" + "))}</strong> · ${fmtNum(pedidos.reduce((a, p) => a + (Number(p.metros) || 0), 0))} m${marcados.length ? " (los marcados)" : ""}</p>
+      <label>¿Por qué?</label>
+      <div class="dtf-motivos">${motivos.map(([v, l], i) => `<label class="dtf-motivo"><input type="radio" name="motivo-sin-venta" value="${v}" ${i === 0 ? "checked" : ""}/> ${l}</label>`).join("")}</div>
+      <label>Nota (opcional)</label>
+      <input type="text" data-x="nota" placeholder="Para quién o por qué" />
+      <p style="font-size:12px; color:var(--vg-text-secondary); margin:8px 0 0;">Quedan en el historial de pedidos DTF con el motivo. No se cobran.</p>
+      <div style="display:flex; gap:8px; margin-top:14px;">
+        <button type="button" class="btn-secondary" data-x="cancelar">Cancelar</button>
+        <button type="button" class="btn-main" data-x="ok" style="margin:0;">✓ Listo, no se vende</button>
+      </div>
+    </div>`;
+  document.body.appendChild(capa);
+  capa.addEventListener("click", async (e) => {
+    if (e.target === capa || e.target.closest("[data-x='cancelar']")) { capa.remove(); return; }
+    const ok = e.target.closest("[data-x='ok']");
+    if (!ok) return;
+    ok.disabled = true;
+    const motivo = capa.querySelector("input[name='motivo-sin-venta']:checked")?.value || "INTERNO";
+    const { error } = await sb().rpc("taller_dtf_sin_venta", { p: { pedidos: pedidos.map(p => p.id), motivo, nota: capa.querySelector("[data-x='nota']").value.trim() } });
+    if (error) { ok.disabled = false; toast("Error: " + error.message, "error"); return; }
+    capa.remove();
+    pedidos.forEach(p => STATE.dtfSelVenta.delete(p.id));
+    toast(`🚫 ${pedidos.length} archivo${pedidos.length === 1 ? "" : "s"} sin venta (${motivo.toLowerCase()}).`);
+    await cargarDatosTodo();
+  });
+}
+
+// Cómo va la venta: un solo renglón "Impresión DTF" con todos los metros (de entrada) o uno por archivo.
+// Viene marcado lo que eligió este cliente la vez anterior.
+async function elegirDetalleVentaDtf(t, cli, textoArriba) {
+  let preferido = "unico";
+  try {
+    const { data } = await sb().from("empresas").select("taller_config").limit(1).maybeSingle();
+    preferido = (data && data.taller_config && data.taller_config.dtf_detalle && data.taller_config.dtf_detalle[cli.id]) || "unico";
+  } catch (e) { /* sin permiso: va lo de siempre */ }
+  return new Promise((resolver) => {
+    const capa = document.createElement("div");
+    capa.className = "modal-overlay open";
+    capa.innerHTML = `
+      <div class="modal-content" style="border-color:var(--accent-blue); max-width:500px; width:100%;">
+        <h2 style="margin-top:0;">🧾 Venta de DTF a ${escHtml(cli.nombre)}</h2>
+        <p style="margin:0 0 10px; white-space:pre-line; font-size:14px;">${escHtml(textoArriba)}</p>
+        <label>En el detalle de la venta</label>
+        <div class="dtf-motivos">
+          <label class="dtf-motivo"><input type="radio" name="detalle-venta" value="unico" ${preferido !== "por_archivo" ? "checked" : ""}/> Un solo renglón: <b>Impresión DTF · ${fmtNum(t.metros)} m</b></label>
+          <label class="dtf-motivo"><input type="radio" name="detalle-venta" value="por_archivo" ${preferido === "por_archivo" ? "checked" : ""}/> Un renglón por archivo (${t.archivos})</label>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:14px;">
+          <button type="button" class="btn-secondary" data-x="cancelar">Cancelar</button>
+          <button type="button" class="btn-main" data-x="ok" style="margin:0;">🧾 Hacer la venta</button>
+        </div>
+      </div>`;
+    document.body.appendChild(capa);
+    capa.addEventListener("click", (e) => {
+      if (e.target === capa || e.target.closest("[data-x='cancelar']")) { capa.remove(); resolver(null); return; }
+      if (!e.target.closest("[data-x='ok']")) return;
+      const detalle = capa.querySelector("input[name='detalle-venta']:checked")?.value || "unico";
+      capa.remove();
+      resolver(detalle);
+    });
+  });
 }
 
 function mostrarPasoDtf(paso) {
@@ -1658,7 +1793,7 @@ function renderBarraRolloDtf() {
         ${otros.length ? `| <strong>En stock:</strong> ${otros.map(r => `${escHtml(r.id_rollo_dtf)} (${fmtNum(r.metros_restantes_reales)}m)`).join(", ")}` : ""}
       </div>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <button type="button" class="btn-secondary btn-dtf-a-mano">+ Archivo Manual</button>
+        <button type="button" class="btn-secondary btn-dtf-avance" title="Errores, calibración, film manchado…: descuenta del rollo sin imprimir">↪️ Avanzar film</button>
         <button type="button" class="btn-secondary btn-dtf-rollo-nuevo">+ Rollo Nuevo</button>
         <button type="button" class="btn-dtf-sync" style="background:var(--accent-blue); color:var(--vg-text-primary); border:none; border-radius:4px; font-weight:bold; cursor:pointer;">Sincronizar</button>
       </div>
@@ -1953,6 +2088,7 @@ function renderVentasDtf() {
           <details class="dtf-venta-archivos" data-clave="${clave}" ${abierta ? "open" : ""}><summary>Ver archivos</summary>${archivos}</details>
           <div class="dtf-venta-pie">
             ${vender && t.a_mano ? `<button type="button" class="btn-secondary btn-dtf-automatico" data-clave="${clave}">↩ Volver a como estaba</button>` : ""}
+            <button type="button" class="btn-secondary btn-dtf-sin-venta" data-clave="${clave}" title="Prueba, muestra, error o consumo interno: sale de Vender sin cobrarse">🚫 No se vende</button>
             ${vender ? `<button type="button" class="btn-main btn-dtf-vender" data-clave="${clave}">🧾 Hacer venta</button>` : `<span style="color:var(--vg-text-secondary);font-size:11px;">La venta la hace el mostrador</span>`}
           </div>
         </div>`;
@@ -2442,8 +2578,9 @@ async function venderDtf(clave) {
       + (t.precio_metro_trabajo != null ? ` Lo normal es vender todo junto al terminar: el metro sale a ${fmtMoney(t.precio_metro_trabajo)} en vez de ${fmtMoney(t.precio_metro)}.` : "")
       + `\n¿Vender ahora solo lo impreso?`
     : "";
-  if (!confirm(`¿Hacer la venta de ${fmtNum(t.metros)} m de DTF (${t.archivos} archivo/s) a ${cli.nombre}?${estimado}\nEl precio sale de la lista de precios: escala por metros y lo que viene pagando ese cliente.${falta}`)) return;
-  const { data, error } = await sb().rpc("taller_dtf_vender", { p: { cliente_id: cli.id, pedidos: t.pedidos.map(p => p.id) } });
+  const detalle = await elegirDetalleVentaDtf(t, cli, `${fmtNum(t.metros)} m de DTF (${t.archivos} archivo/s).${estimado}\nEl precio sale de la lista de precios: escala por metros y lo que viene pagando ese cliente.${falta}`);
+  if (!detalle) return;
+  const { data, error } = await sb().rpc("taller_dtf_vender", { p: { cliente_id: cli.id, pedidos: t.pedidos.map(p => p.id), detalle, recordar_detalle: true } });
   if (error) { toast("Error: " + error.message, "error"); return; }
   if (cli.recordar && nombre) await recordarClienteDtf(nombre, cli);
   toast(`🧾 Venta ${data.numero_comprobante}: ${fmtNum(data.metros)} m a ${fmtMoney(data.precio_metro)} = ${fmtMoney(data.total)}.`);
@@ -5669,6 +5806,9 @@ export function inicializarEventosUI() {
     const btnDtfVender = e.target.closest(".btn-dtf-vender");
     if (btnDtfVender) { venderDtf(btnDtfVender.getAttribute("data-clave")); return; }
     if (e.target.closest(".btn-dtf-rollo-nuevo")) { abrirRolloNuevoDtf(); return; }
+    if (e.target.closest(".btn-dtf-avance")) { abrirAvanceFilmDtf(); return; }
+    const btnSinVenta = e.target.closest(".btn-dtf-sin-venta");
+    if (btnSinVenta) { abrirSinVentaDtf(btnSinVenta.getAttribute("data-clave")); return; }
     if (e.target.closest(".btn-dtf-sync")) { document.getElementById("btnSyncDriveSandbox")?.click(); return; }
     if (e.target.closest(".btn-dtf-a-mano")) {
       mostrarPasoDtf("imprimir");
