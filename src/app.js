@@ -369,7 +369,8 @@ export async function cargarDatosTodo() {
     resAlertasHechas,
     resSinRegistrar,
     resFilaEnlaces,
-    resMetrosEstaciones
+    resMetrosEstaciones,
+    resTelasReservas
   ] = await Promise.all([
     client.from("v_prod_rollos_papel_saldos").select("*").order("fecha_montaje", { ascending: false }),
     client.from("v_prod_bloques_impresion").select("*"),
@@ -397,8 +398,11 @@ export async function cargarDatosTodo() {
     // Las tarjetas del Kanban de los archivos de la fila (para mostrar "T0003" en cada carpeta)
     client.rpc("fila_enlaces", { p: {} }),
     // Los metros de cada estación (hoy, semana, mes, año, histórico) sumados en la base con todas las filas
-    client.rpc("taller_metros_estaciones")
+    client.rpc("taller_metros_estaciones"),
+    // La tela de cada trabajo (reservada o confirmada en la tarjeta del Kanban)
+    client.from("v_telas_reservas").select("id, trabajo_id, trabajo_numero, trabajo_titulo, codigo, tela, color, dueno, metros, kilos, estado, origen, sin_rinde").neq("estado", "anulada")
   ]);
+  STATE.telasReservas = resTelasReservas && !resTelasReservas.error ? (resTelasReservas.data || []) : [];
   STATE.metrosEstaciones = resMetrosEstaciones && !resMetrosEstaciones.error ? (resMetrosEstaciones.data || {}) : {};
 
   STATE.rollosPapelSaldos = resRollosSaldos.data || [];
@@ -915,6 +919,13 @@ function aplicarAutodeteccionAlSeleccionarArchivos() {
     colores: STATE.catalogos.filter(c => c.tipo === "COLOR").map(c => c.nombre)
   };
   const auto = consolidarAutodeteccionLote(seleccionados, catObj);
+  // La tela que la tarjeta tiene reservada o confirmada manda si el nombre del archivo no la dice
+  const telaTarjeta = telasDeArchivos(seleccionados.map(s => s.file_id || s.id).join(","))[0];
+  if (telaTarjeta && !auto.tela) {
+    auto.tela = telaTarjeta.tela || "";
+    if (!auto.color && telaTarjeta.color) auto.color = telaTarjeta.color;
+    if (!auto.rollo) auto.rollo = telaTarjeta.codigo;
+  }
 
   STATE.impForm.perfil = auto.perfil || "";
   STATE.impForm.tela = auto.tela || "";
@@ -927,7 +938,7 @@ function aplicarAutodeteccionAlSeleccionarArchivos() {
 
   const detectadosList = [];
   if (auto.perfil) detectadosList.push(`Perfil: ${auto.perfil}`);
-  if (auto.tela) detectadosList.push(`Tela: ${auto.tela}`);
+  if (auto.tela) detectadosList.push(telaTarjeta && auto.tela === (telaTarjeta.tela || "") ? `Tela de la tarjeta: ${textoTela(telaTarjeta)}` : `Tela: ${auto.tela}`);
   if (auto.rollo) detectadosList.push(`Rollo: ${auto.rollo}`);
   if (auto.color) detectadosList.push(`Color: ${auto.color}`);
 
@@ -1287,7 +1298,7 @@ function renderModuloCalandrado() {
                       ${formatearAnidadosHTML(c.cliente_archivo)}
                     </td>
                     <td data-label="Diseño" style="text-align:center;">${renderCarruselCalandrado(c)}</td>
-                    <td data-label="Tela">${escHtml(c.tela_destino || "")}</td>
+                    <td data-label="Tela">${escHtml(c.tela_destino || "")}${chipTelaTrabajo(c.file_id)}</td>
                     <td data-label="Nº Rollo">${escHtml(c.num_rollo_tela || "")}</td>
                     <td data-label="Color">${escHtml(c.color_tela || "")}</td>
                     <td data-label="Metros" style="color:var(--danger); font-weight:bold;">${fmtNum(c.metros)}m</td>
@@ -1833,6 +1844,45 @@ async function llamarTaller(funcion, p, exito) {
   if (exito) toast(typeof exito === "function" ? exito(data) : exito);
   await cargarDatosTodo();
   return data;
+}
+
+// ===== La tela de cada trabajo (fase B): la que se reservó o confirmó en la tarjeta =====
+function trabajosDeArchivos(fileIdsCsv) {
+  const ids = String(fileIdsCsv || "").split(",").map(s => s.trim()).filter(Boolean);
+  return [...new Set(STATE.pendientesDrive.filter(p => p.trabajo_id && (ids.includes(p.file_id) || ids.includes(p.id))).map(p => p.trabajo_id))];
+}
+function telasDeArchivos(fileIdsCsv) {
+  const trabajos = trabajosDeArchivos(fileIdsCsv);
+  return (STATE.telasReservas || []).filter(r => trabajos.includes(r.trabajo_id));
+}
+const textoTela = (r) => `${r.codigo} ${r.tela || ""}${r.color ? " " + r.color : ""} · ${r.metros != null ? fmtNum(r.metros) + " m" : fmtNum(r.kilos) + " kg"}`;
+function chipTelaTrabajo(fileIdsCsv) {
+  const telas = telasDeArchivos(fileIdsCsv);
+  if (!telas.length) return "";
+  return telas.map(r => `<div class="chip-tela-trabajo ${r.estado}" title="${r.estado === "confirmada" ? "Ya descontada en la tarjeta" : "Reservada en la tarjeta: se descuenta al confirmar"}">🧵 ${escHtml(textoTela(r))}${r.estado === "confirmada" ? " ✓" : ""}</div>`).join("");
+}
+
+// Al terminar de calandrar: ¿se usó la tela reservada? (se descuenta de la tela guardada del cliente)
+async function preguntarTelaCalandrada(regs) {
+  const fileIds = regs.map(r => r.file_id).filter(Boolean).join(",");
+  const pendientes = telasDeArchivos(fileIds).filter(r => r.estado === "sugerida");
+  for (const r of pendientes) {
+    const enKilos = r.dueno === "cliente" && r.sin_rinde;
+    const resp = await ventanaTaller({
+      titulo: "🧵 ¿Se usó esta tela?",
+      texto: `Para <b>T${String(r.trabajo_numero || "").padStart(4, "0")}</b> ${escHtml(r.trabajo_titulo || "")} estaba reservada <b>${escHtml(textoTela(r))}</b>. Si se usó, se descuenta de la tela guardada${r.dueno === "taller" ? " (la del taller sale del stock al vender)" : " del cliente"}.`,
+      campos: [{ nombre: "cant", etiqueta: enKilos ? "Kilos usados (esa tela no tiene rinde)" : "Metros usados", tipo: "number", valor: enKilos ? "" : (r.metros ?? "") }],
+      aceptar: "✓ Sí, descontarla",
+      validar: (v) => (Number(v.cant) > 0 ? null : "Poné cuánto se usó.")
+    });
+    if (!resp) continue;   // queda reservada: se confirma después en la tarjeta
+    const p = { id: r.id };
+    if (enKilos) p.kilos = Number(resp.cant); else p.metros = Number(resp.cant);
+    const { data, error } = await sb().rpc("tela_reserva_confirmar", { p });
+    if (error) { toast("La tela no se descontó: " + error.message, "error"); continue; }
+    toast(data && data.aviso ? data.aviso : "🧵 Tela descontada", data && data.aviso ? "warn" : undefined);
+  }
+  if (pendientes.length) await cargarDatosTodo();
 }
 
 // ===== Archivos de la fila ↔ tarjetas del Kanban =====
@@ -4607,6 +4657,8 @@ async function finalizarTrabajoCalandrado(idCalOrCsv, minutosExtra = 0, skipRelo
     toast(`✅ Calandrado procesado (${fmtDateHoraLineal(fechaFinIso)}).`);
     await cargarDatosTodo();
   }
+  // La tela reservada en la tarjeta: se confirma acá, que es donde se usa (no frena lo demás)
+  preguntarTelaCalandrada(regs).catch(e => console.warn("Tela de la tarjeta:", e));
 }
 
 async function procesarRolloCompletoCalandrado(rolloId) {

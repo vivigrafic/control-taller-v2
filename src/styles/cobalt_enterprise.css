@@ -703,6 +703,9 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
 .chip-tarjeta:hover { filter: brightness(1.15); }
 .chip-tarjeta.duda { border-color: var(--vg-status-alert); background: color-mix(in srgb, var(--vg-status-alert) 24%, transparent); }
 .sub-fila { color: var(--vg-text-secondary); font-size: 11px; font-weight: 400; }
+.chip-tela-trabajo { margin-top: 4px; padding: 2px 8px; border-radius: 8px; font-size: 11px; font-weight: 700; display: inline-block;
+  border: 1px dashed var(--vg-brand-secondary); color: var(--vg-text-primary); background: color-mix(in srgb, var(--vg-brand-secondary) 12%, transparent); }
+.chip-tela-trabajo.confirmada { border-style: solid; border-color: var(--vg-status-ready); background: color-mix(in srgb, var(--vg-status-ready) 12%, transparent); }
 .enlace-tarjeta { max-width: 560px; width: 100%; box-sizing: border-box; border-color: var(--vg-brand-primary); }
 .enlace-archivos { display: flex; flex-direction: column; gap: 4px; max-height: 120px; overflow-y: auto; font-size: 12px; margin-bottom: 8px; }
 .enlace-archivos label { display: flex; gap: 6px; align-items: center; color: var(--vg-text-secondary); word-break: break-word;
