@@ -13,3 +13,4 @@ Este archivo lo leen las herramientas de IA antes de trabajar en el proyecto. El
 - Toda tabla nueva lleva `empresa_id`.
 - Una sola puerta por operación (funciones o transacciones limpias) y totales/metros restantes calculados dinámicamente por vistas.
 - Poder editar, eliminar y agregar información en cualquier tabla y en cualquier momento desde la interfaz.
+- **Manual del sistema:** si cambia cómo se usa una pantalla del taller, se actualizan sus secciones del manual (`manual_guardar_` en una migración, pantallas `taller_impresion`, `taller_dtf`…). Lo usan Vivi y el botón ❓ (`src/componentes/ayuda.js`, copia del ERP). Ver el AGENTS.md del ERP.
