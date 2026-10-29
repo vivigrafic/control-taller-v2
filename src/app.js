@@ -368,7 +368,8 @@ export async function cargarDatosTodo() {
     resAlertas,
     resAlertasHechas,
     resSinRegistrar,
-    resFilaEnlaces
+    resFilaEnlaces,
+    resMetrosEstaciones
   ] = await Promise.all([
     client.from("v_prod_rollos_papel_saldos").select("*").order("fecha_montaje", { ascending: false }),
     client.from("v_prod_bloques_impresion").select("*"),
@@ -394,8 +395,11 @@ export async function cargarDatosTodo() {
     client.from("prod_pendientes_drive").select("id, modulo, cliente, nombre_archivo, metros_totales, file_id, fuera_fila_at, fuera_fila_carpeta")
       .eq("anulado", true).eq("fuera_fila_donde", "impresos").is("fuera_fila_resuelto", null).neq("estado_impreso", "SI").order("fuera_fila_at"),
     // Las tarjetas del Kanban de los archivos de la fila (para mostrar "T0003" en cada carpeta)
-    client.rpc("fila_enlaces", { p: {} })
+    client.rpc("fila_enlaces", { p: {} }),
+    // Los metros de cada estación (hoy, semana, mes, año, histórico) sumados en la base con todas las filas
+    client.rpc("taller_metros_estaciones")
   ]);
+  STATE.metrosEstaciones = resMetrosEstaciones && !resMetrosEstaciones.error ? (resMetrosEstaciones.data || {}) : {};
 
   STATE.rollosPapelSaldos = resRollosSaldos.data || [];
   STATE.bloquesImpresion = resBloques.data || [];
@@ -564,29 +568,43 @@ function renderBadgesYTodosLosKPIs() {
   const pendDtfRows = STATE.pendientesDrive.filter(p => p.modulo === "DTF" && p.estado_impreso !== "SI");
   const plural = (n, una, varias) => `${n} ${n === 1 ? una : varias}`;
   renderKpisEstacion("kpisImpresion", {
-    pendienteTitulo: "A Imprimir", pendiente: mPendImp, pendienteSub: plural(pendSubRows.length, "archivo", "archivos"),
+    clave: "impresion", pendienteTitulo: "A Imprimir", pendiente: mPendImp, pendienteSub: plural(pendSubRows.length, "archivo", "archivos"),
     filas: STATE.impresiones.filter(i => i.accion === "Impresion Normal"), campoFecha: "fecha_hora", metrosDe: r => Number(r.metros_impresos) || 0
   });
   renderKpisEstacion("kpisCalandrado", {
-    pendienteTitulo: "A Calandrar", pendiente: mPendCal, pendienteSub: plural(pendCalRows.length, "trabajo", "trabajos"),
+    clave: "calandrado", pendienteTitulo: "A Calandrar", pendiente: mPendCal, pendienteSub: plural(pendCalRows.length, "trabajo", "trabajos"),
     filas: STATE.colaCalandrado.filter(c => String(c.estado).toLowerCase().includes("terminado")), campoFecha: "fecha_terminado", metrosDe: r => Number(r.metros) || 0
   });
   renderKpisEstacion("kpisLaser", {
-    pendienteTitulo: "A Cortar", pendiente: mPendLas, pendienteSub: `${plural(pendLasRows.length, "trabajo", "trabajos")} · ≈ ${fmtNum(mPendLas / 30, 1)} hs`,
+    clave: "laser", pendienteTitulo: "A Cortar", pendiente: mPendLas, pendienteSub: `${plural(pendLasRows.length, "trabajo", "trabajos")} · ≈ ${fmtNum(mPendLas / 30, 1)} hs`,
     filas: STATE.colaLaser.filter(l => String(l.estado).toLowerCase().includes("terminado")), campoFecha: "fecha_terminado", metrosDe: r => Number(r.metros) || 0
   });
   // DTF: metros de film usados en las tiradas (consumido + desperdicio, igual que el saldo del rollo)
   renderKpisEstacion("kpisDtf", {
-    pendienteTitulo: "A Imprimir", pendiente: pendDtfRows.reduce((a, b) => a + faltaMetros(b), 0), pendienteSub: plural(pendDtfRows.length, "archivo", "archivos"),
+    clave: "dtf", pendienteTitulo: "A Imprimir", pendiente: pendDtfRows.reduce((a, b) => a + faltaMetros(b), 0), pendienteSub: plural(pendDtfRows.length, "archivo", "archivos"),
     filas: STATE.dtfTiradas, campoFecha: "fecha_hora", metrosDe: r => (Number(r.metros_consumidos_rollo) || 0) + (Number(r.metros_desperdicio) || 0)
   });
 }
 
 // Los mismos seis cuadros en Impresión, Calandrado, Láser y DTF, para que los operarios vean lo mismo en todas:
 // lo pendiente, diario (con ayer), semanal (con la anterior), mensual (con el anterior), este año e histórico
-function renderKpisEstacion(idCont, { pendienteTitulo, pendiente, pendienteSub, filas, campoFecha, metrosDe }) {
+function renderKpisEstacion(idCont, { clave, pendienteTitulo, pendiente, pendienteSub, filas, campoFecha, metrosDe }) {
   const cont = document.getElementById(idCont);
   if (!cont) return;
+  // Con los números de la base (todas las filas); si no llegaron, se suma lo que trajo la pantalla
+  const b = clave && STATE.metrosEstaciones ? STATE.metrosEstaciones[clave] : null;
+  if (b) {
+    const cajaB = (clase, titulo, valor, sub = "") => `<div class="stat-box ${clase}"><div class="stat-title">${titulo}</div><div class="stat-value">${fmtNum(valor)}m</div>${sub ? `<div class="kpi-sub">${sub}</div>` : ""}</div>`;
+    cont.innerHTML = [
+      cajaB("kpi-pendiente", pendienteTitulo, pendiente, pendienteSub),
+      cajaB("kpi-diario", "Diario", b.hoy, `Ayer: ${fmtNum(b.ayer)}m`),
+      cajaB("kpi-semanal", "Semanal", b.semana, `Sem. Ant: ${fmtNum(b.semana_ant)}m`),
+      cajaB("kpi-mensual", "Mensual", b.mes, `Mes Ant: ${fmtNum(b.mes_ant)}m`),
+      cajaB("kpi-anual", "Este Año", b.anio),
+      cajaB("kpi-historico", "Histórico", b.historico)
+    ].join("");
+    return;
+  }
   const { hoyIni, ayerIni, semActualIni, semAntIni, mesActualIni, anioActualIni } = obtenerVentanasTemporales();
   const mesAntIni = new Date(mesActualIni.getFullYear(), mesActualIni.getMonth() - 1, 1);
   const suma = (desde, hasta = null) => filas.reduce((a, r) => {
@@ -637,22 +655,19 @@ function obtenerRolloPapelActivo() {
   if (!activo) {
     return { idBase: "29g-1910-1", bloqueActual: "29g-1910-1", restantes: 290, iniciales: 500, impresos: 210 };
   }
-  const impDeRollo = STATE.impresiones.filter(i => i.id_rollo_base === activo.id_rollo || i.id_rollo_papel === activo.id_rollo);
-  let bloqueActual = activo.id_rollo;
-  let maxCut = 0;
+  // El bloque actual: el rollo arranca en el bloque 1 y cada corte de papel abre el siguiente (C2, C3…). Se recorre en orden
+  // de fecha: STATE.impresiones viene de lo más nuevo a lo más viejo y así el corte se contaba dos veces (el bloque saltaba
+  // a uno vacío y cada impresión nueva abría otro).
+  const impDeRollo = STATE.impresiones
+    .filter(i => i.id_rollo_base === activo.id_rollo || i.id_rollo_papel === activo.id_rollo)
+    .sort((a, b) => (new Date(a.fecha_hora) - new Date(b.fecha_hora)) || String(a.created_at || "").localeCompare(String(b.created_at || "")));
+  let bloque = 1;
   impDeRollo.forEach(i => {
     const m = String(i.id_rollo_papel || "").match(/-C(\d+)$/i);
-    if (m) {
-      const n = parseInt(m[1], 10);
-      if (n > maxCut) maxCut = n;
-    }
-    if (i.accion === "Corte de Papel (-4m)") {
-      maxCut = Math.max(1, maxCut) + 1;
-    }
+    if (m) bloque = Math.max(bloque, parseInt(m[1], 10));
+    if (i.accion === "Corte de Papel (-4m)") bloque += 1;
   });
-  if (maxCut > 0) {
-    bloqueActual = `${activo.id_rollo}-C${maxCut}`;
-  }
+  const bloqueActual = bloque > 1 ? `${activo.id_rollo}-C${bloque}` : activo.id_rollo;
   return {
     idBase: activo.id_rollo,
     bloqueActual,
@@ -3836,35 +3851,38 @@ function renderModuloMetricasBI() {
   const calTerm = STATE.colaCalandrado.filter(c => String(c.estado).toLowerCase().includes("terminado"));
   const lasTerm = STATE.colaLaser.filter(l => String(l.estado).toLowerCase().includes("terminado"));
 
-  setTxt("biImpHoy", fmtNum(sumarMetrosEnVentana(impNormal, "fecha_hora", "metros_impresos", hoyIni)));
-  setTxt("biImpAyer", fmtNum(sumarMetrosEnVentana(impNormal, "fecha_hora", "metros_impresos", ayerIni, hoyIni)));
-  setTxt("biImpSem", fmtNum(sumarMetrosEnVentana(impNormal, "fecha_hora", "metros_impresos", semActualIni)));
-  setTxt("biImpSemAnt", fmtNum(sumarMetrosEnVentana(impNormal, "fecha_hora", "metros_impresos", semAntIni, semActualIni)));
-  setTxt("biImpMes", fmtNum(sumarMetrosEnVentana(impNormal, "fecha_hora", "metros_impresos", mesActualIni)));
-  setTxt("biImpHis", fmtNum(impNormal.reduce((a, b) => a + (Number(b.metros_impresos) || 0), 0)));
+  // Con los números de la base (todas las filas); si no llegaron, se suma lo que trajo la pantalla
+  const metrosBase = (clave, campo) => STATE.metrosEstaciones && STATE.metrosEstaciones[clave] ? STATE.metrosEstaciones[clave][campo] : null;
+  const ponerBI = (id, clave, campo, local) => { const v = metrosBase(clave, campo); setTxt(id, fmtNum(v != null ? v : local())); };
+  ponerBI("biImpHoy", "impresion", "hoy", () => sumarMetrosEnVentana(impNormal, "fecha_hora", "metros_impresos", hoyIni));
+  ponerBI("biImpAyer", "impresion", "ayer", () => sumarMetrosEnVentana(impNormal, "fecha_hora", "metros_impresos", ayerIni, hoyIni));
+  ponerBI("biImpSem", "impresion", "semana", () => sumarMetrosEnVentana(impNormal, "fecha_hora", "metros_impresos", semActualIni));
+  ponerBI("biImpSemAnt", "impresion", "semana_ant", () => sumarMetrosEnVentana(impNormal, "fecha_hora", "metros_impresos", semAntIni, semActualIni));
+  ponerBI("biImpMes", "impresion", "mes", () => sumarMetrosEnVentana(impNormal, "fecha_hora", "metros_impresos", mesActualIni));
+  ponerBI("biImpHis", "impresion", "historico", () => impNormal.reduce((a, b) => a + (Number(b.metros_impresos) || 0), 0));
 
-  setTxt("biCalHoy", fmtNum(sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", hoyIni)));
-  setTxt("biCalAyer", fmtNum(sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", ayerIni, hoyIni)));
-  setTxt("biCalSem", fmtNum(sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", semActualIni)));
-  setTxt("biCalSemAnt", fmtNum(sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", semAntIni, semActualIni)));
-  setTxt("biCalMes", fmtNum(sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", mesActualIni)));
-  setTxt("biCalHis", fmtNum(calTerm.reduce((a, b) => a + (Number(b.metros) || 0), 0)));
+  ponerBI("biCalHoy", "calandrado", "hoy", () => sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", hoyIni));
+  ponerBI("biCalAyer", "calandrado", "ayer", () => sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", ayerIni, hoyIni));
+  ponerBI("biCalSem", "calandrado", "semana", () => sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", semActualIni));
+  ponerBI("biCalSemAnt", "calandrado", "semana_ant", () => sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", semAntIni, semActualIni));
+  ponerBI("biCalMes", "calandrado", "mes", () => sumarMetrosEnVentana(calTerm, "fecha_terminado", "metros", mesActualIni));
+  ponerBI("biCalHis", "calandrado", "historico", () => calTerm.reduce((a, b) => a + (Number(b.metros) || 0), 0));
 
-  setTxt("biLasHoy", fmtNum(sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", hoyIni)));
-  setTxt("biLasAyer", fmtNum(sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", ayerIni, hoyIni)));
-  setTxt("biLasSem", fmtNum(sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", semActualIni)));
-  setTxt("biLasSemAnt", fmtNum(sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", semAntIni, semActualIni)));
-  setTxt("biLasMes", fmtNum(sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", mesActualIni)));
-  setTxt("biLasHis", fmtNum(lasTerm.reduce((a, b) => a + (Number(b.metros) || 0), 0)));
+  ponerBI("biLasHoy", "laser", "hoy", () => sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", hoyIni));
+  ponerBI("biLasAyer", "laser", "ayer", () => sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", ayerIni, hoyIni));
+  ponerBI("biLasSem", "laser", "semana", () => sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", semActualIni));
+  ponerBI("biLasSemAnt", "laser", "semana_ant", () => sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", semAntIni, semActualIni));
+  ponerBI("biLasMes", "laser", "mes", () => sumarMetrosEnVentana(lasTerm, "fecha_terminado", "metros", mesActualIni));
+  ponerBI("biLasHis", "laser", "historico", () => lasTerm.reduce((a, b) => a + (Number(b.metros) || 0), 0));
 
   // DTF: metros de film usados en las tiradas (como el tablero del módulo DTF) y lo que espera en la cola
   const mesAntIni = new Date(mesActualIni.getFullYear(), mesActualIni.getMonth() - 1, 1);
-  setTxt("biDtfHoy", fmtNum(metricasDtf(hoyIni).metros));
-  setTxt("biDtfAyer", fmtNum(metricasDtf(ayerIni, hoyIni).metros));
-  setTxt("biDtfSem", fmtNum(metricasDtf(semActualIni).metros));
-  setTxt("biDtfSemAnt", fmtNum(metricasDtf(semAntIni, semActualIni).metros));
-  setTxt("biDtfMes", fmtNum(metricasDtf(mesActualIni).metros));
-  setTxt("biDtfMesAnt", fmtNum(metricasDtf(mesAntIni, mesActualIni).metros));
+  ponerBI("biDtfHoy", "dtf", "hoy", () => metricasDtf(hoyIni).metros);
+  ponerBI("biDtfAyer", "dtf", "ayer", () => metricasDtf(ayerIni, hoyIni).metros);
+  ponerBI("biDtfSem", "dtf", "semana", () => metricasDtf(semActualIni).metros);
+  ponerBI("biDtfSemAnt", "dtf", "semana_ant", () => metricasDtf(semAntIni, semActualIni).metros);
+  ponerBI("biDtfMes", "dtf", "mes", () => metricasDtf(mesActualIni).metros);
+  ponerBI("biDtfMesAnt", "dtf", "mes_ant", () => metricasDtf(mesAntIni, mesActualIni).metros);
   const qDtf = STATE.pendientesDrive.filter(p => p.modulo === "DTF" && p.estado_impreso !== "SI").reduce((a, b) => a + faltaMetros(b), 0);
   setTxt("radarQDtf", `${fmtNum(qDtf, 0)}m`);
   const elTopDtf = document.getElementById("dashTopClientesDtf");
