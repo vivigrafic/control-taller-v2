@@ -1762,7 +1762,8 @@ function campoVentanaTaller(c, i) {
     const ops = c.opciones.map(o => `<option value="${escHtml(o.valor)}" ${String(o.valor) === String(c.valor ?? "") ? "selected" : ""}>${escHtml(o.titulo)}</option>`).join("");
     control = `<label>${escHtml(c.etiqueta)}</label><select data-i="${i}">${ops}</select>`;
   } else {
-    const num = c.tipo === "number" ? `type="number" step="0.01" min="0" inputmode="decimal"` : `type="text"`;
+    const num = c.tipo === "number" ? `type="number" step="0.01" min="0" inputmode="decimal"`
+      : c.tipo === "datetime" ? `type="datetime-local" max="${fechaHoraLocal(new Date())}"` : `type="text"`;
     control = `<label>${escHtml(c.etiqueta)}</label><input ${num} data-i="${i}" value="${escHtml(c.valor ?? "")}" placeholder="${escHtml(c.placeholder || "")}" />`;
   }
   return control + (c.ayuda ? `<small style="display:block; color:var(--vg-text-secondary); margin:2px 0 6px;">${escHtml(c.ayuda)}</small>` : "");
@@ -1944,9 +1945,16 @@ async function abrirEditarTiradaDtf(id) {
     ayuda: "Lo que se descontó del rollo en esta tirada (los metros de cada archivo se corrigen con el ✏️ de cada uno)" });
   else campos.push({ nombre: "metros_desperdicio", etiqueta: "Metros de desperdicio", tipo: "number", valor: Number(t.metros_desperdicio) || 0 });
   campos.push({ nombre: "observaciones", etiqueta: "Nota", valor: t.observaciones || "" });
+  const fechaAntes = fechaHoraLocal(t.fecha_hora);
+  campos.push({ nombre: "fecha_hora", etiqueta: "Fecha y hora de impresión", tipo: "datetime", valor: fechaAntes,
+    ayuda: "Si se cargó otro día, poné cuándo se imprimió de verdad (también cambia en sus archivos)" });
   const r = await ventanaTaller({ titulo: `Editar ${t.codigo_tirada}`, aceptar: "Guardar", campos,
-    validar: (v) => ((v.metros_consumidos ?? 0) < 0 || (v.metros_desperdicio ?? 0) < 0 ? "Los metros no pueden ser negativos." : null) });
+    validar: (v) => ((v.metros_consumidos ?? 0) < 0 || (v.metros_desperdicio ?? 0) < 0 ? "Los metros no pueden ser negativos."
+      : !v.fecha_hora ? "Poné la fecha y hora de impresión."
+      : v.fecha_hora > fechaHoraLocal(new Date()) ? "La fecha de impresión no puede ser en el futuro." : null) });
   if (!r) return;
+  // La fecha solo viaja si cambió
+  if (r.fecha_hora === fechaAntes) delete r.fecha_hora; else r.fecha_hora = fechaHoraParaBase(r.fecha_hora);
   await llamarTaller("taller_dtf_tirada_editar", { id, ...r }, (d) => (d.cambios && d.cambios.length ? `${t.codigo_tirada}: ${d.cambios.join(", ")}` : "Sin cambios"));
 }
 async function abrirNotaTiradaDtf(id) {
@@ -2428,7 +2436,15 @@ function abrirRolloNuevoDtf() {
   });
 }
 
-// Cuadro para confirmar la impresión: rollo, metros reales del RIP (opcional) y observación
+// Fecha y hora de Buenos Aires para un <input type="datetime-local"> ("2026-10-28T22:30") y de vuelta para la base
+function fechaHoraLocal(f) {
+  return new Date(f).toLocaleString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" }).slice(0, 16).replace(" ", "T");
+}
+const fechaHoraParaBase = (local) => (local ? `${local}:00-03:00` : null);
+const fechaHoraCorta = (local) => local ? `${local.slice(8, 10)}/${local.slice(5, 7)} ${local.slice(11, 16)}` : "";
+
+// Cuadro para confirmar la impresión: rollo, metros reales del RIP (opcional), observación y cuándo se imprimió
+// (si se carga después, por ejemplo lo de anoche, se elige el día y la hora: no figura como de hoy)
 function abrirImprimirDtf() {
   const marcados = STATE.pendientesDrive.filter(p => STATE.dtfSeleccion.has(p.id));
   if (!marcados.length) return;
@@ -2457,6 +2473,12 @@ function abrirImprimirDtf() {
       <input type="number" step="0.01" min="0" data-x="rip" placeholder="${fmtNum(metros)} (si lo dejás vacío)" />
       <label>Observación</label>
       <input type="text" data-x="obs" placeholder="Opcional…" />
+      <label>¿Cuándo se imprimió?</label>
+      <div class="dtf-motivos">
+        <label class="dtf-motivo"><input type="radio" name="dtf-cuando" value="ahora" checked /> Recién (ahora)</label>
+        <label class="dtf-motivo"><input type="radio" name="dtf-cuando" value="otra" /> Otro día u hora (ej.: anoche y no se cargó)</label>
+      </div>
+      <input type="datetime-local" data-x="fecha" value="${`${fechaHoraLocal(Date.now() - 864e5).slice(0, 10)}T21:00`}" max="${fechaHoraLocal(new Date())}" hidden />
       <label class="dtf-motivo" style="margin-top:10px;"><input type="checkbox" data-x="cortado" /> ⚠️ El rollo se terminó en el medio de la impresión</label>
       <div data-x="partes" class="imp-partes" hidden>
         <p class="dtf-ayuda" style="margin:6px 0;">Marcá cómo salió cada archivo en este rollo. Lo que salió a medias queda en la cola con lo que falta (se cobra una sola vez, cuando sale la última parte). Este rollo queda <b>terminado</b>.</p>
@@ -2477,6 +2499,7 @@ function abrirImprimirDtf() {
   const q = (x) => capa.querySelector(`[data-x='${x}']`);
   capa.addEventListener("change", (e) => {
     if (e.target === q("cortado")) q("partes").hidden = !e.target.checked;
+    if (e.target.name === "dtf-cuando") { q("fecha").hidden = e.target.value !== "otra"; if (!q("fecha").hidden) q("fecha").focus(); }
     if (e.target.matches("[data-c='estado']")) e.target.closest(".imp-parte").querySelector("[data-c='metros']").hidden = e.target.value !== "parte";
   });
   capa.addEventListener("click", async (e) => {
@@ -2495,9 +2518,14 @@ function abrirImprimirDtf() {
       if (partes.some(x => x.estado === "parte" && !(x.metros > 0))) { toast("Poné cuántos metros salieron de los que salieron a medias.", "warn"); return; }
       if (!partes.some(x => x.estado !== "nada")) { toast("No salió ningún archivo: no hay nada que registrar.", "warn"); return; }
     }
+    const otraFecha = capa.querySelector("input[name='dtf-cuando']:checked").value === "otra";
+    const fecha = otraFecha ? q("fecha").value : "";
+    if (otraFecha && !fecha) { toast("Poné el día y la hora en que se imprimió.", "warn"); return; }
+    if (otraFecha && fecha > fechaHoraLocal(new Date())) { toast("La fecha de impresión no puede ser en el futuro.", "warn"); return; }
     ok.disabled = true;
     ok.textContent = "⏳ Guardando…";
     const { data, error } = await sb().rpc("taller_dtf_imprimir", { p: {
+      fecha: fechaHoraParaBase(fecha),
       pendientes: marcados.map(p => p.id), id_rollo_dtf: rollo,
       metros_rip: q("rip").value || null,
       observaciones: q("obs").value.trim(),
@@ -2507,7 +2535,7 @@ function abrirImprimirDtf() {
     if (error) { ok.disabled = false; ok.textContent = "✓ Ya se imprimió"; toast("Error: " + error.message, "error"); return; }
     cerrar();
     STATE.dtfSeleccion.clear();
-    toast(`✅ Tirada ${data.codigo}: ${data.archivos} archivo(s) completos${data.partes ? `, ${data.partes} a medias (quedan en la cola con lo que falta)` : ""}. ${cortado ? "Poné el rollo nuevo: 🔄 Cambiar film o + Rollo Nuevo." : "Pasan a IMPRESOS y a Vender."}`);
+    toast(`✅ Tirada ${data.codigo}${fecha ? ` (impresa el ${fechaHoraCorta(fecha)})` : ""}: ${data.archivos} archivo(s) completos${data.partes ? `, ${data.partes} a medias (quedan en la cola con lo que falta)` : ""}. ${cortado ? "Poné el rollo nuevo: 🔄 Cambiar film o + Rollo Nuevo." : "Pasan a IMPRESOS y a Vender."}`);
     await cargarDatosTodo();
   });
 }
