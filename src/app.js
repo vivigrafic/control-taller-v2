@@ -3112,7 +3112,11 @@ async function venderDtf(clave) {
   const { data, error } = await sb().rpc("taller_dtf_vender", { p: { cliente_id: cli.id, pedidos: t.pedidos.map(p => p.id), detalle, recordar_detalle: true } });
   if (error) { toast("Error: " + error.message, "error"); return; }
   if (cli.recordar && nombre) await recordarClienteDtf(nombre, cli);
-  toast(`🧾 Venta ${data.numero_comprobante}: ${fmtNum(data.metros)} m a ${fmtMoney(data.precio_metro)} = ${fmtMoney(data.total)}.`);
+  // Si los archivos eran de una tarjeta del Kanban, se sumaron a la venta de esa tarjeta (una sola venta por trabajo)
+  const otras = (data.ventas || []).length > 1 ? ` (y ${data.ventas.length - 1} venta/s más)` : "";
+  toast(data.tarjeta
+    ? `🧾 Sumado a la venta de la tarjeta ${data.tarjeta} (${data.numero_comprobante}): ${fmtNum(data.metros)} m. La venta queda en ${fmtMoney(data.total)}${otras}.`
+    : `🧾 Venta ${data.numero_comprobante}: ${fmtNum(data.metros)} m a ${fmtMoney(data.precio_metro)} = ${fmtMoney(data.total)}${otras}.`);
   await cargarDatosTodo();
   const erp = window.VG_CONEXION?.erpUrl;
   if (erp && confirm(`Venta ${data.numero_comprobante} por ${fmtMoney(data.total)}.\n¿Abrirla en el sistema para cobrarla?`)) {
