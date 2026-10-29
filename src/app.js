@@ -835,7 +835,7 @@ function renderPendientesDriveSublimacion() {
       <div class="folder-header" data-folder-cli="${escHtml(cliente)}" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
         <span>
           <input type="checkbox" class="chk-folder-all" data-folder-cli="${escHtml(cliente)}" ${todosMarcados ? "checked" : ""} style="margin-right:10px; width:16px; height:16px; cursor:pointer;" title="Seleccionar todo" />
-          📁 <strong>${escHtml(cliente)}</strong> (${archivos.length}) ${chipTarjetaCarpeta(cliente, "SUBLIMACION", archivos)}
+          📁 <strong>${escHtml(cliente)}</strong> (${archivos.length}) ${chipTarjetaCarpeta(cliente, "SUBLIMACION", archivos)}${chipDudaCarpeta(cliente, "SUBLIMACION", archivos)}
         </span>
         <span style="cursor:pointer; font-weight:bold; color:var(--accent);">${fmtNum(totalMtsCarpeta)}m ${abierta ? "▼" : "►"}</span>
       </div>
@@ -1583,7 +1583,7 @@ function renderColaDtf() {
       return `
         <div class="folder-header dtf-carpeta" data-carpeta="${escHtml(cli)}">
           <span><input type="checkbox" class="chk-dtf-carpeta" data-carpeta="${escHtml(cli)}" ${marcados === archivos.length ? "checked" : ""} style="margin-right:10px; width:18px; height:18px;" title="Marcar toda la carpeta" />
-            📁 <strong>${escHtml(cli)}</strong> (${archivos.length}${marcados && marcados < archivos.length ? `, ${marcados} marcados` : ""}) ${chipTarjetaCarpeta(cli, "DTF", archivos)}</span>
+            📁 <strong>${escHtml(cli)}</strong> (${archivos.length}${marcados && marcados < archivos.length ? `, ${marcados} marcados` : ""}) ${chipTarjetaCarpeta(cli, "DTF", archivos)}${chipDudaCarpeta(cli, "DTF", archivos)}</span>
           <span style="font-weight:bold; color:var(--accent);">${fmtNum(metros)}m ${cerrada ? "►" : "▼"}</span>
         </div>
         <div class="folder-content" style="display:${cerrada ? "none" : "block"};">
@@ -1660,7 +1660,10 @@ function preguntarComoSalio(archivos, material) {
 
 // Avisos de la cola: medida distinta del nombre, ya impreso antes (volvió a la fila) o salió a medias
 function avisosFila(p) {
-  let h = avisoMedida(p);
+  // La carpeta manda: el archivo está en una subcarpeta de la carpeta del cliente
+  let h = p.subcarpeta ? ` <small class="sub-fila" title="Subcarpeta dentro de la carpeta del cliente">📂 ${escHtml(p.subcarpeta)}</small>` : "";
+  if (p.duda) h += ` <span class="badge danger" title="Está en la carpeta de ${escHtml(p.duda.carpeta_nombre || "")} pero el nombre dice otro cliente">❓ dice ${escHtml(p.duda.archivo_nombre || "")}</span>`;
+  h += avisoMedida(p);
   if (p.ya_impreso_at) h += ` <span class="badge danger" title="Alguien lo volvió a poner en la fila: al imprimirlo se pregunta si es reposición o se cobra">⚠️ ya se imprimió el ${new Date(p.ya_impreso_at).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" })}</span>`;
   if (Number(p.metros_impresos_parcial) > 0) h += ` <span class="badge danger" title="${escHtml(p.parcial_detalle || "")}">✂️ falta ${fmtNum(faltaMetros(p))} de ${fmtNum(p.metros_totales)} m (ya salieron ${fmtNum(p.metros_impresos_parcial)} m)</span>`;
   return h;
@@ -1923,8 +1926,52 @@ async function abrirEnlazarTarjeta(carpeta, modulo) {
   });
 }
 
+// La carpeta manda: si un archivo dice otro cliente conocido, la carpeta avisa "❓ ¿De quién es?" (se pregunta una vez y se
+// recuerda: fila_resolver_duda). Mientras tanto queda con el cliente y la tarjeta de la carpeta.
+function chipDudaCarpeta(carpeta, modulo, archivos) {
+  const n = archivos.filter(a => a.duda).length;
+  if (!n) return "";
+  return `<button type="button" class="chip-tarjeta duda" data-duda-carpeta="${escHtml(carpeta)}" data-duda-modulo="${modulo}" title="Hay archivos que dicen otro cliente que el de la carpeta">❓ ¿De quién es${n > 1 ? ` (${n})` : ""}?</button>`;
+}
+
+async function abrirDudaFila(carpeta, modulo) {
+  const archivos = STATE.pendientesDrive.filter(p => (p.cliente || "SIN CLIENTE") === carpeta && p.modulo === modulo && p.duda && p.estado_impreso !== "SI");
+  const grupos = new Map();
+  archivos.forEach(a => {
+    const k = `${a.duda.carpeta_id}|${a.duda.archivo_id}`;
+    if (!grupos.has(k)) grupos.set(k, { d: a.duda, archivos: [] });
+    grupos.get(k).archivos.push(a);
+  });
+  for (const { d, archivos: lista } of grupos.values()) {
+    const cn = d.carpeta_nombre || "el de la carpeta";
+    const an = d.archivo_nombre || "otro cliente";
+    const r = await ventanaTaller({
+      titulo: "❓ ¿De quién son estos archivos?",
+      texto: `En la carpeta de <b>${escHtml(cn)}</b> hay ${lista.length === 1 ? "un archivo que dice" : `${lista.length} archivos que dicen`} <b>${escHtml(an)}</b>:<br>`
+        + lista.slice(0, 6).map(a => `• ${escHtml(a.nombre_archivo)}`).join("<br>") + (lista.length > 6 ? `<br>… y ${lista.length - 6} más` : ""),
+      campos: [
+        { nombre: "elegido", etiqueta: "Son de", valor: "carpeta",
+          opciones: [{ valor: "carpeta", titulo: `${cn} (la carpeta)` }, { valor: "archivo", titulo: `${an} (lo que dice el archivo)` }] },
+        { nombre: "siempre", tipo: "check", valor: false, texto: `No preguntar más: todo lo que llegue en las carpetas de ${cn} es suyo`,
+          ayuda: "La respuesta se recuerda: la próxima vez no se pregunta." }
+      ],
+      aceptar: "Listo"
+    });
+    if (!r) return;
+    await llamarTaller("fila_resolver_duda", { ids: lista.map(a => a.id), elegido: r.elegido, siempre: r.elegido === "carpeta" && r.siempre },
+      () => r.elegido === "carpeta" ? `✅ Son de ${cn}` : `✅ Pasaron a ${an}`);
+  }
+}
+
 // El aviso de la carpeta se toca sin abrir ni cerrar la carpeta
 document.addEventListener("click", (e) => {
+  const duda = e.target.closest(".chip-tarjeta.duda");
+  if (duda) {
+    e.stopPropagation();
+    e.preventDefault();
+    abrirDudaFila(duda.getAttribute("data-duda-carpeta"), duda.getAttribute("data-duda-modulo"));
+    return;
+  }
   const chip = e.target.closest(".chip-tarjeta");
   if (!chip) return;
   e.stopPropagation();

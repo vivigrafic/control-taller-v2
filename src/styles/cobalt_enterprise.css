@@ -701,6 +701,8 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
   border: 1px solid var(--vg-brand-primary); background: color-mix(in srgb, var(--vg-brand-primary) 14%, transparent); color: var(--vg-text-primary); }
 .chip-tarjeta.sin { border-color: var(--vg-status-alert); background: color-mix(in srgb, var(--vg-status-alert) 14%, transparent); }
 .chip-tarjeta:hover { filter: brightness(1.15); }
+.chip-tarjeta.duda { border-color: var(--vg-status-alert); background: color-mix(in srgb, var(--vg-status-alert) 24%, transparent); }
+.sub-fila { color: var(--vg-text-secondary); font-size: 11px; font-weight: 400; }
 .enlace-tarjeta { max-width: 560px; width: 100%; box-sizing: border-box; border-color: var(--vg-brand-primary); }
 .enlace-archivos { display: flex; flex-direction: column; gap: 4px; max-height: 120px; overflow-y: auto; font-size: 12px; margin-bottom: 8px; }
 .enlace-archivos label { display: flex; gap: 6px; align-items: center; color: var(--vg-text-secondary); word-break: break-word;
