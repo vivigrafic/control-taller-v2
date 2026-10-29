@@ -19,6 +19,7 @@
   <script src="./src/config/conexion.js?v=20261022_04"></script>
   <script src="./src/ver_clave.js?v=20261022_02"></script>
   <script src="./src/acceso.js?v=20261022_04"></script>
+  <script src="./src/componentes/ayuda.js?v=20261029_01" data-ayuda="taller" data-vivi="https://erpvivigrafic.netlify.app/vivi.html"></script>
   <script src="./src/miniaturas.js?v=20261022_01"></script>
   <script src="./src/assets/logo.js?v=20261020_02"></script>
 </head>
@@ -86,7 +87,7 @@
   <!-- ========================================================================
        TAB 1: IMPRESIÓN (Idéntico a Index.html líneas 34-152)
        ======================================================================== -->
-  <div id="sec-impresion" class="tab-content active">
+  <div id="sec-impresion" class="tab-content active" data-ayuda="taller_impresion,taller">
     <div style="background: rgba(33, 150, 243, 0.1); border: 1px solid var(--accent-blue); padding: 10px; border-radius: 6px; margin-bottom: 15px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <div>
         <strong>Rollo Activo:</strong> <span id="lblRolloActivo" style="font-size:16px;">29g-1910-1</span>
@@ -232,7 +233,7 @@
   <!-- ========================================================================
        TAB 2: CALANDRADO (Copia exacta de Index.html líneas 154-201)
        ======================================================================== -->
-  <div id="sec-calandrado" class="tab-content">
+  <div id="sec-calandrado" class="tab-content" data-ayuda="taller_calandrado,taller">
     <div class="stats-grid" id="kpisCalandrado"></div>
 
     <div class="card" style="border-top: 4px solid var(--accent-blue);">
@@ -282,7 +283,7 @@
   <!-- ========================================================================
        TAB 3: LÁSER & QC (Copia exacta de Index.html líneas 203-287 + Anidados agrupados)
        ======================================================================== -->
-  <div id="sec-laser" class="tab-content">
+  <div id="sec-laser" class="tab-content" data-ayuda="taller_laser,taller">
     <div class="stats-grid" id="kpisLaser"></div>
 
     <div class="card" style="border-top: 4px solid var(--accent-blue);">
@@ -337,7 +338,7 @@
   <!-- ========================================================================
        TAB 4: MÓDULO DTF (Con el mismo estilo exacto de tarjetas oscuras)
        ======================================================================== -->
-  <div id="sec-dtf" class="tab-content">
+  <div id="sec-dtf" class="tab-content" data-ayuda="taller_dtf,taller">
     <div id="dtfBarraRollo"></div>
     <div id="dtfSinRegistrar"></div>
     <div class="stats-grid" id="kpisDtf"></div>
@@ -462,7 +463,7 @@
   <!-- ========================================================================
        TAB 5: TELAS, FICHAS TÉCNICAS Y PARÁMETROS RELACIONALES
        ======================================================================== -->
-  <div id="sec-telas" class="tab-content">
+  <div id="sec-telas" class="tab-content" data-ayuda="taller_telas,taller">
     <div style="background: rgba(0, 230, 118, 0.08); border: 1px solid #00E676; padding: 10px 14px; border-radius: 6px; margin-bottom: 15px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
       <div>
         <strong style="color:#00E676; font-size:15px;">🧵 Catálogo Maestro de Telas y Fichas Técnicas</strong>
@@ -520,7 +521,7 @@
   <!-- ========================================================================
        TAB 6: FINANZAS Y STOCK (Copia exacta de Index.html líneas 289-319)
        ======================================================================== -->
-  <div id="sec-finanzas" class="tab-content">
+  <div id="sec-finanzas" class="tab-content" data-ayuda="taller_finanzas,taller">
     <div class="stats-grid">
       <div class="stat-box" style="border-color:var(--accent-orange); background:rgba(255,152,0,0.05);"><div class="stat-title" style="color:var(--accent-orange);">Rinde Tinta Teórico</div><div class="stat-value">400 m/Set</div></div>
       <div class="stat-box" style="border-color:var(--accent-blue); background:rgba(33,150,243,0.05);"><div class="stat-title" style="color:var(--accent-blue);">Total Metros Impresos</div><div class="stat-value" id="finTotalImpMts">0.00m</div></div>
@@ -541,7 +542,7 @@
   <!-- ========================================================================
        TAB 6: MANTENIMIENTO Y CIERRE (Copia exacta de Index.html líneas 474-509)
        ======================================================================== -->
-  <div id="sec-cierre" class="tab-content">
+  <div id="sec-cierre" class="tab-content" data-ayuda="taller_cierre,taller">
     <div class="card" style="border-top: 4px solid var(--accent-orange);">
       <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
         <h2 style="margin:0; border:none; padding:0;">⏰ Alertas y recordatorios</h2>
@@ -565,7 +566,7 @@
   <!-- ========================================================================
        TAB 7: MÉTRICAS (BI) — Copia exacta de Index.html líneas 321-471 + Ayer y Semana Anterior
        ======================================================================== -->
-  <div id="sec-metricas" class="tab-content" style="padding:15px; margin:0 auto; max-width:1200px;">
+  <div id="sec-metricas" class="tab-content" data-ayuda="taller_metricas,taller" style="padding:15px; margin:0 auto; max-width:1200px;">
     <h2 style="color:var(--accent-blue); text-align:center; margin-bottom:10px; text-transform:uppercase; font-size:24px;">📊 Centro de Analítica (BI)</h2>
 
     <div class="card" style="border-top: 4px solid var(--accent); background:#141414; padding:15px; margin-bottom:15px;">
@@ -699,7 +700,7 @@
   <!-- ========================================================================
        TAB 8: CHAT INTERNO DE TALLER
        ======================================================================== -->
-  <div id="sec-chat" class="tab-content">
+  <div id="sec-chat" class="tab-content" data-ayuda="taller_chat,taller">
     <div class="grid-panel">
       <div class="card" style="border-top: 3px solid var(--accent-magenta);">
         <h2>📣 Enviar Mensaje / Nota al Taller</h2>
