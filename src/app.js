@@ -1669,6 +1669,74 @@ function preguntarComoSalio(archivos, material) {
   });
 }
 
+// Se cortó la impresión (falla del cabezal u otra cosa): para cada archivo, si salió completo o cuántos metros salieron
+// bien y cuántos mal. Lo que falta y lo que salió mal se reimprimen con una copia del archivo "REPOSICION NO COBRAR"
+// (taller_impresion_cortada). Devuelve { partes: [{ s, estado, bien, mal }], faltante, reponer, motivo } o null.
+function preguntarCorte(archivos) {
+  return new Promise(resolve => {
+    const capa = document.createElement("div");
+    capa.className = "modal-overlay open";
+    capa.innerHTML = `
+      <div class="modal-content" style="border-color:var(--danger); max-width:600px; width:100%;">
+        <h2 style="margin-top:0;">⏹️ Se cortó la impresión</h2>
+        <p class="dtf-ayuda" style="margin:0 0 8px;">Para cada archivo: cuántos metros salieron <b>bien</b> y cuántos <b>mal</b>. El original pasa a IMPRESOS y se cobra entero; lo que falta y lo que hay que reponer va en una copia "REPOSICION NO COBRAR".</p>
+        <div class="imp-partes">${archivos.map(p => `
+          <div class="imp-parte" data-id="${p.id}">
+            <span class="imp-parte-nombre">${escHtml(p.nombre_archivo)}<small>${fmtNum(faltaMetros(p))} m</small></span>
+            <select data-c="estado"><option value="cortado">Se cortó</option><option value="completo">Salió completo</option></select>
+            <input type="number" step="0.01" min="0" data-c="bien" placeholder="m bien" title="Metros que salieron bien" />
+            <input type="number" step="0.01" min="0" data-c="mal" placeholder="m mal" title="Metros que salieron mal (falla)" />
+            <small data-c="falta" class="dtf-ayuda"></small>
+          </div>`).join("")}</div>
+        <label class="dtf-motivo" style="margin-top:8px;"><input type="checkbox" data-x="faltante" checked /> Imprimir lo que falta</label>
+        <label class="dtf-motivo"><input type="checkbox" data-x="reponer" checked /> Reponer lo que salió mal</label>
+        <label>Motivo</label><input type="text" data-x="motivo" placeholder="Ej.: el cabezal falla" />
+        <div style="display:flex; gap:8px; margin-top:14px;">
+          <button type="button" class="btn-secondary" data-x="cancelar">Cancelar</button>
+          <button type="button" class="btn-main" data-x="ok" style="margin:0;">Seguir</button>
+        </div>
+      </div>`;
+    document.body.appendChild(capa);
+    const leer = (div) => {
+      const s = archivos.find(p => p.id === div.dataset.id);
+      const num = (c) => Number(String(div.querySelector(`[data-c='${c}']`).value).replace(",", ".")) || 0;
+      const estado = div.querySelector("[data-c='estado']").value;
+      return { s, estado, bien: estado === "completo" ? faltaMetros(s) : num("bien"), mal: estado === "completo" ? 0 : num("mal") };
+    };
+    const pintar = () => capa.querySelectorAll(".imp-parte").forEach(div => {
+      const x = leer(div);
+      const cortado = x.estado === "cortado";
+      div.querySelectorAll("[data-c='bien'],[data-c='mal']").forEach(i => { i.hidden = !cortado; });
+      div.querySelector("[data-c='falta']").textContent = cortado ? `falta ${fmtNum(Math.max(faltaMetros(x.s) - x.bien - x.mal, 0))} m` : "";
+    });
+    capa.addEventListener("input", pintar);
+    capa.addEventListener("change", pintar);
+    pintar();
+    capa.addEventListener("click", (e) => {
+      if (e.target === capa || e.target.closest("[data-x='cancelar']")) { capa.remove(); resolve(null); return; }
+      if (!e.target.closest("[data-x='ok']")) return;
+      const partes = [...capa.querySelectorAll(".imp-parte")].map(leer);
+      const mal = partes.find(x => x.estado === "cortado" && (x.bien + x.mal <= 0 || x.bien + x.mal > faltaMetros(x.s) + 0.01));
+      if (mal) { toast(`"${mal.s.nombre_archivo}": poné los metros que salieron bien y mal (entre los dos, hasta ${fmtNum(faltaMetros(mal.s))} m).`, "warn"); return; }
+      const q = (x) => capa.querySelector(`[data-x='${x}']`);
+      capa.remove();
+      resolve({ partes, faltante: q("faltante").checked, reponer: q("reponer").checked, motivo: q("motivo").value.trim() });
+    });
+  });
+}
+
+// Después de registrar la impresión: las copias para lo que falta y lo que hay que reponer, y la falla
+async function anotarCortes(corte, modulo, rollo) {
+  let copias = 0;
+  for (const x of corte.partes.filter(y => y.estado === "cortado")) {
+    const { data, error } = await sb().rpc("taller_impresion_cortada", { p: { id: x.s.id, bien: x.bien, mal: x.mal, imprimir_faltante: corte.faltante,
+      reponer: corte.reponer, motivo: corte.motivo, estacion: modulo === "DTF" ? "DTF" : "Impresión", rollo, quien: STATE.usuarioActual } });
+    if (error) { toast(`"${x.s.nombre_archivo}": ${error.message}`, "error"); continue; }
+    if (Number(data.copia) > 0) copias++;
+  }
+  if (copias) toast(`⏹️ En un minuto aparece${copias > 1 ? "n" : ""} en la fila ${copias > 1 ? `${copias} copias` : "la copia"} "REPOSICION NO COBRAR" con lo que falta.`, "warn");
+}
+
 // Avisos de la cola: medida distinta del nombre, ya impreso antes (volvió a la fila) o salió a medias
 function avisosFila(p) {
   // La carpeta manda: el archivo está en una subcarpeta de la carpeta del cliente
@@ -2679,6 +2747,7 @@ function abrirImprimirDtf() {
       </div>
       <input type="datetime-local" data-x="fecha" value="${`${fechaHoraLocal(Date.now() - 864e5).slice(0, 10)}T21:00`}" max="${fechaHoraLocal(new Date())}" hidden />
       <label class="dtf-motivo" style="margin-top:10px;"><input type="checkbox" data-x="cortado" /> ⚠️ El rollo se terminó en el medio de la impresión</label>
+      <label class="dtf-motivo"><input type="checkbox" data-x="falla" /> ⏹️ Se cortó la impresión (falla, cabezal…): lo que falta va en una copia sin cargo</label>
       <div data-x="partes" class="imp-partes" hidden>
         <p class="dtf-ayuda" style="margin:6px 0;">Marcá cómo salió cada archivo en este rollo. Lo que salió a medias queda en la cola con lo que falta (se cobra una sola vez, cuando sale la última parte). Este rollo queda <b>terminado</b>.</p>
         ${marcados.map(p => `
@@ -2717,6 +2786,13 @@ function abrirImprimirDtf() {
       if (partes.some(x => x.estado === "parte" && !(x.metros > 0))) { toast("Poné cuántos metros salieron de los que salieron a medias.", "warn"); return; }
       if (!partes.some(x => x.estado !== "nada")) { toast("No salió ningún archivo: no hay nada que registrar.", "warn"); return; }
     }
+    // Se cortó por una falla: cuánto salió bien y mal de cada archivo (el original queda impreso y se cobra entero)
+    let corte = null;
+    if (q("falla").checked) {
+      if (cortado) { toast("Elegí una de las dos: se terminó el rollo o se cortó por una falla.", "warn"); return; }
+      corte = await preguntarCorte(marcados);
+      if (!corte) return;
+    }
     const otraFecha = capa.querySelector("input[name='dtf-cuando']:checked").value === "otra";
     const fecha = otraFecha ? q("fecha").value : "";
     if (otraFecha && !fecha) { toast("Poné el día y la hora en que se imprimió.", "warn"); return; }
@@ -2726,7 +2802,7 @@ function abrirImprimirDtf() {
     const { data, error } = await sb().rpc("taller_dtf_imprimir", { p: {
       fecha: fechaHoraParaBase(fecha),
       pendientes: marcados.map(p => p.id), id_rollo_dtf: rollo,
-      metros_rip: q("rip").value || null,
+      metros_rip: q("rip").value || (corte ? corte.partes.reduce((a, x) => a + x.bien + x.mal, 0) : null),
       observaciones: q("obs").value.trim(),
       cargo_reimpresion: reimp ? reimp.value : null,
       partes, rollo_terminado: cortado
@@ -2734,6 +2810,7 @@ function abrirImprimirDtf() {
     if (error) { ok.disabled = false; ok.textContent = "✓ Ya se imprimió"; toast("Error: " + error.message, "error"); return; }
     cerrar();
     STATE.dtfSeleccion.clear();
+    if (corte) await anotarCortes(corte, "DTF", rollo);
     toast(`✅ Tirada ${data.codigo}${fecha ? ` (impresa el ${fechaHoraCorta(fecha)})` : ""}: ${data.archivos} archivo(s) completos${data.partes ? `, ${data.partes} a medias (quedan en la cola con lo que falta)` : ""}. ${cortado ? "Poné el rollo nuevo: 🔄 Cambiar film o + Rollo Nuevo." : "Pasan a IMPRESOS y a Vender."}`);
     await cargarDatosTodo();
   });
@@ -4462,11 +4539,24 @@ async function procesarImpresionLote() {
   const chkCortado = document.getElementById("impInput_rolloCortado");
   const cortado = !!(chkCortado && chkCortado.checked && seleccionados.length > 0);
   let salieron = seleccionados.map(s => ({ s, estado: "completo", metros: faltaMetros(s) }));
+  // Si se cortó por una falla: el original queda impreso (se cobra entero) y lo que falta va en una copia sin cargo
+  const chkFalla = document.getElementById("impInput_cortePorFalla");
+  const porFalla = !!(chkFalla && chkFalla.checked && seleccionados.length > 0);
+  if (cortado && porFalla) { toast("Elegí una de las dos: se terminó el rollo o se cortó por una falla.", "warn"); return; }
+  let corte = null;
+  let desperdicio = 0;
   if (cortado) {
     const r = await preguntarComoSalio(seleccionados, "papel");
     if (!r) return;
     salieron = r.filter(x => x.estado !== "nada");
     if (!salieron.length) { toast("No salió ningún archivo: no hay nada que registrar.", "warn"); return; }
+  }
+  if (porFalla) {
+    corte = await preguntarCorte(seleccionados);
+    if (!corte) return;
+    // Del papel: lo bien es lo impreso y lo mal, desperdicio. El archivo se da por impreso entero.
+    salieron = corte.partes.map(x => ({ s: x.s, estado: "completo", metros: x.bien }));
+    desperdicio = corte.partes.reduce((a, x) => a + x.mal, 0);
   }
   const impresos = salieron.map(x => x.s);
 
@@ -4475,7 +4565,7 @@ async function procesarImpresionLote() {
     : (disenoInput || "TRABAJO MANUAL");
 
   // Con el rollo cortado manda lo que salió (el campo de metros se completa solo con el total de lo marcado)
-  const metrosTotales = metrosManualInput > 0 && !cortado
+  const metrosTotales = metrosManualInput > 0 && !cortado && !porFalla
     ? metrosManualInput
     : salieron.reduce((acc, x) => acc + (Number(x.metros) || 0), 0);
 
@@ -4500,8 +4590,8 @@ async function procesarImpresionLote() {
     color_tela: color,
     accion: "Impresion Normal",
     metros_impresos: metrosTotales,
-    metros_desperdicio: 0,
-    metros_restantes_snapshot: Math.max(0, infoRollo.restantes - metrosTotales),
+    metros_desperdicio: desperdicio,
+    metros_restantes_snapshot: Math.max(0, infoRollo.restantes - metrosTotales - desperdicio),
     perfil,
     ruta,
     observaciones: obs,
@@ -4539,6 +4629,10 @@ async function procesarImpresionLote() {
     } else {
       await sb().from("prod_pendientes_drive").update({ estado_impreso: "SI" }).eq("id", x.s.id);
     }
+  }
+  if (corte) {
+    chkFalla.checked = false;
+    await anotarCortes(corte, "SUBLIMACION", infoRollo.idBase);
   }
   if (cortado) {
     chkCortado.checked = false;
