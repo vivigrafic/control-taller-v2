@@ -759,6 +759,9 @@
       </div>
       <label>Observaciones</label>
       <input type="text" id="montarRolloObs" placeholder="Opcional..." />
+      <label>¿De qué compra sale?</label>
+      <select id="montarRolloCompra"></select>
+      <small id="montarRolloCompraAyuda" style="display:block; color:var(--vg-text-secondary); margin:2px 0 6px;"></small>
       <div class="grid-2" style="margin-top:20px;">
         <button type="button" id="btnConfirmarMontarRollo" class="btn-main" style="margin:0; background:var(--accent-blue);">Confirmar Acción</button>
         <button type="button" class="btn-secondary vg-modal-close" style="margin:0;">Cancelar</button>
@@ -1005,7 +1008,7 @@
   <datalist id="listColores"></datalist>
   <div id="vgToastContainer" style="position:fixed; top:16px; right:16px; z-index:3000; max-width:360px;"></div>
 
-  <script type="module" src="./src/app.js?v=20261029_10"></script>
+  <script type="module" src="./src/app.js?v=20261029_11"></script>
   <script>
     // Registro del Service Worker PWA
     if ('serviceWorker' in navigator) {

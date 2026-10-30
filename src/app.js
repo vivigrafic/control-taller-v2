@@ -1846,6 +1846,24 @@ async function llamarTaller(funcion, p, exito) {
   return data;
 }
 
+// ===== De qué compra sale cada rollo de papel o film (fase C): por defecto la última compra de ese insumo =====
+async function opcionesCompraInsumo(tipo, select, ayuda) {
+  select.innerHTML = '<option value="">Buscando las compras…</option>';
+  const { data, error } = await sb().rpc("taller_compras_insumo", { p_tipo: tipo });
+  const compras = !error && data ? (data.compras || []) : [];
+  select.innerHTML = compras.map((c, i) => `<option value="${escHtml(c.id)}" ${i === 0 ? "selected" : ""}>${escHtml(c.numero || "")} · ${escHtml(c.proveedor || "sin proveedor")} · ${fmtNum(c.cantidad)} ${escHtml(c.unidad_compra ? c.unidad_compra + (Number(c.cantidad) === 1 ? "" : "s") : "")} (${fmtNum(c.metros)} m) · ${escHtml(String(c.fecha || "").split("-").reverse().join("/"))}${c.rollos_montados ? ` · ya montados ${c.rollos_montados}` : ""}</option>`).join("")
+    + `<option value="">${compras.length ? "Ninguna de estas" : "No hay compras cargadas"}</option>`;
+  if (ayuda) ayuda.textContent = compras.length ? "Viene elegida la última compra. Sirve para el informe de insumos (no cambia el stock)."
+    : `No hay compras de ${tipo === "film" ? "film" : "papel"} cargadas: cargalas en Compras del sistema para saber cuánto rinde cada una.`;
+  select.dataset.porDefecto = compras.length ? compras[0].id : "";
+}
+async function enlazarRolloCompra(tipo, idRollo, select) {
+  // El rollo ya tomó la última compra solo (disparador): si se eligió otra (o ninguna), se cambia
+  if (!select || select.value === (select.dataset.porDefecto || "")) return;
+  const { error } = await sb().rpc("taller_rollo_compra", { p: { tipo, id_rollo: idRollo, comprobante_item_id: select.value || null } });
+  if (error) toast("El rollo se montó, pero no se pudo anotar de qué compra sale: " + error.message, "warn");
+}
+
 // ===== La tela de cada trabajo (fase B): la que se reservó o confirmó en la tarjeta =====
 function trabajosDeArchivos(fileIdsCsv) {
   const ids = String(fileIdsCsv || "").split(",").map(s => s.trim()).filter(Boolean);
@@ -2518,6 +2536,9 @@ function abrirRolloNuevoDtf() {
       <input type="number" step="0.01" min="1" data-x="metros" value="${Number(ultimo.metros_iniciales) || 100}" />
       <label>Observación (opcional)</label>
       <input type="text" data-x="obs" />
+      <label>¿De qué compra sale?</label>
+      <select data-x="compra"></select>
+      <small data-x="compra-ayuda" style="display:block; color:var(--vg-text-secondary); margin:2px 0 6px;"></small>
       ${puestos.length ? `<p style="font-size:12px; color:var(--vg-text-secondary); margin:10px 0 0;">El que está puesto (${puestos.map(r => escHtml(r.id_rollo_dtf)).join(", ")}) sale de la máquina: queda terminado, o guardado si todavía le queda film.</p>` : ""}
       <div style="display:flex; gap:8px; margin-top:14px;">
         <button type="button" class="btn-secondary" data-x="cancelar">Cancelar</button>
@@ -2527,6 +2548,7 @@ function abrirRolloNuevoDtf() {
   document.body.appendChild(capa);
   const $ = (x) => capa.querySelector(`[data-x="${x}"]`);
   const valor = (sel, otro) => $(sel).value === "__otro" ? $(otro).value.trim() : $(sel).value;
+  opcionesCompraInsumo("film", $("compra"), $("compra-ayuda"));
   capa.addEventListener("change", (e) => {
     if (e.target === $("marca")) { $("marca-otra").hidden = $("marca").value !== "__otro"; if (!$("marca-otra").hidden) $("marca-otra").focus(); }
     if (e.target === $("perfil")) { $("perfil-otro").hidden = $("perfil").value !== "__otro"; if (!$("perfil-otro").hidden) $("perfil-otro").focus(); }
@@ -2542,6 +2564,7 @@ function abrirRolloNuevoDtf() {
     ok.disabled = true;
     const { data, error } = await sb().rpc("taller_dtf_rollo_nuevo", { p: { marca, perfil, metros_iniciales: $("metros").value || 100, observaciones: $("obs").value.trim() } });
     if (error) { ok.disabled = false; toast("Error: " + error.message, "error"); return; }
+    await enlazarRolloCompra("film", data.id_rollo_dtf, $("compra"));
     capa.remove();
     toast(`🧻 Rollo ${data.id_rollo_dtf} montado${data.sale && data.sale.length ? `. Sale ${data.sale.join(", ")}.` : "."}`);
     await cargarDatosTodo();
@@ -6017,6 +6040,8 @@ export function inicializarEventosUI() {
 
   document.getElementById("btnAbrirModalMontarRollo")?.addEventListener("click", () => {
     document.getElementById("modalMontarRollo")?.classList.add("open");
+    const sel = document.getElementById("montarRolloCompra");
+    if (sel) opcionesCompraInsumo("papel", sel, document.getElementById("montarRolloCompraAyuda"));
   });
   document.getElementById("btnConfirmarMontarRollo")?.addEventListener("click", async () => {
     const gramaje = document.getElementById("montarRolloGramaje")?.value || "29";
@@ -6027,13 +6052,16 @@ export function inicializarEventosUI() {
     const nuevoId = `${gramaje}g-${ddmm}-${STATE.rollosPapelSaldos.length + 1}`;
 
     await sb().from("prod_rollos_papel").update({ estado: "Sobrante" }).eq("estado", "Activo");
+    const selCompra = document.getElementById("montarRolloCompra");
     await sb().from("prod_rollos_papel").insert({
       id_rollo: nuevoId,
       gramaje,
       metros_iniciales: metros,
       estado: "Activo",
-      observaciones: obs
+      observaciones: obs,
+      comprobante_item_id: selCompra && selCompra.value ? selCompra.value : null
     });
+    if (selCompra && !selCompra.value && selCompra.dataset.porDefecto) await enlazarRolloCompra("papel", nuevoId, selCompra);
     document.getElementById("modalMontarRollo")?.classList.remove("open");
     toast(`🧻 Rollo ${nuevoId} montado.`);
     await cargarDatosTodo();
