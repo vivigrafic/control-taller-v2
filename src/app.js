@@ -1856,6 +1856,7 @@ window.ventanaTaller = ventanaTaller;
 window.confirmarTaller = confirmarTaller;
 window.pedirTaller = pedirTaller;
 window.toastTaller = toast;
+window.preguntarRollosCalandrados = (regs) => preguntarRollosCalandrados(regs);
 
 async function llamarTaller(funcion, p, exito) {
   const { data, error } = await sb().rpc(funcion, { p });
@@ -1920,6 +1921,49 @@ async function preguntarTelaCalandrada(regs) {
     toast(data && data.aviso ? data.aviso : "🧵 Tela descontada", data && data.aviso ? "warn" : undefined);
   }
   if (pendientes.length) await cargarDatosTodo();
+}
+
+// Al terminar de calandrar (E2a): cada archivo con sus rollos y los metros teóricos; se ponen los reales y sale una
+// etiqueta por rollo. Lo arma la base (calandrado_rollos / calandrado_rollos_guardar) y las etiquetas, vgEtiquetas.
+async function preguntarRollosCalandrados(regs) {
+  const claves = [...new Set(regs.flatMap(r => String(r.file_id || "").split(",")).map(s => s.trim()).filter(Boolean))];
+  if (!claves.length) return;
+  const { data, error } = await sb().rpc("calandrado_rollos", { p: { archivos: claves } });
+  if (error) { console.warn("Rollos del calandrado:", error.message); return; }
+  const archivos = ((data && data.archivos) || []).filter(a => a.trabajo_id && ((a.piezas || []).length || (a.rollos_trabajo || []).length));
+  if (!archivos.length) return;
+  const campos = [];
+  const sinRollo = { valor: "", titulo: "— ningún rollo —" };
+  archivos.forEach((a, ai) => {
+    const nombre = `${a.tarjeta} · ${a.nombre}`;
+    if ((a.piezas || []).length) {
+      a.piezas.forEach(p => campos.push({ nombre: `p:${p.id}`, tipo: "number", valor: p.reales ?? p.teoricos ?? "",
+        etiqueta: `${nombre} → Rollo ${p.numero} (${p.partida})`, ayuda: `Teórico ${fmtNum(p.teoricos)} m · poné los metros reales` }));
+    } else {
+      const ops = [sinRollo, ...a.rollos_trabajo.map(r => ({ valor: r.id, titulo: `Rollo ${r.numero} · ${r.partida} ${r.tela || ""} ${r.color || ""}`.trim() }))];
+      campos.push({ nombre: `r:${ai}`, etiqueta: `${nombre} (${fmtNum(a.metros)} m): ¿en qué rollo?`, opciones: ops, valor: "" });
+      campos.push({ nombre: `m:${ai}`, tipo: "number", etiqueta: "Metros reales en ese rollo", valor: a.metros ?? "" });
+      campos.push({ nombre: `r2:${ai}`, etiqueta: "¿Y otro rollo? (si el archivo abarcó dos)", opciones: ops, valor: "" });
+      campos.push({ nombre: `m2:${ai}`, tipo: "number", etiqueta: "Metros reales en el otro rollo", valor: "" });
+    }
+  });
+  campos.push({ nombre: "imprimir", tipo: "check", valor: true, texto: "Imprimir una etiqueta por rollo" });
+  const resp = await ventanaTaller({ titulo: "🧻 Rollos calandrados", aceptar: "Guardar",
+    texto: "Lo que se imprimió en cada rollo (teórico) y lo que salió de verdad. Queda en la tarjeta y en el portal del cliente.", campos });
+  if (!resp) return;   // se puede completar después en la tarjeta
+  const piezas = [];
+  archivos.forEach((a, ai) => {
+    (a.piezas || []).forEach(p => { const v = resp[`p:${p.id}`]; if (v > 0) piezas.push({ id: p.id, reales: v }); });
+    if (!(a.piezas || []).length) {
+      if (resp[`r:${ai}`] && resp[`m:${ai}`] > 0) piezas.push({ archivo_id: a.id, rollo_id: resp[`r:${ai}`], reales: resp[`m:${ai}`] });
+      if (resp[`r2:${ai}`] && resp[`m2:${ai}`] > 0) piezas.push({ archivo_id: a.id, rollo_id: resp[`r2:${ai}`], reales: resp[`m2:${ai}`] });
+    }
+  });
+  if (!piezas.length) return;
+  const { data: g, error: e2 } = await sb().rpc("calandrado_rollos_guardar", { p: { lote: regs[0].batch_id || null, quien: STATE.usuarioActual, piezas } });
+  if (e2) { toast("No se guardaron los rollos: " + e2.message, "error"); return; }
+  toast(`🧻 ${piezas.length} rollo(s) anotados`);
+  if (resp.imprimir && window.vgEtiquetas && (g.etiquetas || []).length) await window.vgEtiquetas.imprimir(g.etiquetas);
 }
 
 // ===== Archivos de la fila ↔ tarjetas del Kanban =====
@@ -4702,8 +4746,9 @@ async function finalizarTrabajoCalandrado(idCalOrCsv, minutosExtra = 0, skipRelo
     toast(`✅ Calandrado procesado (${fmtDateHoraLineal(fechaFinIso)}).`);
     await cargarDatosTodo();
   }
-  // La tela reservada en la tarjeta: se confirma acá, que es donde se usa (no frena lo demás)
-  preguntarTelaCalandrada(regs).catch(e => console.warn("Tela de la tarjeta:", e));
+  // Los rollos (metros reales y etiquetas) y la tela reservada en la tarjeta: se anotan acá, que es donde se usan
+  preguntarRollosCalandrados(regs).catch(e => console.warn("Rollos del calandrado:", e))
+    .then(() => preguntarTelaCalandrada(regs)).catch(e => console.warn("Tela de la tarjeta:", e));
 }
 
 async function procesarRolloCompletoCalandrado(rolloId) {
