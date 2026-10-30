@@ -18,7 +18,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./src/config/conexion.js?v=20261022_04"></script>
   <script src="./src/ver_clave.js?v=20261022_02"></script>
-  <script src="./src/acceso.js?v=20261022_04"></script>
+  <script src="./src/acceso.js?v=20261030_01"></script>
   <script src="./src/componentes/ayuda.js?v=20261029_01" data-ayuda="taller" data-vivi="https://erpvivigrafic.netlify.app/vivi.html"></script>
   <script src="./src/componentes/bandeja.js?v=20261030_01"></script>
   <script src="./src/miniaturas.js?v=20261022_01"></script>
@@ -1010,7 +1010,7 @@
   <datalist id="listColores"></datalist>
   <div id="vgToastContainer" style="position:fixed; top:16px; right:16px; z-index:3000; max-width:360px;"></div>
 
-  <script type="module" src="./src/app.js?v=20261030_01"></script>
+  <script type="module" src="./src/app.js?v=20261030_02"></script>
   <script>
     // Registro del Service Worker PWA
     if ('serviceWorker' in navigator) {
@@ -1042,6 +1042,10 @@
         if (esIos && !yaInstalada) {
           btn.style.display = 'inline-flex';
         }
+        // Cómo instalarla: en la ventana del taller (la pone app.js)
+        const mostrarInstalar = (texto) => window.ventanaTaller
+          ? window.ventanaTaller({ titulo: '📲 Instalar la app', texto: texto.replace(/\n/g, '<br>'), aceptar: 'Entendido' })
+          : alert(texto);
 
         btn.addEventListener('click', async () => {
           if (deferredInstallPrompt) {
@@ -1052,9 +1056,9 @@
             }
             deferredInstallPrompt = null;
           } else if (esIos) {
-            alert("📲 Para instalar en tu iPhone / iPad:\n\n1. Tocá el botón 'Compartir' de Safari (el cuadrado con la flecha hacia arriba en la barra inferior).\n2. Bajá un poco y elegí 'Agregar a Inicio' (o 'Add to Home Screen').\n\n¡La app quedará instalada en tu pantalla principal!");
+            mostrarInstalar("Para instalar en tu iPhone / iPad:\n\n1. Tocá el botón 'Compartir' de Safari (el cuadrado con la flecha hacia arriba en la barra inferior).\n2. Bajá un poco y elegí 'Agregar a Inicio' (o 'Add to Home Screen').\n\n¡La app quedará instalada en tu pantalla principal!");
           } else {
-            alert("📲 Para instalar esta App en tu teléfono:\n\nEn el menú de Chrome (los 3 puntos arriba a la derecha), tocá 'Instalar aplicación' o 'Agregar a la pantalla principal'.");
+            mostrarInstalar("Para instalar esta App en tu teléfono:\n\nEn el menú de Chrome (los 3 puntos arriba a la derecha), tocá 'Instalar aplicación' o 'Agregar a la pantalla principal'.");
           }
         });
 

@@ -1780,7 +1780,7 @@ function renderTiradasDtf() {
   }).join("");
 }
 
-// Ventana simple del taller, con el estilo de las demás. campos: { nombre, etiqueta, tipo (text|number|check), valor,
+// Ventana simple del taller, con el estilo de las demás. campos: { nombre, etiqueta, tipo (text|number|check|textarea), valor,
 // opciones: [{ valor, titulo }], placeholder, ayuda, texto (para check) }. Devuelve los valores, o null si se cancela.
 // validar(valores) puede devolver un texto de error.
 function campoVentanaTaller(c, i) {
@@ -1790,6 +1790,8 @@ function campoVentanaTaller(c, i) {
   } else if (c.opciones) {
     const ops = c.opciones.map(o => `<option value="${escHtml(o.valor)}" ${String(o.valor) === String(c.valor ?? "") ? "selected" : ""}>${escHtml(o.titulo)}</option>`).join("");
     control = `<label>${escHtml(c.etiqueta)}</label><select data-i="${i}">${ops}</select>`;
+  } else if (c.tipo === "textarea") {
+    control = `<label>${escHtml(c.etiqueta)}</label><textarea data-i="${i}" rows="3" style="width:100%;">${escHtml(c.valor ?? "")}</textarea>`;
   } else {
     const num = c.tipo === "number" ? `type="number" step="0.01" min="0" inputmode="decimal"`
       : c.tipo === "datetime" ? `type="datetime-local" max="${fechaHoraLocal(new Date())}"` : `type="text"`;
@@ -1821,7 +1823,7 @@ function ventanaTaller({ titulo, texto = "", campos = [], aceptar = "Aceptar", c
       });
       return r;
     };
-    const primero = capa.querySelector("input:not([type=checkbox]), select");
+    const primero = capa.querySelector("input:not([type=checkbox]), select, textarea");
     setTimeout(() => primero && primero.focus(), 50);
     const ok = () => {
       const r = leer();
@@ -1837,6 +1839,23 @@ function ventanaTaller({ titulo, texto = "", campos = [], aceptar = "Aceptar", c
     capa.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.tagName === "INPUT") ok(); if (e.key === "Escape") { capa.remove(); resolve(null); } });
   });
 }
+
+// Preguntar sí/no con la ventana del taller (el texto se escapa). Devuelve true o false.
+async function confirmarTaller(titulo, texto = "", aceptar = "Sí", color) {
+  return (await ventanaTaller({ titulo, texto: escHtml(texto).replace(/\n/g, "<br>"), aceptar, color })) !== null;
+}
+// Pedir un dato con la ventana del taller. Devuelve el texto (o el número) o null si cancela.
+async function pedirTaller(titulo, etiqueta, valor = "", { tipo = "text", texto = "", aceptar = "Aceptar", obligatorio = false } = {}) {
+  const r = await ventanaTaller({ titulo, texto: escHtml(texto).replace(/\n/g, "<br>"), aceptar, campos: [{ nombre: "v", etiqueta, valor, tipo }],
+    validar: obligatorio ? (x) => (String(x.v ?? "").trim() ? null : "Completá: " + etiqueta) : null });
+  return r === null ? null : r.v;
+}
+
+// Las mismas ventanas y carteles para lo que está fuera de este módulo (acceso.js, index.html)
+window.ventanaTaller = ventanaTaller;
+window.confirmarTaller = confirmarTaller;
+window.pedirTaller = pedirTaller;
+window.toastTaller = toast;
 
 async function llamarTaller(funcion, p, exito) {
   const { data, error } = await sb().rpc(funcion, { p });
@@ -2884,7 +2903,7 @@ async function separarTiradasMarcadas() {
   const marcadas = tiradasParaSeparar().filter(x => STATE.dtfSelTiradas.has(x.t.id));
   const faltan = marcadas.flatMap(x => x.ped.filter(d => !d.separado_at));
   if (!faltan.length) return;
-  if (!confirm(`¿Dar por separadas ${faltan.length} ${faltan.length === 1 ? "impresión" : "impresiones"} de ${marcadas.map(x => x.t.codigo_tirada).join(", ")}?`)) return;
+  if (!await confirmarTaller(`¿Dar por separadas ${faltan.length} ${faltan.length === 1 ? "impresión" : "impresiones"}?`, `De ${marcadas.map(x => x.t.codigo_tirada).join(", ")}.`, "Sí, separadas")) return;
   const { error } = await sb().rpc("taller_dtf_separar", { p: { pedidos: faltan.map(d => d.id), separado: true } });
   if (error) { toast("Error: " + error.message, "error"); return; }
   STATE.dtfSelTiradas.clear();
@@ -3187,7 +3206,7 @@ function elegirClienteSistema(textoInicial = "", op = {}) {
       ok.disabled = false;
       if (error && /^YA_EXISTE/.test(error.message)) {
         const msg = error.message.replace(/^YA_EXISTE:\s*/, "");
-        if (confirm(`${msg}\n\n¿Es otra persona con el mismo nombre?\nAceptar: crear el cliente nuevo igual.\nCancelar: volver y elegir el que ya está.`)) { crearCliente(true); return; }
+        if (await confirmarTaller("¿Es otra persona con el mismo nombre?", `${msg}\n\nSi es otra persona, se crea igual. Si no, volvé y elegí el que ya está.`, "Es otra: crearla")) { crearCliente(true); return; }
         zonaNuevo.hidden = true; zonaBuscar.hidden = false; inp.value = nombre; pintarNuevo(); buscar(); inp.focus();
         return;
       }
@@ -3254,7 +3273,7 @@ async function venderDtf(clave) {
     : `🧾 Venta ${data.numero_comprobante}: ${fmtNum(data.metros)} m a ${fmtMoney(data.precio_metro)} = ${fmtMoney(data.total)}${otras}.`);
   await cargarDatosTodo();
   const erp = window.VG_CONEXION?.erpUrl;
-  if (erp && confirm(`Venta ${data.numero_comprobante} por ${fmtMoney(data.total)}.\n¿Abrirla en el sistema para cobrarla?`)) {
+  if (erp && await confirmarTaller(`Venta ${data.numero_comprobante} por ${fmtMoney(data.total)}`, "¿La abro en el sistema para cobrarla?", "Abrirla")) {
     window.open(`${erp}/src/modulos/pos_ventas/ver_venta.html?id=${encodeURIComponent(data.id)}`, "_blank");
   }
 }
@@ -3526,7 +3545,7 @@ function unirTelaConSistema(fichaId) {
     const b = e.target.closest("[data-item]");
     if (!b || b.disabled) return;
     const nueva = b.dataset.item === "nueva";
-    if (nueva && !confirm(`¿Crear la tela "${ficha.nombre_comercial}" en Productos del sistema y unirla a esta ficha?`)) return;
+    if (nueva && !await confirmarTaller(`¿Crear la tela "${ficha.nombre_comercial}"?`, "Se crea en Productos del sistema y queda unida a esta ficha.", "Crearla")) return;
     const { data, error } = await sb().rpc("taller_tela_unir", { p_ficha: ficha.id, p_item: nueva ? null : b.dataset.item });
     if (error) { toast("Error: " + error.message, "error"); return; }
     capa.remove();
@@ -3537,7 +3556,7 @@ function unirTelaConSistema(fichaId) {
 
 async function separarTelaDeSistema(fichaId) {
   const ficha = (STATE.telasFicha || []).find(t => t.id === fichaId);
-  if (!ficha || !confirm(`¿Separar "${ficha.nombre_comercial}" de su tela del sistema? La tela sigue en Productos.`)) return;
+  if (!ficha || !await confirmarTaller(`¿Separar "${ficha.nombre_comercial}" de su tela del sistema?`, "La tela sigue en Productos.", "Separar")) return;
   const { error } = await sb().rpc("taller_tela_separar", { p_ficha: fichaId });
   if (error) { toast("Error: " + error.message, "error"); return; }
   toast("Ficha separada.");
@@ -3896,7 +3915,7 @@ export async function eliminarTela(telaId) {
   const tela = (STATE.telasFicha || []).find(t => t.id === telaId);
   if (!tela) return;
 
-  if (!confirm(`¿Archivar la tela "${tela.nombre_comercial}" y sus variantes asociadas?`)) {
+  if (!await confirmarTaller(`¿Archivar la tela "${tela.nombre_comercial}"?`, "También se archivan sus variantes.", "Archivar", "var(--danger)")) {
     return;
   }
 
@@ -4573,9 +4592,12 @@ async function cortarBloquePapel4m() {
 async function registrarAvanceOCalibracion(tipoAccion) {
   const info = obtenerRolloPapelActivo();
   const defMts = tipoAccion === "Calibración" ? "1.0" : "0.50";
-  const m = parseFloat(prompt(`Cantidad de metros a descontar por ${tipoAccion}:`, defMts));
-  if (!m || m <= 0) return;
-  const obs = prompt("Motivo / Obs:", tipoAccion) || tipoAccion;
+  const datos = await ventanaTaller({ titulo: `📏 ${tipoAccion}`, aceptar: "Anotar",
+    campos: [{ nombre: "m", etiqueta: "Metros a descontar", tipo: "number", valor: defMts }, { nombre: "obs", etiqueta: "Motivo u observación", valor: tipoAccion }],
+    validar: (x) => (x.m > 0 ? null : "Poné los metros.") });
+  if (!datos) return;
+  const m = datos.m;
+  const obs = datos.obs || tipoAccion;
 
   await sb().from("prod_impresiones").insert({
     batch_id: `MERMA-${Date.now()}`,
@@ -4698,7 +4720,7 @@ async function procesarRolloCompletoCalandrado(rolloId) {
     ? `con la fecha seleccionada (${fmtDateHoraLineal(new Date(inputFechaManual).toISOString())})`
     : `con fecha actual`;
 
-  if (!confirm(`¿Procesar los ${lotesAgrupados.length} lote(s)/trabajo(s) del rollo ${rolloId} ${msgFecha}?`)) return;
+  if (!await confirmarTaller(`¿Procesar ${lotesAgrupados.length} lote(s) del rollo ${rolloId}?`, `Se anotan ${msgFecha}.`, "Procesar")) return;
 
   toast(`Procesando ${lotesAgrupados.length} lote(s)...`);
   for (const lote of lotesAgrupados) {
@@ -4743,7 +4765,7 @@ async function cortarLoteLaser(idsCsv) {
 
 function imprimirEtiquetaRollo(loteId, metrosTotales) {
   const win = window.open("", "_blank", "width=400,height=300");
-  if (!win) return alert("Habilita las ventanas emergentes.");
+  if (!win) return toast("Habilitá las ventanas emergentes del navegador para imprimir la etiqueta.", "error");
   win.document.write(`
     <html><head><title>Etiqueta ${escHtml(loteId)}</title>
     <style>@page { size: 100mm 70mm; margin: 0; } body { font-family: sans-serif; margin: 0; padding: 4mm; width: 100mm; height: 70mm; box-sizing: border-box; }</style>
@@ -4780,7 +4802,7 @@ function emitirPDFCalandrado(rolloId) {
   const itemsAgrupados = agruparCalandradoPorBatch(items);
   const totalMts = itemsAgrupados.reduce((a, b) => a + (Number(b.metros) || 0), 0);
   const win = window.open("", "_blank");
-  if (!win) { alert("Habilitá las ventanas emergentes del navegador para imprimir la Hoja de Ruta."); return; }
+  if (!win) { toast("Habilitá las ventanas emergentes del navegador para imprimir la Hoja de Ruta.", "error"); return; }
 
   win.document.write(`
     <!DOCTYPE html>
@@ -5020,7 +5042,7 @@ async function guardarModalCrudUniversal() {
 
 // Nada se borra: se anula, con el motivo (queda quién y cuándo). La base no deja borrar.
 async function eliminarRegistroCrudUniversal(tabla, id, batchId = null, idsCsv = null) {
-  const motivo = prompt("¿Por qué se anula? (queda anotado; no se borra)");
+  const motivo = await pedirTaller("¿Por qué se anula?", "Motivo", "", { texto: "Queda anotado; no se borra.", aceptar: "Anular", obligatorio: true });
   if (!motivo || !motivo.trim()) return;
   const pkCol = tabla === "prod_dtf_rollos" ? "id_rollo_dtf" : tabla === "prod_rollos_papel" ? "id_rollo" : "id";
   const anular = { anulado: true, anulado_motivo: motivo.trim() };
@@ -5051,7 +5073,7 @@ async function eliminarRegistroCrudUniversal(tabla, id, batchId = null, idsCsv =
 async function editarNotaRapida(tabla, id, batchId) {
   const reg = obtenerRegistroMemoria(tabla, id);
   const actual = reg?.observaciones || "";
-  const nueva = prompt("Escribe la nota u observación (se verá en todas las áreas):", actual);
+  const nueva = await pedirTaller("📝 Nota", "Nota u observación (se ve en todas las áreas)", actual, { tipo: "textarea", aceptar: "Guardar" });
   if (nueva === null) return;
 
   await sb().from(tabla).update({ observaciones: nueva }).eq("id", id);
@@ -5687,11 +5709,11 @@ function vincularBotonesAccionesKiosco() {
 
   const btnCerrar = document.getElementById("btnKioscoCancelarDefinitivo");
   if (btnCerrar) {
-    btnCerrar.onclick = () => {
+    btnCerrar.onclick = async () => {
       const msg = STATE.kiosco.modulo === "laser"
-        ? "¿Cerrar el Modo Kiosko Láser y detener el cronómetro sin guardar?"
-        : "¿Cerrar el Modo Kiosko y detener el cronómetro sin guardar?";
-      if (confirm(msg)) {
+        ? "¿Cerrar el Modo Kiosko Láser?"
+        : "¿Cerrar el Modo Kiosko?";
+      if (await confirmarTaller(msg, "Se detiene el cronómetro y no se guarda lo que no terminaste.", "Cerrar sin guardar", "var(--danger)")) {
         cerrarKioscoDefinitivo();
       }
     };
@@ -5765,12 +5787,9 @@ function vincularBotonesAccionesKiosco() {
       const tNom = trabActual.cliente_archivo || trabActual.diseno || (trabActual.archivos ? trabActual.archivos.join(" | ") : "Trabajo");
       const tMetros = Number(trabActual.metros_totales || trabActual.metros) || 0;
 
-      const motivo = prompt(
-        esLaser
-          ? `Vas a registrar merma/descarte en Láser para "${tNom}" (${fmtNum(tMetros)}m).\nMotivo del descarte:`
-          : `Vas a desechar el papel de "${tNom}" (${fmtNum(tMetros)}m).\nMotivo del descarte / falla:`,
-        esLaser ? "Merma en Corte Láser" : "Papel desechado en Calandra"
-      );
+      const motivo = await pedirTaller(esLaser ? "✂️ Descarte en Láser" : "🗑️ Desechar el papel", "Motivo",
+        esLaser ? "Merma en Corte Láser" : "Papel desechado en Calandra",
+        { texto: `"${tNom}" (${fmtNum(tMetros)} m).`, aceptar: "Anotar el descarte" });
       if (motivo === null) return;
 
       await sb().from("prod_fallas_reposiciones").insert({
@@ -5834,7 +5853,7 @@ function vincularBotonesAccionesKiosco() {
         .map(t => t.id)
         .filter(id => !STATE.kiosco.completadosIds.has(id) && !STATE.kiosco.descartadosIds.has(id));
 
-      if (pendientesIds.length > 0 && !confirm(esLaser ? `⚠️ ¿Deseas TERMINAR TODO y marcar como cortados los ${pendientesIds.length} lotes restantes?` : `⚠️ ¿Deseas TERMINAR TODO y marcar como calandrados los ${pendientesIds.length} trabajos restantes de esta bobina?`)) {
+      if (pendientesIds.length > 0 && !await confirmarTaller("¿Terminar todo?", esLaser ? `Se marcan como cortados los ${pendientesIds.length} lotes que faltan.` : `Se marcan como calandrados los ${pendientesIds.length} trabajos que faltan de esta bobina.`, "Terminar todo")) {
         return;
       }
 
@@ -5879,9 +5898,12 @@ async function reportarFallaConReposicion(reg, estacion) {
   if (!reg) return;
   const mDefault = reg.metros || reg.metros_impresos || reg.metros_totales || 10;
   const nombreArch = reg.cliente_archivo || reg.diseno || (reg.archivos ? reg.archivos.join(" | ") : "Trabajo");
-  const metrosFalla = parseFloat(prompt(`¿Cuántos metros salieron con falla en "${nombreArch}"?`, mDefault)) || 0;
-  if (metrosFalla <= 0) return;
-  const motivo = prompt("Motivo de la falla:", `Falla en ${estacion}`) || `Falla en ${estacion}`;
+  const falla = await ventanaTaller({ titulo: "⚠️ Falla con reposición", texto: escHtml(nombreArch), aceptar: "Anotar la falla", color: "var(--danger)",
+    campos: [{ nombre: "m", etiqueta: "Metros con falla", tipo: "number", valor: mDefault }, { nombre: "motivo", etiqueta: "Motivo", valor: `Falla en ${estacion}` }],
+    validar: (x) => (x.m > 0 ? null : "Poné los metros con falla.") });
+  if (!falla) return;
+  const metrosFalla = falla.m;
+  const motivo = falla.motivo || `Falla en ${estacion}`;
 
   await sb().from("prod_fallas_reposiciones").insert({
     tipo_registro: "ALERTA_REPOSICION",
@@ -6330,7 +6352,7 @@ export function inicializarEventosUI() {
     }
 
     // Las compras se cargan en Compras del sistema (con proveedor, caja y stock); acá ya no se escribe en las cajas.
-    if (confirm(`Compra de ${tipo} (${detalle}, ${cant}): las compras de insumos se cargan en Compras del sistema, así entran en la caja y en el stock. ¿Abrir Compras?`)) {
+    if (await confirmarTaller(`Compra de ${tipo} (${detalle}, ${cant})`, "Las compras de insumos se cargan en Compras del sistema, así entran en la caja y en el stock. ¿Abro Compras?", "Abrir Compras")) {
       window.open("https://erpvivigrafic.netlify.app/src/modulos/comercial/compras.html", "_blank");
     }
     return;
@@ -6407,7 +6429,7 @@ export function inicializarEventosUI() {
     const btnImpDeshacer = e.target.closest(".btn-imp-deshacer");
     if (btnImpDeshacer) {
       const reg = STATE.impresiones.find(i => i.id === btnImpDeshacer.getAttribute("data-id"));
-      if (reg && confirm("¿Deshacer impresión de este trabajo? Se devolverá el archivo a la cola de pendientes y fuera de IMPRESOS en Drive.")) {
+      if (reg && await confirmarTaller("¿Deshacer esta impresión?", "El archivo vuelve a la fila de pendientes y sale de IMPRESOS en Drive.", "Deshacer", "var(--danger)")) {
         toast("⏳ Revertiendo impresión en base de datos y Google Drive...", "info");
 
         // 1. Revertir estado_impreso en prod_pendientes_drive

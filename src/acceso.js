@@ -88,8 +88,12 @@
     d.querySelector("button").addEventListener("click", salir);
   }
 
+  // Las ventanas y carteles del taller (los pone app.js); si todavía no cargó, los del navegador
+  const preguntar = (titulo, texto, aceptar) => window.confirmarTaller ? window.confirmarTaller(titulo, texto, aceptar) : Promise.resolve(confirm(titulo + "\n\n" + texto));
+  const avisar = (texto) => (window.toastTaller ? window.toastTaller(texto, "error") : alert(texto));
+
   async function salir() {
-    if (!confirm("¿Cerrar la sesión de este equipo? Para volver a usar el taller va a hacer falta el usuario y la contraseña.")) return;
+    if (!await preguntar("¿Cerrar la sesión de este equipo?", "Para volver a usar el taller va a hacer falta el usuario y la contraseña.", "Cerrar la sesión")) return;
     const s = leerSesion();
     if (s) { try { await sb.rpc("taller_operario_salir", { p_token: s.token }); } catch (e) { /* nada */ } }
     localStorage.removeItem(CLAVE_SESION);
@@ -99,8 +103,10 @@
 
   async function generarClave() {
     const { data, error } = await sb.rpc("taller_clave_ayudante");
-    if (error) { alert(error.message); return; }
-    prompt("Clave del ayudante de Drive (se ve una sola vez). Copiala y pegala en la terminal de Google → Propiedades del script → CLAVE_TALLER:", data.clave);
+    if (error) { avisar(error.message); return; }
+    if (window.pedirTaller) await window.pedirTaller("🔑 Clave del ayudante de Drive", "Clave (se ve una sola vez)", data.clave,
+      { texto: "Copiala y pegala en la terminal de Google → Propiedades del script → CLAVE_TALLER.", aceptar: "Listo, la copié" });
+    else prompt("Clave del ayudante de Drive (se ve una sola vez). Copiala y pegala en la terminal de Google → Propiedades del script → CLAVE_TALLER:", data.clave);
   }
 
   async function cambiarPin() {
@@ -108,9 +114,10 @@
     const texto = prender
       ? "¿Prender el PIN del taller?\n\nCada persona va a elegir su nombre (las de Empleados) y poner su PIN, el mismo de la app de empleados. Quien no tenga PIN lo crea con el QR."
       : "¿Apagar el PIN del taller?\n\nSe vuelve a elegir el nombre de la lista, sin PIN.";
-    if (!confirm(texto)) return;
+    const [titulo, ...resto] = texto.split("\n\n");
+    if (!await preguntar(titulo, resto.join("\n\n"), prender ? "Prender el PIN" : "Apagar el PIN")) return;
     const { error } = await sb.rpc("taller_ajustes_guardar", { p: { pin: prender } });
-    if (error) { alert(error.message); return; }
+    if (error) { avisar(error.message); return; }
     localStorage.removeItem(CLAVE_SESION);
     window.location.reload();
   }
@@ -194,7 +201,7 @@
     const pin = await pedirPin(valor);
     if (pin === null) return null;
     const { data, error } = await sb.rpc("taller_operario_entrar", { p_persona: id, p_pin: pin });
-    if (error || !data || !data.ok) { alert((data && data.error) || (error && error.message) || "No se pudo entrar."); return null; }
+    if (error || !data || !data.ok) { avisar((data && data.error) || (error && error.message) || "No se pudo entrar."); return null; }
     const anterior = leerSesion();
     if (anterior) { try { await sb.rpc("taller_operario_salir", { p_token: anterior.token }); } catch (e) { /* nada */ } }
     localStorage.setItem(CLAVE_SESION, JSON.stringify({ token: data.token, nombre: data.nombre, vence: data.vence_at }));
