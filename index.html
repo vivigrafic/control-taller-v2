@@ -20,6 +20,7 @@
   <script src="./src/ver_clave.js?v=20261022_02"></script>
   <script src="./src/acceso.js?v=20261022_04"></script>
   <script src="./src/componentes/ayuda.js?v=20261029_01" data-ayuda="taller" data-vivi="https://erpvivigrafic.netlify.app/vivi.html"></script>
+  <script src="./src/componentes/bandeja.js?v=20261030_01"></script>
   <script src="./src/miniaturas.js?v=20261022_01"></script>
   <script src="./src/assets/logo.js?v=20261020_02"></script>
 </head>
@@ -29,6 +30,7 @@
   <div style="text-align: center; margin-bottom: 10px; position: relative;">
     <img id="imgLogoVV" src="" alt="V&amp;V Grafic Logo" style="height: 60px; object-fit: contain;" />
     <div class="vg-cabecera-acciones" style="position:absolute; right:0; top:0; display:flex; gap:6px; align-items:center;">
+      <button type="button" class="badge" data-bandeja style="cursor:pointer; margin:0;" title="Para hacer: lo que hay que resolver, en un solo lugar">📥 Para hacer</button>
       <button type="button" id="btnVgBuscar" class="badge" style="cursor:pointer; margin:0;" title="Buscar en todo el taller">🔎 Buscar</button>
       <button type="button" id="btnInstalarPwa" class="badge" style="cursor:pointer; margin:0; background:rgba(0, 230, 118, 0.15); border:1.5px solid #00E676; color:#00E676; font-weight:900; font-size:11px; display:inline-flex; align-items:center; gap:4px; box-shadow:0 2px 6px rgba(0,230,118,0.25);" title="Instalar App en el Celular">📱 Instalar App</button>
       <select id="vgSelectOperadorActual" style="width:auto; padding:4px 8px; font-size:11px; background:#111; border:1px solid #333;">
@@ -1008,7 +1010,7 @@
   <datalist id="listColores"></datalist>
   <div id="vgToastContainer" style="position:fixed; top:16px; right:16px; z-index:3000; max-width:360px;"></div>
 
-  <script type="module" src="./src/app.js?v=20261029_11"></script>
+  <script type="module" src="./src/app.js?v=20261030_01"></script>
   <script>
     // Registro del Service Worker PWA
     if ('serviceWorker' in navigator) {

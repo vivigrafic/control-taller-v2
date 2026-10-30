@@ -6654,6 +6654,9 @@ window.addEventListener("DOMContentLoaded", async () => {
   cargarDatosTodo();
   suscribirRealtime();
   revisarFilaSola();
+  // 📥 Para hacer: la misma bandeja del ERP (las tarjetas y pantallas se abren en el ERP, en otra pestaña)
+  window.vgBandeja?.usar(sb(), { erp: "https://erpvivigrafic.netlify.app", quien: () => STATE.usuarioActual, avisar: (t, tipo) => toast(t, tipo === "error" ? "error" : "info") });
+  window.vgBandeja?.actualizar();
 });
 
 // La fila de Drive se revisa sola: al abrir la app y cada 2 minutos mientras está a la vista. El script no la revisa más
