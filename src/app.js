@@ -1932,20 +1932,19 @@ async function preguntarRollosCalandrados(regs) {
   if (error) { console.warn("Rollos del calandrado:", error.message); return; }
   const archivos = ((data && data.archivos) || []).filter(a => a.trabajo_id && ((a.piezas || []).length || (a.rollos_trabajo || []).length));
   if (!archivos.length) return;
+  // Por archivo, un campo por cada rollo de las telas de su trabajo (sin límite: un archivo largo puede ir en muchos
+  // rollos). Vienen completos los rollos propuestos (con lo teórico); vacío = ese rollo no va.
   const campos = [];
-  const sinRollo = { valor: "", titulo: "— ningún rollo —" };
   archivos.forEach((a, ai) => {
-    const nombre = `${a.tarjeta} · ${a.nombre}`;
-    if ((a.piezas || []).length) {
-      a.piezas.forEach(p => campos.push({ nombre: `p:${p.id}`, tipo: "number", valor: p.reales ?? p.teoricos ?? "",
-        etiqueta: `${nombre} → Rollo ${p.numero} (${p.partida})`, ayuda: `Teórico ${fmtNum(p.teoricos)} m · poné los metros reales` }));
-    } else {
-      const ops = [sinRollo, ...a.rollos_trabajo.map(r => ({ valor: r.id, titulo: `Rollo ${r.numero} · ${r.partida} ${r.tela || ""} ${r.color || ""}`.trim() }))];
-      campos.push({ nombre: `r:${ai}`, etiqueta: `${nombre} (${fmtNum(a.metros)} m): ¿en qué rollo?`, opciones: ops, valor: "" });
-      campos.push({ nombre: `m:${ai}`, tipo: "number", etiqueta: "Metros reales en ese rollo", valor: a.metros ?? "" });
-      campos.push({ nombre: `r2:${ai}`, etiqueta: "¿Y otro rollo? (si el archivo abarcó dos)", opciones: ops, valor: "" });
-      campos.push({ nombre: `m2:${ai}`, tipo: "number", etiqueta: "Metros reales en el otro rollo", valor: "" });
-    }
+    const piezaDe = Object.fromEntries((a.piezas || []).map(p => [p.rollo_id, p]));
+    const rollos = [...(a.rollos_trabajo || [])];
+    (a.piezas || []).forEach(p => { if (!rollos.some(r => r.id === p.rollo_id)) rollos.push({ id: p.rollo_id, numero: p.numero, partida: p.partida, tela: p.tela, color: p.color }); });
+    rollos.forEach((r, ri) => {
+      const p = piezaDe[r.id];
+      campos.push({ nombre: `a${ai}:${r.id}`, tipo: "number", valor: p ? (p.reales ?? p.teoricos ?? "") : "",
+        etiqueta: `${ri === 0 ? `${a.tarjeta} · ${a.nombre} (${fmtNum(a.metros)} m) — ` : ""}Rollo ${r.numero} · ${r.partida} ${r.tela || ""} ${r.color || ""}`.trim(),
+        ayuda: p ? `Teórico ${fmtNum(p.teoricos)} m · poné los metros reales` : (r.metros_est ? `Tiene ${fmtNum(r.metros_est)} m · vacío si no va` : "Vacío si no va") });
+    });
   });
   campos.push({ nombre: "imprimir", tipo: "check", valor: true, texto: "Imprimir una etiqueta por rollo" });
   const resp = await ventanaTaller({ titulo: "🧻 Rollos calandrados", aceptar: "Guardar",
@@ -1953,11 +1952,13 @@ async function preguntarRollosCalandrados(regs) {
   if (!resp) return;   // se puede completar después en la tarjeta
   const piezas = [];
   archivos.forEach((a, ai) => {
-    (a.piezas || []).forEach(p => { const v = resp[`p:${p.id}`]; if (v > 0) piezas.push({ id: p.id, reales: v }); });
-    if (!(a.piezas || []).length) {
-      if (resp[`r:${ai}`] && resp[`m:${ai}`] > 0) piezas.push({ archivo_id: a.id, rollo_id: resp[`r:${ai}`], reales: resp[`m:${ai}`] });
-      if (resp[`r2:${ai}`] && resp[`m2:${ai}`] > 0) piezas.push({ archivo_id: a.id, rollo_id: resp[`r2:${ai}`], reales: resp[`m2:${ai}`] });
-    }
+    const piezaDe = Object.fromEntries((a.piezas || []).map(p => [p.rollo_id, p]));
+    Object.keys(resp).filter(k => k.startsWith(`a${ai}:`)).forEach(k => {
+      const rolloId = k.slice(k.indexOf(":") + 1);
+      const v = resp[k];
+      if (!(v > 0)) return;
+      piezas.push(piezaDe[rolloId] ? { id: piezaDe[rolloId].id, reales: v } : { archivo_id: a.id, rollo_id: rolloId, reales: v });
+    });
   });
   if (!piezas.length) return;
   const { data: g, error: e2 } = await sb().rpc("calandrado_rollos_guardar", { p: { lote: regs[0].batch_id || null, quien: STATE.usuarioActual, piezas } });
