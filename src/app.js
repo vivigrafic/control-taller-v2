@@ -2431,11 +2431,19 @@ function abrirSinVentaDtf(clave) {
 
 // Cómo va la venta: un solo renglón "Impresión DTF" con todos los metros (de entrada) o uno por archivo.
 // Viene marcado lo que eligió este cliente la vez anterior.
+// Cómo se vende: cobrar ahora (la venta) o sumar a la cuenta del cliente (se cobra después desde Por facturar del sistema).
+// Devuelve { detalle, a_cuenta } o null.
 async function elegirDetalleVentaDtf(t, cli, textoArriba) {
   let preferido = "unico";
+  let acumula = false;
   try {
-    const { data } = await sb().from("empresas").select("taller_config").limit(1).maybeSingle();
+    const [cfg, ficha] = await Promise.all([
+      sb().from("empresas").select("taller_config").limit(1).maybeSingle(),
+      sb().from("v3_clientes").select("forma_cobro").eq("id_cliente", cli.id).maybeSingle()
+    ]);
+    const data = cfg.data;
     preferido = (data && data.taller_config && data.taller_config.dtf_detalle && data.taller_config.dtf_detalle[cli.id]) || "unico";
+    acumula = !!(ficha.data && ficha.data.forma_cobro === "semanal");   // "Acumula en su cuenta" en la ficha
   } catch (e) { /* sin permiso: va lo de siempre */ }
   return new Promise((resolver) => {
     const capa = document.createElement("div");
@@ -2444,23 +2452,37 @@ async function elegirDetalleVentaDtf(t, cli, textoArriba) {
       <div class="modal-content" style="border-color:var(--accent-blue); max-width:500px; width:100%;">
         <h2 style="margin-top:0;">🧾 Venta de DTF a ${escHtml(cli.nombre)}</h2>
         <p style="margin:0 0 10px; white-space:pre-line; font-size:14px;">${escHtml(textoArriba)}</p>
+        <label>¿Cómo se cobra?</label>
+        <div class="dtf-motivos">
+          <label class="dtf-motivo"><input type="radio" name="cobro-venta" value="ahora" ${acumula ? "" : "checked"}/> <b>Cobrar ahora</b>: se hace la venta</label>
+          <label class="dtf-motivo"><input type="radio" name="cobro-venta" value="cuenta" ${acumula ? "checked" : ""}/> <b>Sumar a su cuenta</b>: se cobra después, desde "Por facturar" del sistema${acumula ? " (este cliente acumula en su cuenta)" : ""}</label>
+        </div>
+        <div data-x="zona-detalle" ${acumula ? "hidden" : ""}>
         <label>En el detalle de la venta</label>
         <div class="dtf-motivos">
           <label class="dtf-motivo"><input type="radio" name="detalle-venta" value="unico" ${preferido !== "por_archivo" ? "checked" : ""}/> Un solo renglón: <b>Impresión DTF · ${fmtNum(t.metros)} m</b></label>
           <label class="dtf-motivo"><input type="radio" name="detalle-venta" value="por_archivo" ${preferido === "por_archivo" ? "checked" : ""}/> Un renglón por archivo (${t.archivos})</label>
         </div>
+        </div>
         <div style="display:flex; gap:8px; margin-top:14px;">
           <button type="button" class="btn-secondary" data-x="cancelar">Cancelar</button>
-          <button type="button" class="btn-main" data-x="ok" style="margin:0;">🧾 Hacer la venta</button>
+          <button type="button" class="btn-main" data-x="ok" style="margin:0;">${acumula ? "💼 Sumar a su cuenta" : "🧾 Hacer la venta"}</button>
         </div>
       </div>`;
     document.body.appendChild(capa);
+    const aCuenta = () => capa.querySelector("input[name='cobro-venta']:checked")?.value === "cuenta";
+    capa.addEventListener("change", (e) => {
+      if (!e.target.closest("input[name='cobro-venta']")) return;
+      capa.querySelector("[data-x='zona-detalle']").hidden = aCuenta();
+      capa.querySelector("[data-x='ok']").textContent = aCuenta() ? "💼 Sumar a su cuenta" : "🧾 Hacer la venta";
+    });
     capa.addEventListener("click", (e) => {
       if (e.target === capa || e.target.closest("[data-x='cancelar']")) { capa.remove(); resolver(null); return; }
       if (!e.target.closest("[data-x='ok']")) return;
       const detalle = capa.querySelector("input[name='detalle-venta']:checked")?.value || "unico";
+      const a_cuenta = aCuenta();
       capa.remove();
-      resolver(detalle);
+      resolver({ detalle, a_cuenta });
     });
   });
 }
@@ -3383,11 +3405,18 @@ async function venderDtf(clave) {
       + (t.precio_metro_trabajo != null ? ` Lo normal es vender todo junto al terminar: el metro sale a ${fmtMoney(t.precio_metro_trabajo)} en vez de ${fmtMoney(t.precio_metro)}.` : "")
       + `\n¿Vender ahora solo lo impreso?`
     : "";
-  const detalle = await elegirDetalleVentaDtf(t, cli, `${fmtNum(t.metros)} m de DTF (${t.archivos} archivo/s).${estimado}\nEl precio sale de la lista de precios: escala por metros y lo que viene pagando ese cliente.${falta}`);
-  if (!detalle) return;
-  const { data, error } = await sb().rpc("taller_dtf_vender", { p: { cliente_id: cli.id, pedidos: t.pedidos.map(p => p.id), detalle, recordar_detalle: true } });
+  const eleccion = await elegirDetalleVentaDtf(t, cli, `${fmtNum(t.metros)} m de DTF (${t.archivos} archivo/s).${estimado}\nEl precio sale de la lista de precios: escala por metros y lo que viene pagando ese cliente.${falta}`);
+  if (!eleccion) return;
+  const { data, error } = await sb().rpc("taller_dtf_vender", { p: { cliente_id: cli.id, pedidos: t.pedidos.map(p => p.id), detalle: eleccion.detalle,
+    a_cuenta: eleccion.a_cuenta, recordar_detalle: true } });
   if (error) { toast("Error: " + error.message, "error"); return; }
   if (cli.recordar && nombre) await recordarClienteDtf(nombre, cli);
+  // A la cuenta del cliente: no hay venta todavía (se cobra desde Por facturar del sistema)
+  if (data.cuenta_semanal) {
+    toast(`💼 Sumado a la cuenta de ${cli.nombre}: ${fmtNum(data.metros)} m${data.precio_metro != null ? ` a ${fmtMoney(data.precio_metro)} = ${fmtMoney(data.total)}` : ""}. Se cobra desde "Por facturar".`);
+    await cargarDatosTodo();
+    return;
+  }
   // Si los archivos eran de una tarjeta del Kanban, se sumaron a la venta de esa tarjeta (una sola venta por trabajo)
   const otras = (data.ventas || []).length > 1 ? ` (y ${data.ventas.length - 1} venta/s más)` : "";
   toast(data.tarjeta
