@@ -184,7 +184,7 @@
           <div style="grid-column: span 2;">
             <label>Ruta Producción</label>
             <div class="vg-route-group">
-              <button type="button" class="vg-route-btn active" data-ruta-val="Solo Calandrado">1. Solo Calandrado</button>
+              <button type="button" class="vg-route-btn active" data-ruta-val="Solo Calandrado" title="Lo imprimimos nosotros, sin corte">1. Solo Calandrado</button>
               <button type="button" class="vg-route-btn" data-ruta-val="Calandrado + Corte Láser">2. Calandrado + Corte Láser</button>
               <button type="button" class="vg-route-btn" data-ruta-val="Solo Impresión">3. Solo Impresión (Venta de Papel)</button>
             </div>
@@ -249,6 +249,7 @@
           <input type="datetime-local" id="calInputFechaManual" style="width:190px; padding:6px;" />
         </div>
         <div style="display:flex; gap:8px;">
+          <button type="button" id="btnPapelCliente" class="btn-secondary" style="width:auto; padding:8px 15px;" title="El cliente trae el papel ya impreso: entra a la cola sin pasar por impresión">+ Papel del cliente</button>
           <button type="button" class="btn-secondary btn-crud-add" data-table="prod_cola_calandrado" style="width:auto; padding:8px 15px;">+ Agregar Trabajo</button>
           <button type="button" id="btnOrdenCalandra" class="btn-secondary" style="width: auto; padding: 8px 15px;">⬇️ Orden: Más antiguos primero</button>
         </div>
@@ -1012,7 +1013,7 @@
   <datalist id="listColores"></datalist>
   <div id="vgToastContainer" style="position:fixed; top:16px; right:16px; z-index:3000; max-width:360px;"></div>
 
-  <script type="module" src="./src/app.js?v=20261102_01"></script>
+  <script type="module" src="./src/app.js?v=20261102_02"></script>
   <script>
     // Registro del Service Worker PWA
     if ('serviceWorker' in navigator) {

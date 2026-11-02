@@ -3284,6 +3284,22 @@ async function elegirClienteDtf(clave, directo = false) {
   }
 }
 
+// Papel del cliente: trae el papel ya impreso; entra a la cola de calandrado sin pasar por impresión
+async function cargarPapelCliente() {
+  const cli = await elegirClienteSistema("");
+  if (!cli) return;
+  const nombre = await pedirTaller(`Papel de ${cli.nombre}`, "Nombre del trabajo", "", { obligatorio: true, aceptar: "Siguiente" });
+  if (!nombre) return;
+  const m = await pedirTaller("¿Cuántos metros?", "Metros", "", { obligatorio: true, aceptar: "Siguiente" });
+  const metros = parseFloat(String(m || "").replace(",", "."));
+  if (!(metros > 0)) { if (m) toast("Poné los metros.", "error"); return; }
+  const con_corte = await confirmarTaller("¿Lleva corte láser?", "Al terminar el calandrado pasa a la cola del láser.", "Sí, lleva corte");
+  const { error } = await sb().rpc("taller_papel_cliente", { p: { cliente_id: cli.id, nombre, metros, con_corte } });
+  if (error) { toast("Error: " + error.message, "error"); return; }
+  toast(`✅ ${nombre}: ${fmtNum(metros)} m en la cola de calandrado${con_corte ? " (después va al láser)" : ""}.`);
+  await cargarDatosTodo();
+}
+
 // Clientes del sistema (solo nombre y código)
 async function buscarClientesSistema(texto) {
   if (!texto || texto.trim().length < 2) return [];
@@ -6258,6 +6274,7 @@ export function inicializarEventosUI() {
     await cargarDatosTodo();
   });
 
+  document.getElementById("btnPapelCliente")?.addEventListener("click", cargarPapelCliente);
   document.getElementById("btnOrdenCalandra")?.addEventListener("click", (e) => {
     STATE.ordenCalandraAsc = !STATE.ordenCalandraAsc;
     e.currentTarget.textContent = STATE.ordenCalandraAsc
