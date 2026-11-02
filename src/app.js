@@ -1548,7 +1548,7 @@ function renderModuloDTF() {
           <td>${escHtml(d.nombre_archivo)}</td>
           <td><span class="badge ${d.tipo_cargo === "VENTA" ? "activo" : "danger"}">${escHtml(d.tipo_cargo)}</span></td>
           <td style="color:var(--accent);font-weight:bold;">${fmtNum(d.metros_archivo)}m</td>
-          <td>${d.tipo_cargo !== "VENTA" ? "—" : d.vendido ? `<span class="badge activo">🧾 ${escHtml(d.venta_numero)}</span>` : `<span class="badge danger">Sin vender</span>`}</td>
+          <td>${d.tipo_cargo !== "VENTA" ? "—" : d.vendido ? `<span class="badge activo">🧾 ${escHtml(d.venta_numero)}</span>` : `<span class="badge">En Finanzas</span>`}</td>
         </tr>
       `).join("");
   }
@@ -2294,7 +2294,7 @@ function renderSinRegistrar() {
           <label class="dtf-marcar-todas"><input type="checkbox" class="chk-sinreg-todos" data-modulo="${modulo}" ${marcados.length === lista.length ? "checked" : ""}/> Marcar todos</label>
         </div>
         <p class="dtf-ayuda">Se movieron a IMPRESOS sin marcarlos impresos en el taller, así que no estaban para vender.
-          ${modulo === "DTF" ? "Marcá los que se imprimieron juntos y confirmalos: pasan a <b>Vender</b>." : "Mandalos a la cola y cargalos como impresos con su tela y su ruta."}
+          ${modulo === "DTF" ? "Marcá los que se imprimieron juntos y confirmalos: se anotan en la cuenta del cliente." : "Mandalos a la cola y cargalos como impresos con su tela y su ruta."}
           Si no se imprimieron (o ya se cobraron por otro lado), descartalos.</p>
         <div class="sin-registrar-lista">${lista.map(p => `
           <label class="file-item">
@@ -2342,7 +2342,7 @@ async function resolverSinRegistrar(accion, modulo) {
     p = { ...p, ...r };
   }
   const data = await llamarTaller("taller_sin_registrar_resolver", p,
-    accion === "impreso" ? (d) => `Tirada ${d.codigo}: ${d.archivos} archivo(s) pasan a Vender` : accion === "a_la_cola" ? "Vuelven a la cola: cargalos como impresos" : "Descartados");
+    accion === "impreso" ? (d) => `Tirada ${d.codigo}: ${d.archivos} archivo(s) anotados en la cuenta del cliente` : accion === "a_la_cola" ? "Vuelven a la cola: cargalos como impresos" : "Descartados");
   if (data) ids.forEach(id => STATE.sinRegSel.delete(id));
 }
 
