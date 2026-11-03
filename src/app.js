@@ -1998,40 +1998,22 @@ async function preguntarRollosCalandrados(regs) {
   if (!claves.length) return;
   const { data, error } = await sb().rpc("calandrado_rollos", { p: { archivos: claves } });
   if (error) { console.warn("Rollos del calandrado:", error.message); return; }
-  const archivos = ((data && data.archivos) || []).filter(a => a.trabajo_id && ((a.piezas || []).length || (a.rollos_trabajo || []).length));
+  const archivos = ((data && data.archivos) || []).filter(a => a.trabajo_id && (a.tiene_tela || (a.piezas || []).length));
   if (!archivos.length) return;
-  // Por archivo, un campo por cada rollo de las telas de su trabajo (sin límite: un archivo largo puede ir en muchos
-  // rollos). Vienen completos los rollos propuestos (con lo teórico); vacío = ese rollo no va.
-  const campos = [];
-  archivos.forEach((a, ai) => {
-    const piezaDe = Object.fromEntries((a.piezas || []).map(p => [p.rollo_id, p]));
-    const rollos = [...(a.rollos_trabajo || [])];
-    (a.piezas || []).forEach(p => { if (!rollos.some(r => r.id === p.rollo_id)) rollos.push({ id: p.rollo_id, numero: p.numero, partida: p.partida, tela: p.tela, color: p.color }); });
-    rollos.forEach((r, ri) => {
-      const p = piezaDe[r.id];
-      campos.push({ nombre: `a${ai}:${r.id}`, tipo: "number", valor: p ? (p.reales ?? p.teoricos ?? "") : "",
-        etiqueta: `${ri === 0 ? `${a.tarjeta} · ${a.nombre} (${fmtNum(a.metros)} m) — ` : ""}Rollo ${r.numero} · ${r.partida} ${r.tela || ""} ${r.color || ""}`.trim(),
-        ayuda: p ? `Teórico ${fmtNum(p.teoricos)} m · poné los metros reales` : (r.metros_est ? `Tiene ${fmtNum(r.metros_est)} m · vacío si no va` : "Vacío si no va") });
-    });
-  });
-  campos.push({ nombre: "imprimir", tipo: "check", valor: true, texto: "Imprimir una etiqueta por rollo" });
-  const resp = await ventanaTaller({ titulo: "🧻 Rollos calandrados", aceptar: "Guardar",
-    texto: "Lo que se imprimió en cada rollo (teórico) y lo que salió de verdad. Queda en la tarjeta y en el portal del cliente.", campos });
-  if (!resp) return;   // se puede completar después en la tarjeta
-  const piezas = [];
-  archivos.forEach((a, ai) => {
-    const piezaDe = Object.fromEntries((a.piezas || []).map(p => [p.rollo_id, p]));
-    Object.keys(resp).filter(k => k.startsWith(`a${ai}:`)).forEach(k => {
-      const rolloId = k.slice(k.indexOf(":") + 1);
-      const v = resp[k];
-      if (!(v > 0)) return;
-      piezas.push(piezaDe[rolloId] ? { id: piezaDe[rolloId].id, reales: v } : { archivo_id: a.id, rollo_id: rolloId, reales: v });
-    });
-  });
-  if (!piezas.length) return;
-  const { data: g, error: e2 } = await sb().rpc("calandrado_rollos_guardar", { p: { lote: regs[0].batch_id || null, quien: STATE.usuarioActual, piezas } });
-  if (e2) { toast("No se guardaron los rollos: " + e2.message, "error"); return; }
-  toast(`🧻 ${piezas.length} rollo(s) anotados`);
+  // Un campo por archivo, ya completo con lo teórico: si está bien, se toca Guardar y listo. La tela ya se descontó con
+  // lo teórico; esto la ajusta y reparte los metros en los rollos, en orden.
+  const campos = archivos.map(a => ({ nombre: a.id, tipo: "number", valor: a.metros ?? "",
+    etiqueta: `${a.tarjeta} · ${a.nombre}`, ayuda: "Metros que salieron de verdad" }));
+  const hayRollos = archivos.some(a => (a.piezas || []).length);
+  if (hayRollos) campos.push({ nombre: "imprimir", tipo: "check", valor: true, texto: "Imprimir una etiqueta por rollo" });
+  const resp = await ventanaTaller({ titulo: "🧵 Metros calandrados", aceptar: "Guardar",
+    texto: "Con esto se descuenta la tela de cada tarjeta. Si no cambió nada, tocá Guardar.", campos });
+  if (!resp) return;   // queda descontado con lo teórico
+  const lista = archivos.map(a => ({ id: a.id, reales: resp[a.id] })).filter(x => x.reales > 0);
+  if (!lista.length) return;
+  const { data: g, error: e2 } = await sb().rpc("calandrado_metros_guardar", { p: { lote: regs[0].batch_id || null, quien: STATE.usuarioActual, archivos: lista } });
+  if (e2) { toast("No se guardaron los metros: " + e2.message, "error"); return; }
+  toast("🧵 Metros anotados");
   if (resp.imprimir && window.vgEtiquetas && (g.etiquetas || []).length) await window.vgEtiquetas.imprimir(g.etiquetas);
 }
 
