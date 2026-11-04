@@ -1,6 +1,7 @@
 ﻿# Instala en esta PC el armado de vistas previas de los archivos pesados (ver vistas_previas.ps1).
 # - Busca en qué letra está Google Drive ("Mi unidad\VIVI GRAFIC").
-# - Copia el programa a %LOCALAPPDATA%\VVGrafic (así no depende de la carpeta del repositorio).
+# - Copia el programa a %USERPROFILE%\VVGrafic (así no depende de la carpeta del repositorio). No en AppData: las apps
+#   empaquetadas (como la de Claude) guardan AppData en una copia privada que Windows no ve desde afuera.
 # - Crea la tarea programada "VV Grafic - Vistas previas de la fila": al iniciar sesión y cada 10 minutos, oculta (sin ventanas).
 # - Corre una vez enseguida.
 # -Respaldo: para la segunda PC (solo arma lo que la principal no armó en 30 minutos).
@@ -19,7 +20,7 @@ foreach ($letra in [IO.DriveInfo]::GetDrives() | ForEach-Object { $_.Name }) {
 }
 if (-not $raiz) { throw "No encontré la carpeta 'Mi unidad\VIVI GRAFIC'. Abrí Google Drive para escritorio con la cuenta del taller y probá de nuevo." }
 
-$dir = Join-Path $env:LOCALAPPDATA "VVGrafic"
+$dir = Join-Path $env:USERPROFILE "VVGrafic"
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
 $programa = Join-Path $dir "vistas_previas.ps1"
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "vistas_previas.ps1") -Destination $programa -Force

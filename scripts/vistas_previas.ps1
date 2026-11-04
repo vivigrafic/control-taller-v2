@@ -8,7 +8,8 @@
 # - No instala nada: usa lo que ya trae Windows para leer y achicar imágenes.
 # - La transparencia queda negra, igual que en las vistas previas de Drive.
 # - 900 px de ancho (1600 si la imagen es apaisada). Un archivo de 65 MB tarda unos 10 segundos.
-# - Lo que hace queda anotado en %LOCALAPPDATA%\VVGrafic\vistas_previas.log
+# - Lo que hace queda anotado en %USERPROFILE%\VVGrafic\vistas_previas.log
+# - Nunca corre más de uno a la vez en la misma PC, y con prioridad baja para no frenar el RIP mientras imprime.
 # Se instala con instalar_vistas_previas.ps1 (tarea programada de Windows, oculta).
 param(
     [string]$Raiz = "G:\Mi unidad\VIVI GRAFIC",
@@ -21,11 +22,17 @@ param(
     [switch]$Respaldo
 )
 $ErrorActionPreference = 'Continue'
+# Uno solo a la vez: si ya hay otro trabajando, este se va
+$candado = New-Object System.Threading.Mutex($false, "Global\VVGraficVistasPrevias")
+try { $tengo = $candado.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $tengo = $true }
+if (-not $tengo) { exit 0 }
+# Prioridad baja: la PC del taller está imprimiendo
+try { (Get-Process -Id $PID).PriorityClass = [System.Diagnostics.ProcessPriorityClass]::BelowNormal } catch { }
 Add-Type -AssemblyName PresentationCore
 
 if (-not $Destino) { $Destino = Join-Path $Raiz "vistas_previas_fila" }
 $filas = @((Join-Path $Raiz "fila_impresión\dtf"), (Join-Path $Raiz "fila_impresión\sublimacion"))
-$dirLog = Join-Path $env:LOCALAPPDATA "VVGrafic"
+$dirLog = Join-Path $env:USERPROFILE "VVGrafic"
 $log = Join-Path $dirLog "vistas_previas.log"
 New-Item -ItemType Directory -Force -Path $dirLog | Out-Null
 function Anotar([string]$texto) {
