@@ -15,7 +15,10 @@ param(
     [string]$Destino = "",
     [int]$MinMB = 45,
     [int]$Dias = 30,
-    [int]$MaxPorVuelta = 40
+    [int]$MaxPorVuelta = 40,
+    # En una segunda PC de respaldo: solo arma las que lleven más de 30 minutos sin vista previa (si la principal está
+    # apagada). Así las dos no arman la misma a la vez.
+    [switch]$Respaldo
 )
 $ErrorActionPreference = 'Continue'
 Add-Type -AssemblyName PresentationCore
@@ -44,6 +47,7 @@ foreach ($fila in $filas) {
         Sort-Object LastWriteTime -Descending   # primero lo más nuevo (lo que está en la fila)
     foreach ($archivo in $pesados) {
         if ($hechos -ge $MaxPorVuelta) { break }
+        if ($Respaldo -and $archivo.LastWriteTime -gt (Get-Date).AddMinutes(-30)) { continue }
         $salida = Join-Path $Destino ("{0} [{1}].jpg" -f $archivo.Name, $archivo.Length)
         if (Test-Path -LiteralPath $salida) { continue }
         $reloj = [Diagnostics.Stopwatch]::StartNew()
