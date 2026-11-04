@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261029_05" />
+  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261104_01" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./src/config/conexion.js?v=20261022_04"></script>
   <script src="./src/ver_clave.js?v=20261022_02"></script>
@@ -352,6 +352,16 @@
       <button type="button" class="dtf-paso activo" data-dtf-paso="imprimir">🖨️ 1. Imprimir <span id="dtfBadgeImprimir" class="dtf-paso-contador" hidden></span></button>
       <button type="button" class="dtf-paso" data-dtf-paso="separar">✂️ 2. Separar <span id="dtfBadgeSeparar" class="dtf-paso-contador" hidden></span></button>
       <!-- Las ventas se hacen en Finanzas → Por facturar: lo impreso se anota solo en la cuenta del cliente -->
+    </div>
+
+    <!-- Buscador de pedidos (se ve en Imprimir y en Separar): cliente, archivo, fecha, metros o teléfono; tocar uno lo muestra grande -->
+    <div class="card dtf-buscador" data-ayuda="taller_dtf">
+      <div class="dtf-buscar-fila">
+        <span class="dtf-buscar-lupa">🔎</span>
+        <input type="search" id="dtfBuscarPedidos" autocomplete="off" placeholder="Buscar pedidos: cliente, archivo, fecha (03/11), metros (2,5 m) o teléfono (últimos 4)" />
+        <button type="button" id="dtfBuscarBorrar" class="btn-secondary" hidden>✕</button>
+      </div>
+      <div id="dtfBuscarResultados" hidden></div>
     </div>
 
     <div data-dtf-panel="imprimir">
@@ -1013,7 +1023,7 @@
   <datalist id="listColores"></datalist>
   <div id="vgToastContainer" style="position:fixed; top:16px; right:16px; z-index:3000; max-width:360px;"></div>
 
-  <script type="module" src="./src/app.js?v=20261103_01"></script>
+  <script type="module" src="./src/app.js?v=20261104_01"></script>
   <script>
     // Registro del Service Worker PWA
     if ('serviceWorker' in navigator) {

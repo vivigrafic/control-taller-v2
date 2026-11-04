@@ -719,3 +719,31 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
 .enlace-op[hidden] { display: none; }
 .enlace-op small { display: block; color: var(--vg-text-secondary); font-size: 11px; margin-top: 2px; }
 .enlace-op em { color: var(--vg-brand-primary); font-style: normal; font-weight: 700; }
+
+/* DTF: buscador de pedidos (se ve en Imprimir y en Separar) */
+.dtf-buscador { margin: 0 0 12px; padding: 12px; }
+.dtf-buscar-fila { display: flex; align-items: center; gap: 8px; }
+.dtf-buscar-lupa { font-size: 20px; }
+.dtf-buscar-fila input { flex: 1; min-width: 0; margin: 0; font-size: 16px; padding: 12px 14px; }
+.dtf-buscar-fila button { width: auto; margin: 0; padding: 10px 14px; }
+.dtf-buscar-resumen { margin: 10px 2px 8px; font-size: 13px; color: var(--vg-text-secondary); }
+.dtf-buscar-resumen b { color: var(--vg-text-primary); }
+.dtf-buscar-grilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; max-height: 62vh; overflow-y: auto; padding: 2px; }
+.dtf-buscar-item { display: flex; flex-direction: column; gap: 3px; width: auto; margin: 0; padding: 8px; text-align: left; border-radius: 12px; cursor: pointer;
+  border: 1px solid var(--vg-surface-border); background: var(--vg-surface-base); color: var(--vg-text-primary); font: inherit; }
+.dtf-buscar-item:hover { border-color: var(--vg-brand-primary); }
+.dtf-buscar-mini { position: relative; display: flex; align-items: center; justify-content: center; height: 130px; border-radius: 8px; overflow: hidden;
+  background: var(--vg-bg-app); font-size: 28px; }
+.dtf-buscar-mini img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: var(--vg-bg-app); }
+.dtf-buscar-cliente { font-weight: 800; font-size: 14px; line-height: 1.2; }
+.dtf-buscar-archivo { font-size: 11px; color: var(--vg-text-secondary); word-break: break-word; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.dtf-buscar-datos { font-size: 12px; color: var(--vg-text-secondary); }
+.dtf-buscar-estado { align-self: flex-start; margin-top: 2px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 800;
+  color: var(--vg-text-secondary); background: color-mix(in srgb, var(--vg-text-secondary) 15%, transparent); }
+.dtf-buscar-estado.fila { color: var(--vg-status-processing); background: color-mix(in srgb, var(--vg-status-processing) 15%, transparent); }
+.dtf-buscar-estado.separado, .dtf-buscar-estado.entregado { color: var(--vg-status-ready); background: color-mix(in srgb, var(--vg-status-ready) 15%, transparent); }
+.dtf-buscar-estado.impreso { color: var(--vg-brand-secondary); background: color-mix(in srgb, var(--vg-brand-secondary) 15%, transparent); }
+@media (max-width: 600px) {
+  .dtf-buscar-grilla { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dtf-buscar-mini { height: 110px; }
+}

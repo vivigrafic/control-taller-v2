@@ -1555,6 +1555,8 @@ function renderModuloDTF() {
 
   renderVentasDtf();
   renderSepararDtf();
+  // El buscador de pedidos se actualiza con lo nuevo (el teléfono se vuelve a buscar en la base)
+  if (document.getElementById("dtfBuscarPedidos")?.value.trim()) { busquedaDtfTel = null; buscarPedidosDtf(); }
 }
 
 // ===== DTF paso 1: imprimir en lote =====
@@ -3037,14 +3039,16 @@ async function separarTiradasMarcadas() {
   await cargarDatosTodo();
 }
 
-// Imagen grande del archivo (la guarda mientras la app está abierta: ir y volver no la vuelve a pedir)
+// Imagen grande del archivo (la guarda mientras la app está abierta: ir y volver no la vuelve a pedir).
+// Con los archivos muy largos la terminal no llega a 1600 px: se baja a 800 y, si no, a 300.
 const imagenesGrandes = new Map();
 function traerImagenGrande(fileId) {
   const terminal = window.VG_CONEXION && window.VG_CONEXION.terminalUrl;
   if (!fileId || !terminal) return Promise.resolve("");
+  const pedir = (lado) => fetch(`${terminal}?action=miniatura&id=${encodeURIComponent(fileId)}&lado=${lado}`)
+    .then(r => r.json()).then(d => (d && /^data:image\//.test(d.data || "") ? d.data : "")).catch(() => "");
   if (!imagenesGrandes.has(fileId)) {
-    imagenesGrandes.set(fileId, fetch(`${terminal}?action=miniatura&id=${encodeURIComponent(fileId)}&lado=1600`)
-      .then(r => r.json()).then(d => (d && d.data) || "").catch(() => ""));
+    imagenesGrandes.set(fileId, pedir(1600).then(u => u || pedir(800)).then(u => u || pedir(300)));
   }
   return imagenesGrandes.get(fileId);
 }
@@ -3186,6 +3190,198 @@ function abrirSeparadorDtf(tiradaId) {
     $("marco").scrollTop = 0;
   });
 
+  mostrar();
+}
+
+// ===== DTF: buscador de pedidos (se ve en Imprimir y en Separar) =====
+// Por cliente o archivo, fecha (03/11, hoy, ayer), metros (2,5 m, o un número de 1 o 2 cifras) o teléfono (los últimos 3
+// o 4 números o el número entero: lo busca la base, sin mostrar el teléfono). Se pueden juntar: "juan 03/11".
+// Busca en la fila para imprimir y en todo lo impreso. Tocar uno lo muestra grande (con flechas para pasar).
+let busquedaDtfTel = null;   // { digitos, pedidos: Set, pendientes: Set, clientes: [] }
+let tBusquedaDtf = null;
+const normalDtf = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+function partesBusquedaDtf(texto) {
+  const q = { palabras: [], fechas: [], metros: [], telefono: null };
+  normalDtf(texto).replace(/(\d)\s+(m|mt|mts|metros?)(?=\s|$)/g, "$1$2").split(/\s+/).filter(Boolean).forEach(w => {
+    let m;
+    if (w === "hoy" || w === "ayer") {
+      const d = new Date();
+      if (w === "ayer") d.setDate(d.getDate() - 1);
+      q.fechas.push({ d: d.getDate(), m: d.getMonth() + 1, a: d.getFullYear() });
+    } else if ((m = w.match(/^(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?$/))) {   // con punto es metros (5.5)
+      q.fechas.push({ d: +m[1], m: +m[2], a: m[3] ? (m[3].length === 2 ? 2000 + +m[3] : +m[3]) : null });
+    } else if ((m = w.match(/^(\d+(?:[.,]\d+)?)(?:m|mt|mts|metros?)$/)) || (m = w.match(/^(\d+[.,]\d+)$/)) || (m = w.match(/^(\d{1,2})$/))) {
+      q.metros.push(Number(m[1].replace(",", ".")));
+    } else if (/^[+\d()-]+$/.test(w) && w.replace(/\D/g, "").length >= 3) {
+      q.telefono = w.replace(/\D/g, "");
+    } else q.palabras.push(w);
+  });
+  return q;
+}
+
+// Todo lo que se puede buscar: la fila del DTF (sin imprimir) y lo impreso
+function candidatosDtf() {
+  const tiradas = new Map(STATE.dtfTiradas.map(t => [t.id, t]));
+  const cola = STATE.pendientesDrive.filter(p => p.modulo === "DTF" && p.estado_impreso !== "SI").map(p => ({
+    tipo: "fila", id: p.id, cliente: p.cliente || "SIN NOMBRE", clienteTxt: p.cliente || "", archivo: p.nombre_archivo || "", file_id: p.file_id,
+    metros: faltaMetros(p) || Number(p.metros_totales) || 0, fecha: p.created_at, tirada: null, estado: "fila"
+  }));
+  const impresos = STATE.dtfPedidos.map(d => ({
+    tipo: "pedido", id: d.id, cliente: d.cliente_limpio || d.cliente_sistema || d.cliente || "SIN NOMBRE",
+    clienteTxt: [d.cliente, d.cliente_limpio, d.cliente_sistema].filter(Boolean).join(" "), archivo: d.nombre_archivo || "", file_id: d.file_id,
+    metros: Number(d.metros_archivo) || 0, fecha: d.fecha_hora, tirada: tiradas.get(d.tirada_id) || null,
+    estado: d.estado_entrega === "Entregado" ? "entregado" : d.separado_at ? "separado" : "impreso"
+  }));
+  return cola.concat(impresos);
+}
+
+const ESTADOS_BUSQUEDA_DTF = { fila: "🕒 En la fila", impreso: "🖨️ Impreso", separado: "✂️ Separado", entregado: "✅ Entregado" };
+
+function buscarPedidosDtf() {
+  const input = document.getElementById("dtfBuscarPedidos");
+  const cont = document.getElementById("dtfBuscarResultados");
+  if (!input || !cont) return;
+  const texto = input.value.trim();
+  const borrar = document.getElementById("dtfBuscarBorrar");
+  if (borrar) borrar.hidden = !texto;
+  if (!texto) { cont.hidden = true; cont.innerHTML = ""; STATE.dtfBusqueda = []; return; }
+  const q = partesBusquedaDtf(texto);
+  // El teléfono lo busca la base (la app no tiene los teléfonos)
+  if (q.telefono && (!busquedaDtfTel || busquedaDtfTel.digitos !== q.telefono)) {
+    cont.hidden = false;
+    cont.innerHTML = `<div class="dtf-ayuda">Buscando el teléfono…</div>`;
+    const digitos = q.telefono;
+    sb().rpc("taller_dtf_buscar_telefono", { p_digitos: digitos }).then(({ data, error }) => {
+      if (error) { cont.innerHTML = `<div class="dtf-ayuda">No se pudo buscar el teléfono: ${escHtml(error.message)}</div>`; return; }
+      busquedaDtfTel = { digitos, pedidos: new Set(data.pedidos || []), pendientes: new Set(data.pendientes || []), clientes: data.clientes || [] };
+      if (document.getElementById("dtfBuscarPedidos").value.trim() === texto) buscarPedidosDtf();
+    });
+    return;
+  }
+  const lista = candidatosDtf().filter(x => {
+    const txt = normalDtf(`${x.clienteTxt} ${x.archivo} ${x.tirada ? x.tirada.codigo_tirada : ""}`);
+    if (!q.palabras.every(w => txt.includes(w))) return false;
+    if (q.fechas.length) {
+      const f = new Date(x.fecha);
+      if (!q.fechas.some(k => f.getDate() === k.d && f.getMonth() + 1 === k.m && (!k.a || f.getFullYear() === k.a))) return false;
+    }
+    if (q.metros.length && !q.metros.some(v => Math.abs(x.metros - v) <= Math.max(0.05, v * 0.05))) return false;
+    if (q.telefono && !(x.tipo === "pedido" ? busquedaDtfTel.pedidos : busquedaDtfTel.pendientes).has(x.id)) return false;
+    return true;
+  }).sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")));
+  STATE.dtfBusqueda = lista.slice(0, 60);
+  const total = lista.reduce((a, x) => a + x.metros, 0);
+  const clientesTel = q.telefono && busquedaDtfTel ? busquedaDtfTel.clientes : [];
+  cont.hidden = false;
+  cont.innerHTML = !lista.length
+    ? `<div class="dtf-ayuda">No encontré pedidos con «${escHtml(texto)}».${q.telefono && !clientesTel.length ? " Ningún cliente tiene ese teléfono." : ""}</div>`
+    : `<div class="dtf-buscar-resumen">${lista.length} archivo${lista.length === 1 ? "" : "s"} · <b>${fmtNum(total)} m</b>${clientesTel.length ? ` · ${clientesTel.map(escHtml).join(", ")}` : ""}${lista.length > STATE.dtfBusqueda.length ? ` · se ven los ${STATE.dtfBusqueda.length} más nuevos` : ""}</div>
+      <div class="dtf-buscar-grilla">${STATE.dtfBusqueda.map((x, i) => `
+        <button type="button" class="dtf-buscar-item" data-busq="${i}" title="${escHtml(x.archivo)}">
+          <span class="dtf-buscar-mini">🖼️${x.file_id ? `<img src="https://drive.google.com/thumbnail?id=${escHtml(x.file_id)}&sz=w300" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()" />` : ""}</span>
+          <span class="dtf-buscar-cliente">${escHtml(x.cliente)}</span>
+          <span class="dtf-buscar-archivo">${escHtml(x.archivo)}</span>
+          <span class="dtf-buscar-datos">${fmtNum(x.metros)} m · ${escHtml(fmtDateHoraLineal(x.fecha))}${x.tirada ? ` · ${escHtml(x.tirada.codigo_tirada)}` : ""}</span>
+          <span class="dtf-buscar-estado ${x.estado}">${ESTADOS_BUSQUEDA_DTF[x.estado]}</span>
+        </button>`).join("")}</div>`;
+}
+
+// El resultado en grande: flechas o deslizar para pasar; tocar la imagen la agranda; desde lo impreso se abre su tirada
+function abrirVisorBusquedaDtf(lista, inicio) {
+  if (!lista.length) return;
+  let i = Math.max(0, Math.min(inicio, lista.length - 1));
+  const capa = document.createElement("div");
+  capa.className = "dtf-separador";
+  capa.innerHTML = `
+    <div class="dtf-sep-arriba">
+      <strong>🔎 Pedidos</strong><span data-x="contador"></span>
+      <button type="button" class="btn-secondary" data-x="cerrar">✕ Cerrar</button>
+    </div>
+    <div class="dtf-sep-imagen" data-x="marco"><img data-x="img" alt="" /><div class="dtf-sep-cargando" data-x="cargando"></div></div>
+    <div class="dtf-sep-datos">
+      <div class="dtf-sep-cliente" data-x="cliente"></div>
+      <div class="dtf-sep-archivo" data-x="archivo"></div>
+      <div class="dtf-sep-estado" data-x="estado"></div>
+    </div>
+    <div class="dtf-sep-botones">
+      <button type="button" class="btn-secondary" data-x="anterior">← Anterior</button>
+      <button type="button" class="btn-main" data-x="tirada">✂️ Ver su tirada</button>
+      <button type="button" class="btn-secondary" data-x="siguiente">Siguiente →</button>
+    </div>
+    <div class="dtf-sep-extra">
+      <a class="dtf-link" data-x="drive" target="_blank" rel="noopener">Abrir en Drive</a>
+      <span style="font-size:12px; color:var(--vg-text-secondary);">🔍 Tocá la imagen para agrandarla · deslizá para pasar</span>
+    </div>`;
+  document.body.appendChild(capa);
+  document.body.style.overflow = "hidden";
+  const $ = (x) => capa.querySelector(`[data-x="${x}"]`);
+  const img = $("img");
+
+  function mostrar() {
+    const x = lista[i];
+    $("contador").textContent = ` · ${i + 1} de ${lista.length}`;
+    $("cliente").textContent = x.cliente;
+    $("archivo").textContent = `${x.archivo} · ${fmtNum(x.metros)} m · ${fmtDateHoraLineal(x.fecha)}${x.tirada ? " · " + x.tirada.codigo_tirada : ""}`;
+    $("estado").className = "dtf-sep-estado" + (x.estado === "separado" || x.estado === "entregado" ? " si" : "");
+    $("estado").textContent = ESTADOS_BUSQUEDA_DTF[x.estado];
+    $("tirada").hidden = !x.tirada;
+    $("anterior").disabled = i === 0;
+    $("siguiente").disabled = i === lista.length - 1;
+    const drive = $("drive");
+    drive.hidden = !x.file_id;
+    if (x.file_id) drive.href = `https://drive.google.com/file/d/${encodeURIComponent(x.file_id)}/view`;
+    img.removeAttribute("src");
+    img.hidden = true;
+    $("marco").classList.remove("zoom");
+    $("cargando").textContent = x.file_id ? "Cargando imagen…" : "Sin imagen (trabajo cargado a mano)";
+    $("cargando").hidden = false;
+    if (x.file_id) {
+      traerImagenGrande(x.file_id).then(url => {
+        if (lista[i] !== x) return;
+        if (url) { img.src = url; img.hidden = false; $("cargando").hidden = true; }
+        else $("cargando").textContent = "No se pudo traer la imagen. Tocá «Abrir en Drive».";
+      });
+      const sig = lista[i + 1];
+      if (sig && sig.file_id) traerImagenGrande(sig.file_id);
+    }
+  }
+  const ir = (k) => { if (k >= 0 && k < lista.length) { i = k; mostrar(); } };
+  function cerrar() {
+    document.removeEventListener("keydown", teclas, true);
+    capa.remove();
+    document.body.style.overflow = "";
+  }
+  function teclas(e) {
+    if (!document.body.contains(capa) || document.querySelector(".modal-overlay.open")) return;
+    if (e.key === "Escape") { e.preventDefault(); cerrar(); }
+    else if (e.key === "ArrowRight") { e.preventDefault(); ir(i + 1); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); ir(i - 1); }
+  }
+  document.addEventListener("keydown", teclas, true);
+  capa.addEventListener("click", (e) => {
+    const x = e.target.closest("[data-x]");
+    if (!x) return;
+    const que = x.getAttribute("data-x");
+    if (que === "cerrar") cerrar();
+    else if (que === "anterior") ir(i - 1);
+    else if (que === "siguiente") ir(i + 1);
+    else if (que === "tirada") { const t = lista[i].tirada; cerrar(); if (t) abrirSeparadorDtf(t.id); }
+  });
+  let x0 = null;
+  let deslizo = false;
+  $("marco").addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; deslizo = false; }, { passive: true });
+  $("marco").addEventListener("touchend", (e) => {
+    if (x0 === null) return;
+    const dx = e.changedTouches[0].clientX - x0;
+    x0 = null;
+    if (Math.abs(dx) > 60) { deslizo = true; ir(i + (dx < 0 ? 1 : -1)); }
+  });
+  img.addEventListener("click", () => {
+    if (deslizo) { deslizo = false; return; }
+    $("marco").classList.toggle("zoom");
+    $("marco").scrollTop = 0;
+  });
   mostrar();
 }
 
@@ -6360,6 +6556,13 @@ export function inicializarEventosUI() {
     renderColaDtf();
   });
   document.getElementById("dtfFiltroCola")?.addEventListener("input", (e) => { STATE.dtfFiltroCola = e.target.value; renderColaDtf(); });
+  // Buscador de pedidos (Imprimir y Separar)
+  document.getElementById("dtfBuscarPedidos")?.addEventListener("input", () => { clearTimeout(tBusquedaDtf); tBusquedaDtf = setTimeout(buscarPedidosDtf, 250); });
+  document.getElementById("dtfBuscarBorrar")?.addEventListener("click", () => { document.getElementById("dtfBuscarPedidos").value = ""; buscarPedidosDtf(); });
+  document.getElementById("dtfBuscarResultados")?.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-busq]");
+    if (b) abrirVisorBusquedaDtf(STATE.dtfBusqueda || [], Number(b.getAttribute("data-busq")));
+  });
   document.getElementById("btnDtfImprimirSeleccion")?.addEventListener("click", abrirImprimirDtf);
   document.getElementById("btnDtfLimpiarSeleccion")?.addEventListener("click", () => { STATE.dtfSeleccion.clear(); renderColaDtf(); });
   document.querySelectorAll("[data-dtf-paso]").forEach(b => b.addEventListener("click", () => mostrarPasoDtf(b.getAttribute("data-dtf-paso"))));
