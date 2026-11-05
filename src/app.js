@@ -2112,7 +2112,8 @@ async function preguntarRollosCalandrados(regs) {
 
 // ===== Archivos de la fila ↔ tarjetas del Kanban =====
 // La base los enlaza sola cuando está segura (número de tarjeta, el mismo archivo que en la carpeta de la tarjeta, número de
-// cliente, "llega como" o nombre exacto). Lo que queda sin tarjeta se enlaza acá a mano: fila_enlazar_manual.
+// cliente, "llega como" o nombre exacto). Lo que queda sin tarjeta se resuelve acá: se dice de quién es (vgFilaContacto: elegir,
+// buscar o crear el contacto) y la base busca o crea la tarjeta, o se elige una tarjeta directo con fila_enlazar_manual.
 const ESTADO_TARJETA = { "col-consultas": "Consultas", "col-diseno": "En diseño", "col-impresion": "En impresión", "col-calandrado": "En calandrado",
   "col-laser": "En corte", "col-control": "Control", "col-listo": "Listo", "col-listo-dtf": "Listo DTF" };
 
@@ -2124,14 +2125,18 @@ const claveNombre = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, 
 
 // "🗂️ T0003" si todos los archivos de la carpeta son de la misma tarjeta; "⚠️ sin tarjeta · Enlazar" si falta alguno
 function chipTarjetaCarpeta(carpeta, modulo, archivos) {
-  const ids = [...new Set(archivos.map(a => a.trabajo_id || ""))];
   const datos = `data-tarjeta-carpeta="${escHtml(carpeta)}" data-tarjeta-modulo="${modulo}"`;
+  // Lo marcado "No lleva tarjeta" (muestras, archivos propios) no es un aviso, pero se puede cambiar
+  const activos = archivos.filter(a => a.trabajo_id || a.enlace !== "manual_sin");
+  if (!activos.length) return `<button type="button" class="chip-tarjeta no-lleva" ${datos} title="Marcado para que no lleve tarjeta. Tocá para cambiarlo.">🚫 No lleva tarjeta</button>`;
+  const ids = [...new Set(activos.map(a => a.trabajo_id || ""))];
   if (ids.length === 1 && ids[0]) {
     const t = (STATE.filaTarjetas || {})[ids[0]];
     return `<button type="button" class="chip-tarjeta" ${datos} title="${escHtml(t ? `${t.cliente} · ${t.titulo}` : "Tarjeta del Kanban")}. Tocá para cambiarla.">🗂️ ${escHtml(t ? t.codigo : "Tarjeta")}</button>`;
   }
-  const sin = archivos.filter(a => !a.trabajo_id).length;
-  return `<button type="button" class="chip-tarjeta sin" ${datos} title="Estos archivos no están enlazados a ninguna tarjeta del Kanban">⚠️ ${sin === archivos.length ? "sin tarjeta" : `${sin} sin tarjeta`} · Enlazar</button>`;
+  const sin = activos.filter(a => !a.trabajo_id).length;
+  if (!sin) return `<button type="button" class="chip-tarjeta" ${datos} title="Estos archivos están en distintas tarjetas. Tocá para cambiarlas.">🗂️ ${ids.length} tarjetas</button>`;
+  return `<button type="button" class="chip-tarjeta sin" ${datos} title="Estos archivos no están enlazados a ninguna tarjeta del Kanban. Tocá para decir de quién son.">⚠️ ${sin === activos.length ? "sin tarjeta" : `${sin} sin tarjeta`} · Enlazar</button>`;
 }
 
 async function abrirEnlazarTarjeta(carpeta, modulo) {
@@ -2148,9 +2153,11 @@ async function abrirEnlazarTarjeta(carpeta, modulo) {
   capa.className = "modal-overlay open";
   capa.innerHTML = `
     <div class="modal-content enlace-tarjeta">
-      <h2 style="margin-top:0;">🗂️ ¿De qué tarjeta es?</h2>
-      <p class="dtf-ayuda" style="margin:0 0 8px;">📁 <b>${escHtml(carpeta)}</b> · ${archivos.length} archivo${archivos.length === 1 ? "" : "s"}. La que más se parece ya viene elegida.</p>
+      <h2 style="margin-top:0;">${actual ? "🗂️ ¿De qué tarjeta es?" : "🗂️ ¿De quién es?"}</h2>
+      <p class="dtf-ayuda" style="margin:0 0 8px;">📁 <b>${escHtml(carpeta)}</b> · ${archivos.length} archivo${archivos.length === 1 ? "" : "s"}.${actual ? " La que más se parece ya viene elegida." : ""}</p>
       <div class="enlace-archivos">${archivos.map(a => `<label><input type="checkbox" data-id="${a.id}" checked /> ${escHtml(a.nombre_archivo)}${a.trabajo_id && a.trabajo_id !== actual ? ` <small>(${escHtml(((STATE.filaTarjetas || {})[a.trabajo_id] || {}).codigo || "otra tarjeta")})</small>` : ""}</label>`).join("")}</div>
+      ${actual ? `<details class="enlace-plegado"><summary>👤 Es de otro contacto</summary><div data-x="contacto"></div></details>` : `<div data-x="contacto"></div>`}
+      <details class="enlace-plegado" ${actual ? "open" : ""}><summary>${actual ? "🗂️ Cambiar de tarjeta" : "🗂️ O elegí una tarjeta abierta"}</summary>
       <input type="search" data-x="buscar" placeholder="🔎 Buscar tarjeta o cliente…" />
       <div class="enlace-lista">${tarjetas.length ? tarjetas.map(t => `
         <label class="enlace-op" data-texto="${escHtml(claveNombre(`${t.codigo} ${t.cliente} ${t.titulo}`))}">
@@ -2159,10 +2166,11 @@ async function abrirEnlazarTarjeta(carpeta, modulo) {
             <small>${escHtml(ESTADO_TARJETA[t.estado] || t.estado || "")}${t.motivo ? ` · <em>${escHtml(t.motivo)}</em>` : ""}${t.id === actual ? " · es la de ahora" : ""}</small></span>
         </label>`).join("") : `<p class="dtf-ayuda">No hay tarjetas abiertas en el Kanban.</p>`}</div>
       <label class="dtf-motivo" data-x="rec-caja" hidden><input type="checkbox" data-x="recordar" checked /> <span data-x="rec-texto"></span></label>
+      <button type="button" class="btn-main" data-x="ok" style="margin:10px 0 0; width:100%;">Enlazar a esta tarjeta</button>
+      </details>
       <div style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap;">
-        <button type="button" class="btn-secondary" data-x="cancelar">Cancelar</button>
-        ${archivos.some(a => a.trabajo_id) ? `<button type="button" class="btn-secondary" data-x="sacar">Sacar de la tarjeta</button>` : ""}
-        <button type="button" class="btn-main" data-x="ok" style="margin:0; flex:1;">Enlazar</button>
+        <button type="button" class="btn-secondary" data-x="cancelar" style="flex:1;">Cancelar</button>
+        ${archivos.some(a => a.trabajo_id) ? `<button type="button" class="btn-secondary" data-x="sacar" style="flex:1;">Sacar de la tarjeta</button>` : ""}
       </div>
     </div>`;
   document.body.appendChild(capa);
@@ -2182,6 +2190,17 @@ async function abrirEnlazarTarjeta(carpeta, modulo) {
     capa.querySelectorAll(".enlace-op").forEach(op => { op.hidden = !!t && !op.getAttribute("data-texto").includes(t); });
   });
   const ids = () => [...capa.querySelectorAll(".enlace-archivos input:checked")].map(c => c.getAttribute("data-id"));
+  // De quién es: elegir, buscar o crear el contacto. La base busca o crea la tarjeta
+  window.vgFilaContacto.usar(sb());
+  window.vgFilaContacto.armar(q("contacto"), {
+    carpeta, modulo, clienteId: clienteFila, ids,
+    alTerminar: async (r) => {
+      capa.remove();
+      const rec = (r.recordados || []).length ? `. Recordado: ${r.recordados.join(", ")}` : "";
+      toast(r.codigo ? `✅ Enlazado a ${r.codigo}${r.nueva ? " (tarjeta nueva)" : ""}${r.cliente ? ` · ${r.cliente}` : ""}${rec}` : "🚫 Listo: no lleva tarjeta");
+      await cargarDatosTodo();
+    }
+  });
   capa.addEventListener("click", async (e) => {
     if (e.target === capa || e.target.closest("[data-x='cancelar']")) { capa.remove(); return; }
     if (e.target.closest("[data-x='sacar']")) {

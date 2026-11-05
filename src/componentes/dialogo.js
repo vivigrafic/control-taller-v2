@@ -88,7 +88,10 @@
             const cerrar = (valor) => { document.removeEventListener('keydown', teclas, true); fondo.remove(); resolver(valor); };
             const ok = () => { const v = leer(); if (v !== undefined) cerrar(v); };
             const teclas = (e) => {
+                const abiertas = document.querySelectorAll('.vgd-fondo');
+                if (abiertas[abiertas.length - 1] !== fondo) return;   // con dos ventanas abiertas, las teclas son de la de arriba
                 if (e.key === 'Escape') { e.preventDefault(); cerrar(null); }
+                if (e.key === 'Enter' && e.target && e.target.closest && e.target.closest('[data-sin-enter]')) { e.preventDefault(); return; }   // un buscador adentro de la ventana
                 if (e.key === 'Enter' && !(e.target && e.target.tagName === 'TEXTAREA')) { e.preventDefault(); ok(); }
             };
             fondo.querySelector('.si').onclick = ok;
