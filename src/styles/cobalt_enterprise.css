@@ -765,3 +765,44 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
 .las-deshacer { display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap; margin: 0 0 12px; padding: 10px 12px; border: 1px dashed var(--vg-surface-border); border-radius: 10px; color: var(--vg-text-primary); }
 .las-deshacer button { width: auto; margin: 0; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--vg-surface-border); background: transparent; color: var(--vg-text-primary); font-weight: 700; cursor: pointer; }
 .las-vacio { padding: 18px; text-align: center; color: var(--vg-text-secondary); }
+
+/* Calandrado limpio: lo esencial a la vista y el resto plegado */
+.cal-plegado { margin: 0 0 12px; }
+.cal-plegado > summary, .cal-rollo-mas > summary, .cal-item-mas > summary, .kio-mas > summary { cursor: pointer; color: var(--vg-text-secondary); font-size: 14px; padding: 8px 0; }
+.cal-rollo-nom { font-weight: 800; font-size: 15px; color: var(--vg-text-primary); overflow-wrap: anywhere; }
+.cal-rollo-sub { font-size: 14px; color: var(--vg-text-secondary); margin-top: 2px; }
+.cal-rollo-sub b { color: var(--vg-text-primary); font-size: 16px; }
+.cal-empezar { flex: none; width: auto !important; min-height: 56px; margin: 0; padding: 0 20px; border: none; border-radius: 10px; background: var(--vg-brand-primary); color: var(--vg-text-primary); font: 900 16px var(--vg-font-sans); cursor: pointer; }
+.cal-rollo-mas { padding: 0 12px; }
+.cal-rollo-btns { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 8px; }
+.cal-item { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; border-top: 1px solid var(--vg-surface-border); }
+.cal-item-play { flex: none; width: 52px !important; height: 52px; margin: 0; padding: 0; border-radius: 10px; border: 1px solid var(--vg-surface-border); background: transparent; color: var(--vg-text-primary); font-size: 20px; cursor: pointer; }
+.cal-item-tx { flex: 1; min-width: 0; }
+.cal-item-tx b { display: block; font-size: 16px; color: var(--vg-text-primary); }
+.cal-item-tx small { display: block; font-size: 13px; color: var(--vg-text-secondary); }
+.cal-item-tx .cal-alerta { color: var(--vg-status-alert); font-weight: 700; }
+.cal-item-m { font-weight: 900; font-size: 18px; color: var(--vg-text-primary); white-space: nowrap; }
+.cal-item-mas { flex: 1 1 100%; }
+.cal-item-arch { font-size: 12px; color: var(--vg-text-secondary); margin: 6px 0; }
+.kio-trab { font-size: 20px; line-height: 1.2; color: var(--vg-text-primary); margin-bottom: 8px; }
+.kio-trab b { display: block; font-weight: 900; }
+.kio-trab small { display: block; font-size: 14px; color: var(--vg-text-secondary); }
+.kio-metros { text-align: center; font-size: 44px; font-weight: 900; line-height: 1.1; color: var(--vg-text-primary); margin: 6px 0; }
+.kio-tela { font-size: 19px; font-weight: 800; color: var(--vg-text-primary); margin-top: 6px; }
+.kio-param { text-align: center; font-size: 15px; color: var(--vg-text-secondary); margin-top: 8px; }
+.kio-arch { text-align: center; font-size: 14px; color: var(--vg-text-secondary); margin-top: 4px; }
+.kio-nota { margin-top: 8px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--vg-status-alert); color: var(--vg-text-primary); font-size: 14px; font-weight: 700; }
+.kio-mas { margin-top: 10px; }
+.kio-cola-btn { width: 100%; margin: 0 0 8px; padding: 10px; border-radius: 8px; border: 1px solid var(--vg-surface-border); background: transparent; color: var(--vg-text-primary); font-size: 14px; cursor: pointer; }
+.kio-burbujas { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.kio-archivo { font-size: 13px; color: var(--vg-text-secondary); margin-bottom: 8px; overflow-wrap: anywhere; }
+.kio-mas-acc { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.kio-mas-acc #btnKioscoMinimizar { width: 100%; }
+#kioscoCronometroBox { padding: 6px 12px !important; }
+#kioscoCronometroBox > div:first-child > span:first-child { display: none; }
+#kioscoCronometro { font-size: 20px !important; }
+#btnKioscoPausarReanudar { padding: 8px 14px !important; font-size: 13px !important; }
+#btnKioscoSiguienteTrabajo { min-height: 64px !important; height: auto !important; max-height: none !important; font-size: 20px !important; }
+@media (max-width: 768px) { #modalKioscoOperativo { padding: 0 !important; } }
+#kioscoFooterAcciones { padding: 8px 14px !important; gap: 8px !important; }
+body.kiosco-abierto .vga-boton { display: none; }

@@ -56,6 +56,10 @@
         .ft-otro { display: flex; gap: 8px; margin-top: 10px; }
         .ft-otro input { flex: 1; min-width: 0; box-sizing: border-box; padding: 12px; border-radius: 10px; border: 1px solid var(--vg-surface-border); background: var(--vg-surface-base); color: var(--vg-text-primary); font: 15px var(--vg-font-sans); }
         .ft-otro button { padding: 0 16px; border-radius: 10px; border: 1px solid var(--vg-brand-primary); background: var(--vg-brand-primary); color: var(--vg-text-primary); font: 700 14px var(--vg-font-sans); cursor: pointer; }
+        .ft-kio { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .ft-kio .ft-nombre { font-size: 19px; }
+        .ft-kio .ft-dato { font-size: 15px; }
+        .ft-kio button { flex: none; min-height: 48px; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--vg-surface-border); background: transparent; color: var(--vg-text-primary); font: 700 14px var(--vg-font-sans); cursor: pointer; width: auto; margin: 0; }
         .ft-despues { display: block; width: 100%; margin-top: 8px; padding: 12px; border-radius: 10px; border: 1px dashed var(--vg-surface-border); background: transparent; color: var(--vg-text-primary); font: 600 15px var(--vg-font-sans); cursor: pointer; }
         .ft-det h4 { margin: 14px 0 6px; font-size: 13px; color: var(--vg-text-secondary); text-transform: uppercase; letter-spacing: .03em; }
         .ft-det .ft-fila { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; padding: 7px 0; border-bottom: 1px dashed var(--vg-surface-border); font-size: 13px; }
@@ -99,6 +103,12 @@
             if (!(Number(ficha.necesita) > 0.5)) return '';
             return `<div class="${clase} ft-sin"><div class="ft-nombre">${pie}⚠️ Sin tela</div><div class="ft-dato">Pide ${num(ficha.necesita)} m</div>
                 <div class="ft-acc"><button type="button" class="ft-fuerte" data-ficha-elegir="${id}">🧵 Elegir tela</button></div></div>`;
+        }
+        if (op.kiosko) {
+            const corto = (t) => [...cantidades(t), t.lugar || 'sin lugar cargado', (t.rollos || []).length ? `rollo${t.rollos.length > 1 ? 's' : ''} ${t.rollos.slice().sort((a, b) => a - b).join(', ')}` : ''].filter(Boolean).join(' · ');
+            return telas.map(t => `<div class="ft-ficha ft-kio"><div><div class="ft-nombre">🧵 ${esc(nombreTela(t))}</div><div class="ft-dato">${esc(corto(t).replace(' para este trabajo', ''))}</div></div>
+                <button type="button" data-ficha-cambiar="${id}" data-partida="${esc(t.partida_id)}">Cambiar</button></div>`).join('')
+                + (Number(ficha.falta) > 0.5 ? `<div class="ft-ficha ft-sin"><div class="ft-falta">⚠️ Faltan ${num(ficha.falta)} m</div></div>` : '');
         }
         return telas.map(t => `<div class="${clase}">
             <div class="ft-nombre">${pie}🧵 ${esc(nombreTela(t))} <span class="ft-tag">· ${t.dueno === 'taller' ? 'del taller' : (t.para_quien ? 'de ' + esc(t.para_quien) : 'del cliente')} · ${esc(t.codigo)}</span></div>

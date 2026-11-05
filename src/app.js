@@ -1253,13 +1253,10 @@ function renderModuloCalandrado() {
       let btnAccion = "";
       if (isActivo) {
         btnAccion = `<button type="button" class="btn-cal-montar-rollo" data-rollo="${escHtml(lote)}" style="background:var(--danger); border:none; padding:6px 12px; border-radius:4px; color:#fff; font-weight:bold; cursor:pointer;">⏸️ Desmontar</button>`;
-        btnAccion += `<button type="button" class="btn-cal-kiosco-rollo" data-rollo="${escHtml(lote)}" style="background:#2196F3; border:none; padding:6px 12px; border-radius:4px; color:#fff; font-weight:bold; cursor:pointer; margin-left:5px;" title="Modo Kiosko / Reproductor de todo el Rollo">▶️ KIOSKO</button>`;
       } else if (isImprimiendo) {
         btnAccion = `<button type="button" disabled style="background:#444; border:none; padding:6px 12px; border-radius:4px; color:#888; font-weight:bold; cursor:not-allowed;">🖨️ Aún Imprimiendo</button>`;
-        btnAccion += `<button type="button" class="btn-cal-kiosco-rollo" data-rollo="${escHtml(lote)}" style="background:#2196F3; border:none; padding:6px 12px; border-radius:4px; color:#fff; font-weight:bold; cursor:pointer; margin-left:5px;" title="Modo Kiosko / Reproductor de todo el Rollo">▶️ KIOSKO</button>`;
       } else {
         btnAccion = `<button type="button" class="btn-cal-montar-rollo" data-rollo="${escHtml(lote)}" style="background:var(--accent); border:none; padding:6px 12px; border-radius:4px; color:#000; font-weight:bold; cursor:pointer;">⚙️ Montar</button>`;
-        btnAccion += `<button type="button" class="btn-cal-kiosco-rollo" data-rollo="${escHtml(lote)}" style="background:#2196F3; border:none; padding:6px 12px; border-radius:4px; color:#fff; font-weight:bold; cursor:pointer; margin-left:5px;" title="Modo Kiosko / Reproductor de todo el Rollo">▶️ KIOSKO</button>`;
       }
       const procesarBtn = `<button type="button" class="btn-cal-procesar-rollo" data-rollo="${escHtml(lote)}" style="background:var(--accent); border:none; padding:6px 12px; border-radius:4px; color:#000; font-weight:bold; cursor:pointer; margin-left:5px;">✅ Procesar</button>`;
       const pdfBtn = `<button type="button" class="btn-cal-pdf-rollo" data-rollo="${escHtml(lote)}" style="background:var(--accent-blue); border:none; padding:6px 12px; border-radius:4px; color:#fff; font-weight:bold; cursor:pointer; margin-left:5px;">🖨️ PDF</button>`;
@@ -1267,37 +1264,30 @@ function renderModuloCalandrado() {
       html += `
         <div class="rollo-card">
           <div ${headerStyle} data-toggle-rollo="${escHtml(lote)}" style="cursor:pointer;">
-            <div style="flex:1;">
-              <div style="font-size:14px; font-weight:bold; color:var(--accent); margin-bottom:4px;">${escHtml(lote)}${badgeHTML}${countBadge}</div>
-              <div style="font-size:11px; color:#ccc;">Total a procesar: <strong style="color:#fff; font-size:13px;">${fmtNum(totalMts)}m</strong></div>
+            <div style="flex:1; min-width:0;">
+              <div class="cal-rollo-nom">${escHtml(lote)}${badgeHTML}</div>
+              <div class="cal-rollo-sub">${itemsAgrupados.length} ${itemsAgrupados.length === 1 ? "trabajo" : "trabajos"} · <b>${fmtNum(totalMts)} m</b></div>
             </div>
-            <div style="display:flex; flex-wrap:wrap; justify-content:flex-end; gap:5px;">
-              ${btnAccion}${procesarBtn}${pdfBtn}
-            </div>
+            <button type="button" class="btn-cal-kiosco-rollo cal-empezar" data-rollo="${escHtml(lote)}">▶️ EMPEZAR</button>
           </div>
+          <details class="cal-rollo-mas"><summary>⋯ Más</summary><div class="cal-rollo-btns">${btnAccion}${procesarBtn}${pdfBtn}</div></details>
           <div id="body_rollo_${escHtml(lote)}" class="rollo-body ${isAbierto ? "open" : ""}">
-            <table class="tabla-tarjetas" style="width:100%; min-width:500px;">
-              <thead>
-                <tr>
-                  <th style="width:1%; white-space:nowrap;">Acción</th>
-                  <th>Fecha</th>
-                  <th>Cliente/Archivo</th>
-                  <th>Diseño</th>
-                  <th>Tela</th>
-                  <th>Nº Rollo</th>
-                  <th>Color</th>
-                  <th>Metros</th>
-                  <th>Perfil</th>
-                  <th>Notas</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${itemsAgrupados.map(c => {
-                  const idsCsv = c.ids ? c.ids.join(",") : c.id;
-                  return `
-                  <tr>
-                    <td data-label="Acción" style="width:1%; white-space:nowrap;">
-                      <div class="cal-actions-grid">
+            ${itemsAgrupados.map(c => {
+              const idsCsv = c.ids ? c.ids.join(",") : c.id;
+              const fichasC = fichasDeTrabajos(trabajosDeArchivos(c.file_id));
+              const fc = fichasC[0];
+              const tc = fc && (fc.telas || [])[0];
+              const sinTelaC = fc && !(fc.telas || []).length && Number(fc.necesita) > 0.5;
+              const telaC = tc ? [tc.tela, tc.color].filter(Boolean).join(" ") + (tc.lugar ? " · " + tc.lugar : "") : (sinTelaC ? "⚠️ Sin tela" : (c.tela_destino || "Sin tela anotada"));
+              return `<div class="cal-item">
+                <button type="button" class="cal-item-play btn-cal-kiosco" data-id="${c.id}" data-ids="${idsCsv}" data-batch="${escHtml(c.batch_id)}" title="Empezar este trabajo">▶️</button>
+                <div class="cal-item-tx"><b>${escHtml(fc ? fc.cliente || "" : (c.archivos || [])[0] || "")}</b><small>${escHtml(fc ? fc.tarjeta + " · " + (fc.titulo || "") : "")}</small><small class="${sinTelaC ? "cal-alerta" : ""}">🧵 ${escHtml(telaC)}</small></div>
+                <span class="cal-item-m">${fmtNum(c.metros)} m</span>
+                <details class="cal-item-mas"><summary>⋯ Más</summary>
+                  ${htmlFichas(fichasC)}
+                  <div class="cal-item-arch">${formatearAnidadosHTML(c.cliente_archivo)}</div>
+                  ${c.observaciones ? `<div class="kio-nota">📝 ${escHtml(c.observaciones)}</div>` : ""}
+                  <div class="cal-actions-grid">
                         <button type="button" class="btn-secondary btn-cal-terminar" data-id="${c.id}" data-ids="${idsCsv}" style="width:auto; padding:5px 8px; border-color:var(--accent); color:var(--accent); cursor:pointer;">✅ Hecho</button>
                         <button type="button" class="btn-secondary btn-cal-kiosco" data-id="${c.id}" data-ids="${idsCsv}" data-batch="${escHtml(c.batch_id)}" style="width:auto; padding:5px 8px; cursor:pointer;" title="Modo Enfoque / Kiosko">▶️</button>
                         <button type="button" class="btn-secondary btn-cal-falla" data-id="${c.id}" style="width:auto; padding:5px 8px; border-color:var(--danger); color:var(--danger); cursor:pointer;" title="Reportar Falla">⚠️</button>
@@ -1305,23 +1295,9 @@ function renderModuloCalandrado() {
                         <button type="button" class="btn-secondary btn-crud-edit" data-table="prod_cola_calandrado" data-id="${c.id}" style="width:auto; padding:5px 8px; cursor:pointer;" title="Editar">✏️</button>
                         <button type="button" class="btn-secondary btn-crud-del" data-table="prod_cola_calandrado" data-id="${c.id}" data-batch="${escHtml(c.batch_id)}" data-ids="${idsCsv}" style="width:auto; padding:5px 8px; cursor:pointer;" title="Eliminar">🗑️</button>
                       </div>
-                    </td>
-                    <td data-label="Fecha">${fmtDateHora(c.fecha_hora)}</td>
-                    <td data-label="Cliente/Archivo">
-                      ${c.es_anidado ? `<span class="badge activo" style="font-size:10px; margin-bottom:4px; display:inline-block;">📦 ANIDADO (${c.archivos.length} archivos)</span><br>` : ""}
-                      ${formatearAnidadosHTML(c.cliente_archivo)}
-                    </td>
-                    <td data-label="Diseño" style="text-align:center;">${renderCarruselCalandrado(c)}</td>
-                    <td data-label="Tela">${escHtml(c.tela_destino || "")}${chipTelaTrabajo(c.file_id)}</td>
-                    <td data-label="Nº Rollo">${escHtml(c.num_rollo_tela || "")}</td>
-                    <td data-label="Color">${escHtml(c.color_tela || "")}</td>
-                    <td data-label="Metros" style="color:var(--danger); font-weight:bold;">${fmtNum(c.metros)}m</td>
-                    <td data-label="Perfil">${escHtml(c.perfil || "")}</td>
-                    <td data-label="Notas">${c.observaciones ? `<span style="color:var(--accent-orange); font-weight:bold;">📝 ${escHtml(c.observaciones)}</span>` : "-"}</td>
-                  </tr>
-                `;}).join("")}
-              </tbody>
-            </table>
+                </details>
+              </div>`;
+            }).join("")}
           </div>
         </div>
       `;
@@ -5787,7 +5763,7 @@ function renderContenidoModalKiosco() {
   const fallbackDirect = thumbIdActual ? `https://drive.usercontent.google.com/download?id=${escHtml(thumbIdActual)}` : "";
 
   const imgPreviewHtml = thumbIdActual
-    ? `<div style="position:relative; width:100%; height:115px; background:#000; border:2px solid var(--accent-magenta); border-radius:8px; overflow:hidden; margin-bottom:6px; cursor:pointer;" ${clickAttrActual}>
+    ? `<div class="kio-img" style="position:relative; width:100%; height:clamp(150px, 34dvh, 340px); background:#000; border:2px solid var(--accent-magenta); border-radius:8px; overflow:hidden; margin-bottom:6px; cursor:pointer;" ${clickAttrActual}>
         <img class="kiosk-preview-img" src="${thumbUrl}" alt="${nombreLimpio}" referrerpolicy="no-referrer" style="width:100%; height:100%; object-fit:contain; display:block;" onerror="if(this.dataset.step!=='1'&&this.dataset.step!=='2'){this.dataset.step='1';this.src='${fallback1}';}else if(this.dataset.step==='1'){this.dataset.step='2';this.src='${fallbackDirect}';}else{this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';}" />
         <div class="kiosk-preview-ph" style="display:none; width:100%; height:100%; position:absolute; top:0; left:0; align-items:center; justify-content:center; flex-direction:column; background:#111; color:#aaa; font-size:11px; font-weight:bold; padding:8px; text-align:center;">
           <span style="font-size:22px;">🖼️</span>
@@ -5796,9 +5772,6 @@ function renderContenidoModalKiosco() {
       </div>`
     : `<div class="kiosk-preview-ph" style="width:100%; height:55px; background:#111; border:2px dashed #444; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#888; font-weight:bold; margin-bottom:6px; font-size:11px; padding:4px; text-align:center;">🖼️ ${escHtml(nombreLimpio || "SIN VISTA PREVIA")}</div>`;
 
-  document.getElementById("kioscoTitulo").textContent = esLaser
-    ? `⚡ MODO KIOSKO LÁSER (LOTE: ${rolloNombre})`
-    : `🔥 MODO KIOSKO ACTIVO (BOBINA: ${rolloNombre})`;
 
   const labelMetros = esLaser ? "METROS A CORTAR" : "METROS A CALANDRAR";
   const metrosVal = fmtNum(trabActual.metros_totales || trabActual.metros || 0);
@@ -5850,20 +5823,28 @@ function renderContenidoModalKiosco() {
       </span>
     `;
 
+  // Lo esencial a la vista: quién, imagen, metros, tela y lugar. Lo demás, en "Más opciones".
+  const fichasK = esLaser ? [] : fichasDeTrabajos(trabajosDeArchivos(trabActual.file_id));
+  const f0 = fichasK[0] || fichasDeTrabajos(trabajosDeArchivos(trabActual.file_id))[0];
+  const quienK = f0 ? `${f0.cliente || ""}${f0.para_quien ? " · para " + f0.para_quien : ""}` : nombreLimpio;
+  const subK = f0 ? `${f0.tarjeta} · ${f0.titulo || ""}` : "";
+  const paramK = esLaser ? `⚡ ${velActual} mm/s · 💡 ${tempActual} %` : `🔥 ${tempActual} °C · ⚙️ ${velActual} m/min`;
+  const notaK = trabActual.observaciones && trabActual.observaciones !== "-" ? `<div class="kio-nota">📝 ${escHtml(trabActual.observaciones)}</div>` : "";
+  const cuantosArch = (trabActual.archivos || []).length;
+  document.getElementById("kioscoTitulo").textContent = `${esLaser ? "⚡ Lote" : "🔥 Trabajo"} ${STATE.kiosco.indiceActual + 1} de ${trabajos.length} · faltan ${fmtNum(totalM)} m`;
   document.getElementById("kioscoSubtitulo").innerHTML = `
-    <!-- Encabezado Kiosko General con botón para ver cola opcional -->
-    <div id="kioscoTopHeader" style="display:flex; justify-content:space-between; align-items:center; background:#151821; border:1px solid #2a324b; padding:8px 14px; border-radius:8px; margin-bottom:10px;">
-      <div style="display:flex; align-items:center; gap:10px;">
-        <span style="font-size:15px; font-weight:900; color:#00E676;">${esLaser ? "LOTE" : "TRABAJO"} ${STATE.kiosco.indiceActual + 1} DE ${trabajos.length}</span>
-        <button type="button" id="btnKioscoToggleCola" style="background:#1e293b; border:1px solid #475569; color:#94a3b8; font-size:11px; padding:3px 10px; border-radius:6px; cursor:pointer; font-weight:bold;" title="Ver todos los trabajos">${esLaser ? "📋 Ver cola láser" : "📋 Ver cola"} (${pendientesRestantes.length})</button>
-      </div>
-      <div style="text-align:right; font-size:13px; color:#aaa;">
-        Restante: <strong style="color:#4CAF50; font-size:16px;">${fmtNum(totalM)} m</strong>
-      </div>
-    </div>
-
-    ${esLaser ? "" : htmlFichas(fichasDeTrabajos(trabajosDeArchivos(trabActual.file_id)), { grande: true })}
-
+    <div class="kio-trab"><b>${escHtml(quienK)}</b>${subK ? `<small>${escHtml(subK)}</small>` : ""}</div>
+    ${imgPreviewHtml}
+    <div class="kio-metros">${metrosVal} m</div>
+    ${fichasK.length && fichasK.some(x => (x.telas || []).length || Number(x.necesita) > 0.5)
+      ? fichasK.map(x => (x.telas || []).length ? window.vgFichaTela.html(x, { kiosko: true }) : window.vgFichaTela.html(x, { grande: true })).join("")
+      : `<div class="kio-tela">🧵 ${escHtml(telaVal)}</div>`}
+    <div class="kio-param" id="kioscoParamLinea">${paramK}</div>
+    ${cuantosArch > 1 ? `<div class="kio-arch">📦 ${cuantosArch} archivos</div>` : ""}
+    ${notaK}
+  `;
+  document.getElementById("kioscoMasDin").innerHTML = `
+    <button type="button" id="btnKioscoToggleCola" class="kio-cola-btn">📋 Ver cola (${pendientesRestantes.length})</button>
     <!-- Panel de cola colapsable (oculto por defecto para cero distracciones) -->
     <div id="kioscoPanelColaOculta" style="display:none; background:#11141c; border:1px solid #334155; border-radius:8px; padding:10px; margin-bottom:12px; max-height:240px; overflow-y:auto;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid #2a324b; padding-bottom:6px;">
@@ -5910,37 +5891,9 @@ function renderContenidoModalKiosco() {
       }).join("")}
     </div>
 
-    <!-- Reproductor Principal Limpio de 2 Columnas -->
-    <div class="kiosk-player-grid">
-      <div class="kiosk-player-left" style="text-align:center;">
-        ${imgPreviewHtml}
-        <div class="kiosk-metros-val" style="font-size:38px; font-weight:900; color:var(--accent-magenta); line-height:1;">${metrosVal} m</div>
-        <div class="kiosk-metros-lbl" style="color:#aaa; font-size:11px; margin-top:3px; font-weight:bold; letter-spacing:0.5px;">${labelMetros}</div>
-
-        <!-- Burbujas Rollo y Color en la misma línea lado a lado -->
-        <div class="kiosk-bubbles-rollo-color" style="display:flex; flex-direction:row; justify-content:center; align-items:center; gap:8px; flex-wrap:nowrap; margin-top:6px;">
-          ${bubblesHtml}
-        </div>
-      </div>
-
-      <div class="kiosk-player-right" style="display:flex; flex-direction:column; gap:8px;">
-        <!-- Tela en grande y visible -->
-        <div class="kiosk-info-tela" style="background:#0f1117; padding:8px 12px; border-radius:6px; border-left:4px solid #2196F3; display:flex; align-items:center; gap:8px; overflow:hidden;">
-          <span style="color:#888; font-size:12px; font-weight:bold; white-space:nowrap;">TELA:</span>
-          <span style="font-size:18px; font-weight:900; color:#2196F3; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escHtml(telaVal)}">${escHtml(telaVal)}</span>
-        </div>
-
-        ${pillSugerenciaHtml}
-
-        <!-- Nombre del trabajo en máximo 2 líneas sin prefijo -->
-        <div class="kiosk-info-cliente-rollo" style="background:#0f1117; padding:6px 12px; border-radius:6px; border:1px solid #2a324b;">
-          ${(trabActual.es_anidado || (trabActual.archivos && trabActual.archivos.length > 1)) ? `<div style="margin-bottom:3px;"><span class="badge activo" style="font-size:10px; padding:2px 7px;">📦 LOTE ANIDADO (${trabActual.archivos ? trabActual.archivos.length : "Múltiple"})</span></div>` : ""}
-          <div class="kiosk-job-title-clamp" style="font-size:13px; font-weight:bold; color:#fff; line-height:1.25; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; text-overflow:ellipsis;" title="${escHtml(rawNombre)}">
-            ${escHtml(nombreLimpio)}
-          </div>
-        </div>
-      </div>
-    </div>
+    <div class="kio-burbujas">${bubblesHtml}</div>
+    <div class="kio-archivo">${escHtml(nombreLimpio)}</div>
+    ${pillSugerenciaHtml}
 
     <!-- Parámetros operativos adaptados para Calandrado o Láser -->
     <div id="kioscoParametrosBox" style="background:#111; border:1px solid #333; padding:10px 14px; border-radius:8px; margin-top:8px; display:flex; justify-content:space-around; align-items:center; flex-wrap:wrap; gap:10px;">
@@ -5990,6 +5943,18 @@ function renderContenidoModalKiosco() {
       `}
     </div>
   `;
+  // La línea de parámetros sigue a lo que se cambie en "Más opciones"
+  ["kioscoInputVelocidad", "kioscoInputTemperatura"].forEach(idInp => {
+    const inp = document.getElementById(idInp);
+    if (inp) inp.oninput = () => {
+      const v = document.getElementById("kioscoInputVelocidad")?.value || velActual;
+      const t = document.getElementById("kioscoInputTemperatura")?.value || tempActual;
+      const linea = document.getElementById("kioscoParamLinea");
+      if (linea) linea.textContent = esLaser ? `⚡ ${v} mm/s · 💡 ${t} %` : `🔥 ${t} °C · ⚙️ ${v} m/min`;
+    };
+  });
+  const masK = document.getElementById("kioscoMas");
+  if (masK) masK.open = false;
 
   // Control para abrir y cerrar el cajón de la cola
   const btnToggleCola = document.getElementById("btnKioscoToggleCola");
@@ -6029,9 +5994,9 @@ function renderContenidoModalKiosco() {
 
   if (btnSig) {
     if (esLaser) {
-      btnSig.innerHTML = pendientesRestantes.length > 1 ? "✔️ TERMINAR CORTE Y SIGUIENTE ➔" : "✔️ FINALIZAR CORTE";
+      btnSig.innerHTML = pendientesRestantes.length > 1 ? "✔️ CORTADO Y SEGUIR" : "✔️ CORTADO";
     } else {
-      btnSig.innerHTML = pendientesRestantes.length > 1 ? "✔️ TERMINAR ESTE Y SIGUIENTE ➔" : "✔️ FINALIZAR TRABAJO";
+      btnSig.innerHTML = pendientesRestantes.length > 1 ? "✔️ TERMINAR Y SEGUIR" : "✔️ TERMINAR";
     }
     btnSig.style.display = "block";
   }
@@ -7196,6 +7161,17 @@ window.addEventListener("DOMContentLoaded", async () => {
   suscribirRealtime();
   revisarFilaSola();
   // 📥 Para hacer: la misma bandeja del ERP (las tarjetas y pantallas se abren en el ERP, en otra pestaña)
+  // Mientras haya un kiosko abierto: pantalla completa (si el taller está dentro del sistema, le avisa) y sin el botón de ayuda
+  const avisarKiosco = () => {
+    const abierto = ["modalKioscoOperativo", "modalEnfoqueCalandra"].some(id => document.getElementById(id)?.classList.contains("open"));
+    document.body.classList.toggle("kiosco-abierto", abierto);
+    if (window.parent !== window) window.parent.postMessage({ vgTaller: "kiosco", abierto }, location.origin);
+  };
+  ["modalKioscoOperativo", "modalEnfoqueCalandra"].forEach(id => {
+    const m = document.getElementById(id);
+    if (m) new MutationObserver(avisarKiosco).observe(m, { attributes: true, attributeFilter: ["class"] });
+  });
+
   // La ficha de tela y las tiradas: las mismas pantallas que en la tarjeta del sistema
   window.vgFichaTela?.usar(sb());
   window.vgTiradas?.usar(sb(), { terminal: window.VG_CONEXION?.terminalUrl || null });

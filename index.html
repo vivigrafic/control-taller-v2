@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261105_03" />
+  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261105_04" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./src/config/conexion.js?v=20261022_04"></script>
   <script src="./src/ver_clave.js?v=20261022_02"></script>
@@ -22,7 +22,7 @@
   <script src="./src/componentes/ayuda.js?v=20261029_01" data-ayuda="taller" data-vivi="https://erpvivigrafic.netlify.app/vivi.html"></script>
   <script src="./src/componentes/bandeja.js?v=20261030_01"></script>
   <script src="./src/componentes/dialogo.js?v=20261105_01"></script>
-  <script src="./src/componentes/ficha_tela.js?v=20261105_03"></script>
+  <script src="./src/componentes/ficha_tela.js?v=20261105_04"></script>
   <script src="./src/componentes/tiradas.js?v=20261105_01"></script>
   <script src="./src/componentes/etiquetas_rollos.js?v=20261105_01"></script>
   <script src="./src/miniaturas.js?v=20261022_01"></script>
@@ -244,12 +244,17 @@
        TAB 2: CALANDRADO (Copia exacta de Index.html líneas 154-201)
        ======================================================================== -->
   <div id="sec-calandrado" class="tab-content" data-ayuda="taller_calandrado,taller">
-    <div class="stats-grid" id="kpisCalandrado"></div>
+    <details class="cal-plegado"><summary>📊 Ver números</summary><div class="stats-grid" id="kpisCalandrado"></div></details>
+
+    <div class="card" style="padding-bottom:4px;">
+      <button type="button" id="btnAbrirPrevisionTelas" class="btn-main" style="width:100%; margin-top:0; margin-bottom:15px; font-size:16px; padding:12px; background:#4CAF50; color:#000; font-weight:bold; border-radius:8px; box-shadow: 0 4px 10px rgba(76, 175, 80, 0.3);">🛒 VER TELAS REQUERIDAS (PREVISIÓN)</button>
+      <div id="panelPrevisionTelasInline" style="display:none; background:#111; border:1px solid #333; border-radius:8px; padding:15px; margin-bottom:15px;"></div>
+    </div>
 
     <div class="card" style="border-top: 4px solid var(--accent-blue);">
-      <h2>Hoja de Trabajo - Cola Calandrado</h2>
+      <h2>Para calandrar</h2>
       <input type="text" id="searchCalandraLocal" class="search-input" placeholder="🔍 Buscar rollo, cliente o tela..." />
-      <div style="margin-bottom: 15px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+      <details class="cal-plegado"><summary>⋯ Más opciones</summary><div style="margin-bottom: 15px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
         <div style="display:flex; align-items:center; gap:8px;">
           <span style="font-size:11px; color:var(--accent-blue); font-weight:bold;">📅 Fecha Proceso (Opcional):</span>
           <input type="datetime-local" id="calInputFechaManual" style="width:190px; padding:6px;" />
@@ -259,15 +264,13 @@
           <button type="button" class="btn-secondary btn-crud-add" data-table="prod_cola_calandrado" style="width:auto; padding:8px 15px;">+ Agregar Trabajo</button>
           <button type="button" id="btnOrdenCalandra" class="btn-secondary" style="width: auto; padding: 8px 15px;">⬇️ Orden: Más antiguos primero</button>
         </div>
-      </div>
+      </div></details>
       <div id="contenedorRollosCalandrado">Cargando Rollos...</div>
     </div>
 
     <div class="card">
-      <button type="button" id="btnAbrirPrevisionTelas" class="btn-main" style="width:100%; margin-top:0; margin-bottom:15px; font-size:16px; padding:12px; background:#4CAF50; color:#000; font-weight:bold; border-radius:8px; box-shadow: 0 4px 10px rgba(76, 175, 80, 0.3);">🛒 VER TELAS REQUERIDAS (PREVISIÓN)</button>
-      <div id="panelPrevisionTelasInline" style="display:none; background:#111; border:1px solid #333; border-radius:8px; padding:15px; margin-bottom:15px;"></div>
 
-      <h2>Historial Reciente (Procesados)</h2>
+      <details class="cal-plegado"><summary>🕘 Ver lo ya calandrado</summary>
       <div style="overflow-x: auto;">
         <table>
           <thead>
@@ -288,6 +291,7 @@
           <tbody id="tbodyHistorialCalandrado"></tbody>
         </table>
       </div>
+      </details>
     </div>
   </div>
 
@@ -854,13 +858,23 @@
       <div id="kioscoHeaderBar" style="background:#1a1c23; padding:12px 18px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #333; flex-wrap:wrap; gap:8px;">
         <h2 id="kioscoTitulo" style="margin:0; border:none; padding:0; color:#fff; font-size:18px;">▶️ MODO KIOSKO - ROLLO: <span id="kioskRolloId" style="color:#d81b60;"></span></h2>
         <div style="display:flex; gap:8px; align-items:center;">
-          <button type="button" id="btnKioscoMinimizar" style="background:#2196F3; border:none; color:#fff; padding:7px 12px; border-radius:6px; font-size:12px; cursor:pointer; font-weight:bold;" title="Salir para ver otros módulos sin detener el reloj">👁️ Salir (Sigue el reloj)</button>
           <button type="button" id="btnKioscoCancelarDefinitivo" style="background:none; border:1px solid #ff5252; color:#ff5252; padding:6px 12px; border-radius:6px; font-size:13px; cursor:pointer; font-weight:bold;">✖ CERRAR</button>
         </div>
       </div>
 
       <div id="kioscoScrollArea" style="padding:14px 18px; overflow-y:auto; flex:1;">
         <div id="kioscoSubtitulo"></div>
+        <details id="kioscoMas" class="kio-mas">
+          <summary>⋯ Más opciones</summary>
+          <div id="kioscoMasDin"></div>
+          <div class="kio-mas-acc">
+<button type="button" id="btnKioscoMinimizar" style="background:#2196F3; border:none; color:#fff; padding:7px 12px; border-radius:6px; font-size:12px; cursor:pointer; font-weight:bold;" title="Salir para ver otros módulos sin detener el reloj">👁️ Salir (Sigue el reloj)</button>
+          <div id="kioscoBotonesSecundarios" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+            <button type="button" id="btnKioscoDescartarSiguiente" style="margin:0; padding:10px 8px; font-size:12px; font-weight:bold; background:rgba(255,82,82,0.14); border:1px solid #ff5252; color:#ff5252; border-radius:6px; cursor:pointer;">✂️ DESECHAR PAPEL</button>
+            <button type="button" id="btnKioscoFinalizar" style="margin:0; padding:10px 8px; font-size:12px; font-weight:bold; background:#1e293b; color:#94a3b8; border:1px solid #475569; border-radius:6px; cursor:pointer;">🏁 TERMINAR TODO</button>
+          </div>
+          </div>
+        </details>
       </div>
 
       <!-- Barra de Cronómetro y Acciones Fijas del Reproductor -->
@@ -878,10 +892,6 @@
 
         <div id="kioscoBotonesAccion" style="display:flex; flex-direction:column; gap:8px;">
           <button type="button" id="btnKioscoSiguienteTrabajo" class="btn-main" style="margin:0; padding:14px; font-size:16px; font-weight:900; background:#00E676; color:#000; box-shadow:0 4px 15px rgba(0,230,118,0.3); border:none; border-radius:8px; cursor:pointer; width:100%;">✔️ TERMINAR ESTE Y SIGUIENTE ➔</button>
-          <div id="kioscoBotonesSecundarios" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
-            <button type="button" id="btnKioscoDescartarSiguiente" style="margin:0; padding:10px 8px; font-size:12px; font-weight:bold; background:rgba(255,82,82,0.14); border:1px solid #ff5252; color:#ff5252; border-radius:6px; cursor:pointer;">✂️ DESECHAR PAPEL</button>
-            <button type="button" id="btnKioscoFinalizar" style="margin:0; padding:10px 8px; font-size:12px; font-weight:bold; background:#1e293b; color:#94a3b8; border:1px solid #475569; border-radius:6px; cursor:pointer;">🏁 TERMINAR TODO</button>
-          </div>
         </div>
       </div>
     </div>
@@ -1030,7 +1040,7 @@
   <datalist id="listColores"></datalist>
   <div id="vgToastContainer" style="position:fixed; top:16px; right:16px; z-index:3000; max-width:360px;"></div>
 
-  <script type="module" src="./src/app.js?v=20261105_03"></script>
+  <script type="module" src="./src/app.js?v=20261105_04"></script>
   <script>
     // Registro del Service Worker PWA
     if ('serviceWorker' in navigator) {
