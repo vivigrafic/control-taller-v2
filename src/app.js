@@ -1326,23 +1326,25 @@ function renderModuloCalandrado() {
     contRollos.innerHTML = html;
   }
 
-  // Previsión de Telas Requeridas
+  // Telas requeridas: un recuadro por trabajo, los que no tienen tela primero. Se elige o se cambia antes de calandrar.
   const panelPrev = document.getElementById("panelPrevisionTelasInline");
   if (panelPrev) {
-    const mapaTelas = {};
+    const ids = [];
+    const sinTarjeta = [];
     pendientes.forEach(p => {
-      const k = `${p.tela_destino || "SIN ESPECIFICAR"} (${p.color_tela || "BLANCO"})`;
-      mapaTelas[k] = (mapaTelas[k] || 0) + (Number(p.metros) || 0);
+      const t = trabajosDeArchivos(p.file_id);
+      if (!t.length) sinTarjeta.push(p);
+      t.forEach(id => { if (!ids.includes(id)) ids.push(id); });
     });
-    const entries = Object.entries(mapaTelas);
-    panelPrev.innerHTML = entries.length === 0
-      ? `<div style="color:#888;">Sin telas requeridas.</div>`
-      : entries.map(([k, m]) => `
-          <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #222; color:#ccc;">
-            <span>👕 <strong>${escHtml(k)}</strong></span>
-            <strong style="color:#4CAF50;">${fmtNum(m)}m</strong>
-          </div>
-        `).join("");
+    const sinTela = (f) => !(f.telas || []).length;
+    const fichas = fichasDeTrabajos(ids).filter(f => (f.telas || []).length || Number(f.necesita) > 0.5).sort((a, b) => Number(sinTela(b)) - Number(sinTela(a)));
+    const faltan = fichas.filter(sinTela).length;
+    if (window.vgFichaTela) window.vgFichaTela.escuchar(panelPrev, { alCambiar: cargarDatosTodo });
+    panelPrev.innerHTML = !fichas.length && !sinTarjeta.length
+      ? `<div class="ft-resumen">Sin telas requeridas.</div>`
+      : `<div class="ft-resumen">${fichas.length} trabajo${fichas.length === 1 ? "" : "s"} · ${faltan ? `⚠️ ${faltan} sin tela` : "✅ todos con tela"}</div>`
+        + fichas.map(f => window.vgFichaTela ? window.vgFichaTela.tarjetaTrabajo(f) : "").join("")
+        + sinTarjeta.map(p => `<div class="ft-trabajo"><div class="ft-cab">⚠️ Sin tarjeta<small>${escHtml(p.cliente_archivo || "")}</small></div><div class="ft-dato">${escHtml(p.tela_destino || "Sin tela escrita")} · ${fmtNum(p.metros)} m</div></div>`).join("");
   }
 
   // Historial Reciente de Calandrado agrupado por rollo (y colapsable al hacer clic)

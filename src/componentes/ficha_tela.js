@@ -2,6 +2,7 @@
 // Calandrado y kiosko): qué tela lleva, de quién es, cuántos metros, cuánto queda y dónde está; con Ver detalle y Cambiar.
 //   vgFichaTela.usar(clienteSupabase)                → la conexión de la pantalla (el taller)
 //   vgFichaTela.html(ficha, { grande, compacta })    → el recuadro (ficha: fichas_tela_abiertas o trabajo_ficha_tela)
+//   vgFichaTela.tarjetaTrabajo(ficha)                → el trabajo con su tela, en grande (telas requeridas)
 //   vgFichaTela.escuchar(raiz, { alCambiar })        → activa los botones de los recuadros que estén dentro de raiz
 //   vgFichaTela.abrir(trabajoId, { alCambiar })      → ventana con el detalle
 //   vgFichaTela.elegir(trabajoId, { despues, partidaActual, titulo }) → 'elegida', 'despues' o null (canceló)
@@ -34,7 +35,19 @@
         .ft-acc button, .ft-det button { padding: 5px 10px; border-radius: 8px; border: 1px solid var(--vg-surface-border); background: transparent;
             color: var(--vg-text-primary); font: 600 12px var(--vg-font-sans); cursor: pointer; width: auto; margin: 0; }
         .ft-acc button.ft-fuerte, .ft-det button.ft-fuerte { background: var(--vg-brand-primary); border-color: var(--vg-brand-primary); }
-        .ft-ficha.ft-grande .ft-acc button { padding: 9px 14px; font-size: 14px; }
+        .ft-ficha.ft-grande .ft-acc button { flex: 1 1 140px; min-height: 52px; padding: 12px 16px; font-size: 17px; }
+        .ft-trabajo { margin: 0 0 14px; padding: 10px; border: 1px solid var(--vg-surface-border); border-radius: 12px; background: var(--vg-bg-app); }
+        .ft-cab { font: 800 15px/1.3 var(--vg-font-sans); color: var(--vg-text-primary); margin-bottom: 8px; }
+        .ft-cab small { display: block; font-weight: 400; color: var(--vg-text-secondary); }
+        .ft-resumen { font: 700 16px var(--vg-font-sans); color: var(--vg-text-primary); margin: 0 0 12px; }
+        .ft-sel input { width: 100%; box-sizing: border-box; padding: 12px; border-radius: 10px; border: 1px solid var(--vg-surface-border); background: var(--vg-surface-base); color: var(--vg-text-primary); font: 16px var(--vg-font-sans); }
+        .ft-lista { margin-top: 8px; max-height: 52vh; overflow: auto; }
+        .ft-lista h4 { margin: 12px 0 6px; font: 700 12px var(--vg-font-sans); color: var(--vg-text-secondary); text-transform: uppercase; }
+        .ft-op { display: block; width: 100%; margin: 0 0 8px; padding: 12px 14px; text-align: left; cursor: pointer; border-radius: 10px; border: 1px solid var(--vg-surface-border); background: var(--vg-surface-base); color: var(--vg-text-primary); font-family: var(--vg-font-sans); }
+        .ft-op.ft-rec { border: 2px solid var(--vg-brand-primary); }
+        .ft-op-t { display: block; font-weight: 800; font-size: 16px; }
+        .ft-op-d { display: block; font-size: 13px; color: var(--vg-text-secondary); }
+        .ft-despues { display: block; width: 100%; margin-top: 8px; padding: 12px; border-radius: 10px; border: 1px dashed var(--vg-surface-border); background: transparent; color: var(--vg-text-primary); font: 600 15px var(--vg-font-sans); cursor: pointer; }
         .ft-det h4 { margin: 14px 0 6px; font-size: 13px; color: var(--vg-text-secondary); text-transform: uppercase; letter-spacing: .03em; }
         .ft-det .ft-fila { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; padding: 7px 0; border-bottom: 1px dashed var(--vg-surface-border); font-size: 13px; }
         .ft-det small { color: var(--vg-text-secondary); display: block; }
@@ -59,6 +72,13 @@
             rollos.length ? `rollo${rollos.length > 1 ? 's' : ''} ${rollos.slice().sort((a, b) => a - b).join(', ')}` : ''].filter(Boolean).join(' · ');
     }
 
+    // El trabajo con su tela, para la lista de telas requeridas
+    function tarjetaTrabajo(ficha) {
+        const cuerpo = html(ficha, { grande: true });
+        if (!cuerpo) return '';
+        return `<div class="ft-trabajo"><div class="ft-cab">${esc(ficha.cliente || '')}${ficha.para_quien ? ` · para ${esc(ficha.para_quien)}` : ''}<small>${esc(ficha.tarjeta || '')} · ${esc(ficha.titulo || '')}</small></div>${cuerpo}</div>`;
+    }
+
     function html(ficha, op = {}) {
         ponerEstilos();
         if (!ficha) return '';
@@ -72,7 +92,7 @@
                 <div class="ft-acc"><button type="button" class="ft-fuerte" data-ficha-elegir="${id}">🧵 Elegir tela</button></div></div>`;
         }
         return telas.map(t => `<div class="${clase}">
-            <div class="ft-nombre">${pie}🧵 ${esc(nombreTela(t))} <span class="ft-tag">· ${t.dueno === 'taller' ? 'del taller' : 'del cliente'} · ${esc(t.codigo)}</span></div>
+            <div class="ft-nombre">${pie}🧵 ${esc(nombreTela(t))} <span class="ft-tag">· ${t.dueno === 'taller' ? 'del taller' : (t.para_quien ? 'de ' + esc(t.para_quien) : 'del cliente')} · ${esc(t.codigo)}</span></div>
             <div class="ft-dato">${esc(datosTela(t))}</div>
             ${t.sin_rinde ? '<div class="ft-dato">Sin rinde: al terminar se ponen los kilos</div>' : ''}
             <div class="ft-acc"><button type="button" data-ficha-ver="${id}">Ver detalle</button>
@@ -112,20 +132,58 @@
             || Number(!!b.alcanza) - Number(!!a.alcanza));
     }
 
-    // Elegir o cambiar la tela. Lo recomendado viene primero y ya elegido: alcanza con Aceptar.
+    // El buscador de telas: lo recomendado primero; un toque en una tela la elige
+    function tarjetaOpcion(o, i, pide) {
+        const dueno = o.dueno === 'taller' ? 'Del taller' : (o.para_quien ? 'De ' + o.para_quien : 'Del cliente');
+        return `<button type="button" class="ft-op${o.recomendada ? ' ft-rec' : ''}" data-op="${i}">
+            <span class="ft-op-t">${o.recomendada ? '⭐ ' : ''}${esc(nombreTela(o))}</span>
+            <span class="ft-op-d">${esc(dueno)} · ${esc(o.codigo)}${o.alcanza || o.sin_rinde ? '' : ' · <b>no alcanza</b>'}</span>
+            <span class="ft-op-d">${esc(detalleOpcion(o, pide))}</span></button>`;
+    }
+
+    async function elegirDeLista(f, opciones, op) {
+        const grupos = [['⭐ Para este trabajo', x => x.dueno === 'cliente' && !x.otro], ['Del taller', x => x.dueno === 'taller'], ['De otros subclientes', x => x.otro]];
+        return window.vgDialogo.ventana({ titulo: op.titulo || '🧵 ¿Qué tela va?', texto: `${f.tarjeta} · ${f.cliente || ''}${f.para_quien ? ' · para ' + f.para_quien : ''} · ${f.titulo || ''}${Number(f.pide) > 0 ? `. Pide ${num(f.pide)} m.` : ''}`, aceptar: 'Elegir la primera', ancho: '640px' }, (zona) => {
+            zona.innerHTML = `<div class="ft-sel"><input type="search" data-b placeholder="🔎 Buscar tela, color, código o lugar…" autocomplete="off"><div data-l class="ft-lista"></div>
+                ${op.despues ? '<button type="button" class="ft-despues" data-despues="1">⏳ La elijo después</button>' : ''}</div>`;
+            let resultado;
+            const aceptar = () => zona.closest('.vgd-caja').querySelector('.si').click();
+            const pintar = (q) => {
+                const t = q.trim().toLowerCase();
+                const pasa = (o) => !t || `${nombreTela(o)} ${o.codigo} ${o.lugar || ''} ${o.para_quien || ''}`.toLowerCase().includes(t);
+                const html = grupos.map(([titulo, cond]) => {
+                    const items = opciones.map((o, i) => [o, i]).filter(([o]) => cond(o) && pasa(o));
+                    return items.length ? `<h4>${esc(titulo)}</h4>${items.map(([o, i]) => tarjetaOpcion(o, i, f.pide)).join('')}` : '';
+                }).join('');
+                zona.querySelector('[data-l]').innerHTML = html || '<div class="ft-dato">No encontré esa tela. Si llegó recién, cargala con 📥 Recibir telas.</div>';
+            };
+            pintar('');
+            zona.querySelector('[data-b]').addEventListener('input', (e) => pintar(e.target.value));
+            zona.addEventListener('click', (e) => {
+                const b = e.target.closest('[data-op]');
+                if (b) { resultado = opciones[Number(b.dataset.op)]; aceptar(); return; }
+                if (e.target.closest('[data-despues]')) { resultado = 'despues'; aceptar(); }
+            });
+            return () => {
+                if (resultado) return resultado;
+                const primera = opciones.find(o => o.recomendada) || opciones.find(o => !o.otro);
+                if (!primera) { avisar('Elegí una tela.', 'error'); return undefined; }
+                return primera;
+            };
+        });
+    }
+
+    // Elegir o cambiar la tela
     async function elegir(trabajoId, op = {}) {
+        ponerEstilos();
         const f = await traer(trabajoId);
         if (!f) return null;
         const opciones = agrupar((f.opciones || []).filter(o => o.partida_id !== op.partidaActual || o.rollo_id), f.pide);
         if (!opciones.length && !op.despues) { avisar('No hay telas con saldo. Cargala con 📥 Recibir telas.', 'error'); return null; }
-        const lista = opciones.map((o, i) => ({ valor: String(i), icono: o.dueno === 'taller' ? '🏭' : '🧵',
-            titulo: `${o.recomendada ? '⭐ ' : ''}${nombreTela(o)} · ${o.codigo}${o.dueno === 'taller' ? ' · del taller' : ''}`, detalle: detalleOpcion(o, f.pide) }));
-        if (op.despues) lista.push({ valor: 'despues', icono: '⏳', titulo: 'La elijo después', detalle: 'Sigue igual y el trabajo queda en la Bandeja como "Trabajos sin tela"' });
-        const texto = `${f.tarjeta} · ${f.cliente || ''} · ${f.titulo || ''}. ${Number(f.pide) > 0 ? `Pide ${num(f.pide)} m.` : ''}`;
-        const r = await window.vgDialogo.elegir({ titulo: op.titulo || '🧵 ¿Qué tela va?', texto, opciones: lista, elegida: lista[0] ? lista[0].valor : undefined, aceptar: 'Elegir' });
-        if (r === null || r === undefined) return null;
-        if (r === 'despues') return 'despues';
-        const o = opciones[Number(r)];
+        const o = await elegirDeLista(f, opciones, op);
+        if (o === null || o === undefined) return null;
+        if (o === 'despues') return 'despues';
+        if (o.otro && !(await window.vgDialogo.confirmar({ titulo: `Esta tela es de ${o.para_quien}`, texto: `${nombreTela(o)} está guardada para ${o.para_quien}${f.para_quien ? ` y este trabajo es para ${f.para_quien}` : ''}. ¿La usás igual?`, aceptar: 'Sí, usarla' }))) return null;
         const metros = Number(f.pide) > 0 ? Number(f.pide) : (Number(o.libre) || null);
         if (!(metros > 0)) { avisar('Este trabajo todavía no dice cuántos metros lleva: asignale la tela desde la tarjeta.', 'error'); return null; }
         const p = { trabajo_id: trabajoId, partida_id: o.partida_id };
@@ -137,6 +195,24 @@
         const aviso = res.data && res.data.aviso;
         avisar(aviso || `Listo: ${nombreTela(o)} para ${f.tarjeta}`, aviso ? 'error' : undefined);
         return 'elegida';
+    }
+
+    // Para quién es el trabajo (clientes que revenden)
+    async function cambiarParaQuien(f, alListo) {
+        let valor = f.para_quien || '';
+        const ok = await window.vgDialogo.ventana({ titulo: '👤 ¿Para quién es este trabajo?', texto: `${f.cliente || ''} · ${f.titulo || ''}`, aceptar: 'Guardar', ancho: '480px' }, (zona) => {
+            zona.innerHTML = `<div class="ft-sel"><input type="text" data-n list="ft-dl-sub" autocomplete="off" placeholder="Nombre del subcliente" value="${esc(valor)}">
+                <datalist id="ft-dl-sub">${(f.subclientes || []).map(n => `<option value="${esc(n)}">`).join('')}</datalist>
+                <button type="button" class="ft-despues" data-mismo="1">Es de ${esc(f.cliente || 'el cliente')} mismo</button></div>`;
+            const inp = zona.querySelector('[data-n]');
+            zona.querySelector('[data-mismo]').addEventListener('click', () => { inp.value = ''; zona.closest('.vgd-caja').querySelector('.si').click(); });
+            return () => { valor = inp.value; return true; };
+        });
+        if (!ok) return;
+        const { error } = await db().rpc('trabajo_para_quien_guardar', { p: { trabajo_id: f.trabajo_id, para_quien: valor } });
+        if (error) { avisar(errorTexto(error), 'error'); return; }
+        avisar('Guardado');
+        await alListo();
     }
 
     // Cuántos metros se apartan de esa tela
@@ -172,6 +248,7 @@
         const rollosDe = (a) => (a.rollos || []).length ? a.rollos.map(r => `rollo ${r.numero}: ${num(r.metros)} m`).join(' · ') : '';
         zona.innerHTML = `<div class="ft-det">
             <div>${esc(f.cliente || '')} · ${esc(f.titulo || '')}. Pide ${num(f.necesita)} m${Number(f.falta) > 0.5 ? ` y faltan ${num(f.falta)} m` : ''}.</div>
+            ${f.revende ? `<div class="ft-fila"><span>Para quién: <b>${esc(f.para_quien || f.cliente || '')}</b></span><span class="ft-acc" style="margin:0;"><button type="button" data-d="para">Cambiar</button></span></div>` : ''}
             <h4>Tela</h4>
             ${telas.map((t, i) => `<div class="ft-fila"><span><b>${esc(nombreTela(t))}</b> · ${t.dueno === 'taller' ? 'del taller' : 'del cliente'} · ${esc(t.codigo)}<small>${esc(datosTela(t))}</small></span>
                 <span class="ft-acc" style="margin:0;"><button type="button" data-d="cambiar" data-i="${i}">Cambiar</button>
@@ -200,6 +277,7 @@
                 const b = e.target.closest('[data-d]');
                 if (!b) return;
                 const i = Number(b.dataset.i);
+                if (b.dataset.d === 'para') await cambiarParaQuien(f, recargar);
                 if (b.dataset.d === 'sumar') { if (await elegir(trabajoId) === 'elegida') await recargar(); }
                 if (b.dataset.d === 'cambiar') { if (await elegir(trabajoId, { partidaActual: f.telas[i].partida_id, titulo: `Cambiar ${nombreTela(f.telas[i])}` }) === 'elegida') await recargar(); }
                 if (b.dataset.d === 'metros') await cambiarMetros(f, f.telas[i], recargar);
@@ -228,5 +306,5 @@
         });
     }
 
-    window.vgFichaTela = { usar: (c) => { sb = c; }, html, escuchar, abrir, elegir };
+    window.vgFichaTela = { usar: (c) => { sb = c; }, html, tarjetaTrabajo, escuchar, abrir, elegir };
 })();
