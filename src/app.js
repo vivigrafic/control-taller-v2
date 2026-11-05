@@ -372,7 +372,8 @@ export async function cargarDatosTodo() {
     resMetrosEstaciones,
     resTelasReservas,
     resFichasTela,
-    resTelaAjustes
+    resTelaAjustes,
+    resPorGuardar
   ] = await Promise.all([
     client.from("v_prod_rollos_papel_saldos").select("*").order("fecha_montaje", { ascending: false }),
     client.from("v_prod_bloques_impresion").select("*"),
@@ -405,8 +406,10 @@ export async function cargarDatosTodo() {
     client.from("v_telas_reservas").select("id, trabajo_id, trabajo_numero, trabajo_titulo, codigo, tela, color, dueno, metros, kilos, estado, origen, sin_rinde").neq("estado", "anulada"),
     // La ficha de tela de cada trabajo abierto y el máximo por tirada
     client.rpc("fichas_tela_abiertas"),
-    client.rpc("tela_ajustes")
+    client.rpc("tela_ajustes"),
+    client.rpc("telas_por_guardar")
   ]);
+  STATE.telasPorGuardar = resPorGuardar && !resPorGuardar.error ? ((resPorGuardar.data || {}).telas || []) : [];
   STATE.fichasTela = resFichasTela && !resFichasTela.error ? (resFichasTela.data || {}) : {};
   STATE.telaAjustes = resTelaAjustes && !resTelaAjustes.error ? (resTelaAjustes.data || {}) : {};
   STATE.telasReservas = resTelasReservas && !resTelasReservas.error ? (resTelasReservas.data || []) : [];
@@ -1340,11 +1343,13 @@ function renderModuloCalandrado() {
     const fichas = fichasDeTrabajos(ids).filter(f => (f.telas || []).length || Number(f.necesita) > 0.5).sort((a, b) => Number(sinTela(b)) - Number(sinTela(a)));
     const faltan = fichas.filter(sinTela).length;
     if (window.vgFichaTela) window.vgFichaTela.escuchar(panelPrev, { alCambiar: cargarDatosTodo });
-    panelPrev.innerHTML = !fichas.length && !sinTarjeta.length
+    const porGuardar = STATE.telasPorGuardar || [];
+    const htmlGuardar = porGuardar.length ? `<div class="ft-resumen">📍 ${porGuardar.length} tela${porGuardar.length === 1 ? "" : "s"} por guardar</div>` + porGuardar.map((t, i) => `<div class="ft-trabajo"><div class="ft-cab">${escHtml([t.tela, t.color].filter(Boolean).join(" "))}<small>${escHtml(t.para_quien || t.cliente || "Del taller")} · ${escHtml(t.codigo)}</small></div><button type="button" class="btn-tela-guardar ft-despues" data-i="${i}">📍 Guardar</button></div>`).join("") : "";
+    panelPrev.innerHTML = htmlGuardar + (!fichas.length && !sinTarjeta.length
       ? `<div class="ft-resumen">Sin telas requeridas.</div>`
       : `<div class="ft-resumen">${fichas.length} trabajo${fichas.length === 1 ? "" : "s"} · ${faltan ? `⚠️ ${faltan} sin tela` : "✅ todos con tela"}</div>`
         + fichas.map(f => window.vgFichaTela ? window.vgFichaTela.tarjetaTrabajo(f) : "").join("")
-        + sinTarjeta.map(p => `<div class="ft-trabajo"><div class="ft-cab">⚠️ Sin tarjeta<small>${escHtml(p.cliente_archivo || "")}</small></div><div class="ft-dato">${escHtml(p.tela_destino || "Sin tela escrita")} · ${fmtNum(p.metros)} m</div></div>`).join("");
+        + sinTarjeta.map(p => `<div class="ft-trabajo"><div class="ft-cab">⚠️ Sin tarjeta<small>${escHtml(p.cliente_archivo || "")}</small></div><div class="ft-dato">${escHtml(p.tela_destino || "Sin tela escrita")} · ${fmtNum(p.metros)} m</div></div>`).join(""));
   }
 
   // Historial Reciente de Calandrado agrupado por rollo (y colapsable al hacer clic)
@@ -1476,6 +1481,35 @@ function renderModuloLaser() {
 
   const lotesPendientes = agruparLaserPorBatch(pendRaw);
   const lotesTerminados = agruparLaserPorBatch(termRaw);
+
+  const caja = document.getElementById("colaLaserTarjetas");
+  if (caja) {
+    const deshacer = STATE.ultimoCorte ? `<div class="las-deshacer"><span>✅ Cortado: ${escHtml(STATE.ultimoCorte.nombre)}</span><button type="button" class="btn-laser-deshacer">↩️ Deshacer</button></div>` : "";
+    caja.innerHTML = deshacer + (lotesPendientes.length === 0
+      ? `<div class="las-vacio">No hay nada para cortar.</div>`
+      : lotesPendientes.map(g => {
+        const f = fichasDeTrabajos(trabajosDeArchivos(g.file_ids.join(",")))[0];
+        const titulo = f ? `${f.cliente || ""}${f.para_quien ? " · para " + f.para_quien : ""}` : (g.archivos[0] || "Lote");
+        const sub = f ? `${f.tarjeta} · ${f.titulo || ""}` : "";
+        const ids = g.ids.join(",");
+        return `<div class="las-card">
+          <div class="las-cab"><div><b>${escHtml(titulo)}</b><small>${escHtml(sub)}</small></div><span class="las-m">${fmtNum(g.metros_totales)} m</span></div>
+          <div class="las-tela">🧵 ${escHtml(g.tela_rollo_color || "Sin tela anotada")}</div>
+          <details class="las-arch"><summary>${g.archivos.length} archivo${g.archivos.length === 1 ? "" : "s"} · rollo de papel ${escHtml(g.id_rollo_papel || "-")}</summary>${g.archivos.map(a => `<div>• ${escHtml(a)}</div>`).join("")}</details>
+          ${g.observaciones ? `<div class="las-nota">📝 ${escHtml(g.observaciones)}</div>` : ""}
+          <div class="las-acc">
+            <button type="button" class="las-ok btn-laser-cortar-lote" data-batch="${escHtml(g.batch_id)}" data-ids="${ids}">✅ CORTADO</button>
+            <button type="button" class="las-repo btn-laser-repo" data-id="${g.ids[0]}">⚠️ REPOSICIÓN</button>
+          </div>
+          <div class="las-mas">
+            <button type="button" class="btn-laser-kiosco-lote" data-batch="${escHtml(g.batch_id)}" data-ids="${ids}">▶️ Kiosko</button>
+            <button type="button" class="btn-nota-rapida" data-table="prod_cola_laser" data-id="${g.ids[0]}" data-batch="${escHtml(g.batch_id)}">📝 Nota</button>
+            <button type="button" class="btn-crud-edit" data-table="prod_cola_laser" data-id="${g.ids[0]}">✏️ Editar</button>
+            <button type="button" class="btn-crud-del" data-table="prod_cola_laser" data-id="${g.ids[0]}">🗑️</button>
+          </div>
+        </div>`;
+      }).join(""));
+  }
 
   tbodyCola.innerHTML = lotesPendientes.length === 0
     ? `<tr><td colspan="8" style="text-align:center;padding:18px;color:#888;">Cola vacía</td></tr>`
@@ -2012,6 +2046,24 @@ async function revisarTelaAntesDeImprimir(seleccionados, metrosManual) {
   const metros = metrosManual > 0 ? metrosManual : seleccionados.reduce((a, b) => a + faltaMetros(b), 0);
   if (metros > max && !(await confirmarTaller(`Esta tirada pasa de ${fmtNum(max)} m`, `Son ${fmtNum(metros)} m y el ripeador llega hasta ${fmtNum(max)} m continuos. ¿Seguís igual?`, "Seguir"))) return false;
   return true;
+}
+
+// Cuando un trabajo termina: ¿dónde se guarda lo que quedó? Junta los que terminan seguidos y espera a que no haya otra ventana abierta.
+const trabajosPorGuardar = new Set();
+let timerGuardar = null;
+function anotarParaGuardar(fileIdsCsv) {
+  if (!window.vgFichaTela) return;
+  trabajosDeArchivos(fileIdsCsv).forEach(id => trabajosPorGuardar.add(id));
+  clearTimeout(timerGuardar);
+  timerGuardar = setTimeout(preguntarDondeGuardar, 1200);
+}
+async function preguntarDondeGuardar() {
+  if (document.querySelector(".vgd-fondo, .modal-overlay.open:not(#modalKioscoOperativo)")) { timerGuardar = setTimeout(preguntarDondeGuardar, 1000); return; }
+  const ids = [...trabajosPorGuardar];
+  trabajosPorGuardar.clear();
+  if (!ids.length) return;
+  await window.vgFichaTela.guardarTrabajos(ids);
+  await cargarDatosTodo();
 }
 
 // Al terminar de calandrar un trabajo sin tela: se pide la que se usó y se descuenta en ese momento
@@ -5130,7 +5182,8 @@ async function finalizarTrabajoCalandrado(idCalOrCsv, minutosExtra = 0, skipRelo
   // Los rollos (metros reales y etiquetas) y la tela reservada en la tarjeta: se anotan acá, que es donde se usan
   preguntarSinTelaCalandrada(regs).catch(e => console.warn("Tela del trabajo:", e))
     .then(() => preguntarRollosCalandrados(regs)).catch(e => console.warn("Rollos del calandrado:", e))
-    .then(() => preguntarTelaCalandrada(regs)).catch(e => console.warn("Tela de la tarjeta:", e));
+    .then(() => preguntarTelaCalandrada(regs))
+    .then(() => anotarParaGuardar(regs.filter(r => !/l[aá]ser|corte/i.test(r.ruta || "")).map(r => r.file_id).filter(Boolean).join(","))).catch(e => console.warn("Tela de la tarjeta:", e));
 }
 
 async function procesarRolloCompletoCalandrado(rolloId) {
@@ -5186,8 +5239,11 @@ async function cortarLoteLaser(idsCsv) {
       estado: "Terminado"
     });
   }
+  const primero = (STATE.colaLaser || []).filter(l => ids.includes(l.id));
+  STATE.ultimoCorte = { ids, nombre: (primero[0] && primero[0].cliente_archivo) || "lote" };
   toast(`⚡ Lote cortado en Láser.`);
   await cargarDatosTodo();
+  anotarParaGuardar(primero.map(l => l.file_id).filter(Boolean).join(","));
 }
 
 function imprimirEtiquetaRollo(loteId, metrosTotales) {
@@ -6179,6 +6235,7 @@ function vincularBotonesAccionesKiosco() {
         STATE.kiosco.completadosIds.add(trabActual.id);
         if (trabActual.ids) trabActual.ids.forEach(id => STATE.kiosco.completadosIds.add(id));
         toast(`✅ Corte Láser finalizado (Vel: ${vel}mm/s | Poder: ${valParam2}%).`);
+        anotarParaGuardar(trabActual.file_id);
       } else {
         const idsCsv = trabActual.ids ? trabActual.ids.join(",") : trabActual.id;
         await finalizarTrabajoCalandrado(idsCsv, min, true, vel, valParam2, notaExtra);
@@ -6966,6 +7023,13 @@ export function inicializarEventosUI() {
       return;
     }
 
+    const btnGuardarTela = e.target.closest(".btn-tela-guardar");
+    if (btnGuardarTela) {
+      const t = (STATE.telasPorGuardar || [])[Number(btnGuardarTela.getAttribute("data-i"))];
+      if (t && window.vgFichaTela) window.vgFichaTela.guardarTela(t).then(cargarDatosTodo);
+      return;
+    }
+
     const btnLasKiosco = e.target.closest(".btn-laser-kiosco-lote");
     if (btnLasKiosco) {
       abrirKioscoLaser(btnLasKiosco.getAttribute("data-batch"), btnLasKiosco.getAttribute("data-ids"));
@@ -6974,6 +7038,24 @@ export function inicializarEventosUI() {
 
     const btnLasCorte = e.target.closest(".btn-laser-cortar-lote");
     if (btnLasCorte) { cortarLoteLaser(btnLasCorte.getAttribute("data-ids")); return; }
+
+    const btnLasRepo = e.target.closest(".btn-laser-repo");
+    if (btnLasRepo) {
+      const reg = STATE.colaLaser.find(l => l.id === btnLasRepo.getAttribute("data-id"));
+      if (reg) reportarFallaConReposicion(reg, "Láser");
+      return;
+    }
+
+    if (e.target.closest(".btn-laser-deshacer") && STATE.ultimoCorte) {
+      const ids = STATE.ultimoCorte.ids;
+      STATE.ultimoCorte = null;
+      (async () => {
+        for (const id of ids) await sb().from("prod_cola_laser").update({ estado: "Pendiente", fecha_terminado: null }).eq("id", id);
+        toast("↩️ Volvió a la cola de Láser.");
+        await cargarDatosTodo();
+      })();
+      return;
+    }
 
     const btnDtfVender = e.target.closest(".btn-dtf-vender");
     if (btnDtfVender) { venderDtf(btnDtfVender.getAttribute("data-clave")); return; }

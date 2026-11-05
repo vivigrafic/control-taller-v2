@@ -747,3 +747,21 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
   .dtf-buscar-grilla { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dtf-buscar-mini { height: 110px; }
 }
+
+/* Láser: un recuadro por lote, con el botón de cortado bien grande */
+.las-card { margin: 0 0 12px; padding: 12px 14px; border: 1px solid var(--vg-surface-border); border-radius: 12px; background: var(--vg-surface-base); color: var(--vg-text-primary); }
+.las-cab { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; font-size: 17px; }
+.las-cab small { display: block; font-size: 13px; color: var(--vg-text-secondary); font-weight: 400; }
+.las-m { font-weight: 900; font-size: 22px; white-space: nowrap; }
+.las-tela { margin-top: 6px; font-size: 15px; }
+.las-arch { margin-top: 6px; font-size: 13px; color: var(--vg-text-secondary); }
+.las-nota { margin-top: 6px; font-size: 14px; color: var(--vg-status-alert); font-weight: 700; }
+.las-acc { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.las-acc button { flex: 1 1 160px; min-height: 60px; margin: 0; border-radius: 10px; font: 900 18px var(--vg-font-sans); cursor: pointer; color: var(--vg-text-primary); }
+.las-ok { flex-grow: 3 !important; border: 2px solid var(--vg-status-ready); background: color-mix(in srgb, var(--vg-status-ready) 30%, transparent); }
+.las-repo { border: 2px solid var(--vg-status-alert); background: transparent; }
+.las-mas { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.las-mas button { padding: 4px 10px; width: auto; margin: 0; border-radius: 6px; border: 1px solid var(--vg-surface-border); background: transparent; color: var(--vg-text-secondary); font-size: 12px; cursor: pointer; }
+.las-deshacer { display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap; margin: 0 0 12px; padding: 10px 12px; border: 1px dashed var(--vg-surface-border); border-radius: 10px; color: var(--vg-text-primary); }
+.las-deshacer button { width: auto; margin: 0; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--vg-surface-border); background: transparent; color: var(--vg-text-primary); font-weight: 700; cursor: pointer; }
+.las-vacio { padding: 18px; text-align: center; color: var(--vg-text-secondary); }

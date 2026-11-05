@@ -6,6 +6,8 @@
 //   vgFichaTela.escuchar(raiz, { alCambiar })        → activa los botones de los recuadros que estén dentro de raiz
 //   vgFichaTela.abrir(trabajoId, { alCambiar })      → ventana con el detalle
 //   vgFichaTela.elegir(trabajoId, { despues, partidaActual, titulo }) → 'elegida', 'despues' o null (canceló)
+//   vgFichaTela.guardarTrabajos([ids])               → ¿dónde se guarda lo que quedó? de los trabajos que terminaron
+//   vgFichaTela.guardarTela(tela)                    → lo mismo con una tela suelta
 // Las puertas de la base: trabajo_ficha_tela, tela_ficha_cambiar, tela_reserva_elegir y calandrado_metros_guardar.
 (function () {
     if (window.vgFichaTela) return;
@@ -47,6 +49,13 @@
         .ft-op.ft-rec { border: 2px solid var(--vg-brand-primary); }
         .ft-op-t { display: block; font-weight: 800; font-size: 16px; }
         .ft-op-d { display: block; font-size: 13px; color: var(--vg-text-secondary); }
+        .ft-lug { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; margin-top: 10px; }
+        .ft-lug button { min-height: 60px; padding: 10px; border-radius: 10px; border: 1px solid var(--vg-surface-border); background: var(--vg-surface-base); color: var(--vg-text-primary); font: 700 15px var(--vg-font-sans); cursor: pointer; }
+        .ft-roll { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+        .ft-roll label { display: inline-flex; gap: 6px; align-items: center; margin: 0; padding: 6px 10px; border: 1px solid var(--vg-surface-border); border-radius: 8px; color: var(--vg-text-primary); font: 14px var(--vg-font-sans); cursor: pointer; }
+        .ft-otro { display: flex; gap: 8px; margin-top: 10px; }
+        .ft-otro input { flex: 1; min-width: 0; box-sizing: border-box; padding: 12px; border-radius: 10px; border: 1px solid var(--vg-surface-border); background: var(--vg-surface-base); color: var(--vg-text-primary); font: 15px var(--vg-font-sans); }
+        .ft-otro button { padding: 0 16px; border-radius: 10px; border: 1px solid var(--vg-brand-primary); background: var(--vg-brand-primary); color: var(--vg-text-primary); font: 700 14px var(--vg-font-sans); cursor: pointer; }
         .ft-despues { display: block; width: 100%; margin-top: 8px; padding: 12px; border-radius: 10px; border: 1px dashed var(--vg-surface-border); background: transparent; color: var(--vg-text-primary); font: 600 15px var(--vg-font-sans); cursor: pointer; }
         .ft-det h4 { margin: 14px 0 6px; font-size: 13px; color: var(--vg-text-secondary); text-transform: uppercase; letter-spacing: .03em; }
         .ft-det .ft-fila { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; padding: 7px 0; border-bottom: 1px dashed var(--vg-surface-border); font-size: 13px; }
@@ -215,6 +224,67 @@
         await alListo();
     }
 
+    // ¿Dónde se guarda lo que quedó? Un toque en el lugar. "La guardo después" la deja en la Bandeja.
+    async function guardarUna(item, lugares) {
+        const de = item.dueno === 'taller' ? 'del taller' : `de ${item.para_quien || item.cliente || 'el cliente'}`;
+        let rollos = (item.rollos || []).slice();
+        for (;;) {
+            const queda = rollos.length ? rollos.reduce((a, r) => a + (Number(r.libre) || 0), 0) : null;
+            const cuanto = queda != null ? `quedan ${num(queda)} m` : (item.queda_metros != null ? `quedan ${num(item.queda_metros)} m` : `quedan ${num(item.queda_kilos)} kg`);
+            let accion = null;
+            const r = await window.vgDialogo.ventana({ titulo: '📍 ¿Dónde guardás lo que quedó?', texto: `${nombreTela(item)} · ${de} · ${cuanto}`, aceptar: 'La guardo después', sinCancelar: true, ancho: '640px' }, (zona) => {
+                zona.innerHTML = `<div class="ft-sel">
+                    ${rollos.length > 1 ? `<div class="ft-roll">${rollos.map(x => `<label><input type="checkbox" data-rollo="${esc(x.id)}" checked> Rollo ${esc(x.numero)} · ${num(x.libre)} m</label>`).join('')}</div>` : ''}
+                    <div class="ft-lug">${lugares.map(l => `<button type="button" data-lugar="${esc(l)}">${esc(l)}</button>`).join('')}</div>
+                    <div class="ft-otro"><input type="text" data-otro placeholder="Otro lugar" autocomplete="off"><button type="button" data-otro-ok="1">Guardar</button></div>
+                    ${item.lugar ? `<button type="button" class="ft-despues" data-igual="1">Sigue en ${esc(item.lugar)}</button>` : ''}
+                    <button type="button" class="ft-despues" data-nada="1">No quedó nada</button></div>`;
+                const aceptar = () => zona.closest('.vgd-caja').querySelector('.si').click();
+                zona.addEventListener('click', (e) => {
+                    const l = e.target.closest('[data-lugar]');
+                    if (l) { accion = { accion: 'lugar', lugar: l.dataset.lugar }; aceptar(); return; }
+                    if (e.target.closest('[data-igual]')) { accion = { accion: 'igual' }; aceptar(); return; }
+                    if (e.target.closest('[data-nada]')) { accion = { accion: 'nada' }; aceptar(); return; }
+                    if (e.target.closest('[data-otro-ok]')) {
+                        const v = zona.querySelector('[data-otro]').value.trim();
+                        if (!v) { avisar('Escribí el lugar.', 'error'); return; }
+                        accion = { accion: 'lugar', lugar: v };
+                        aceptar();
+                    }
+                });
+                return () => {
+                    const marcados = [...zona.querySelectorAll('[data-rollo]:checked')].map(c => c.dataset.rollo);
+                    return { ...(accion || { accion: 'despues' }), marcados };
+                };
+            });
+            const pedido = r || { accion: 'despues', marcados: [] };
+            const usados = rollos.length === 1 ? [rollos[0].id] : (pedido.marcados || []);
+            if (rollos.length > 1 && pedido.accion !== 'despues' && !usados.length) { avisar('Marcá al menos un rollo.', 'error'); continue; }
+            const { error } = await db().rpc('tela_guardar_resto', { p: { partida_id: item.partida_id, trabajo_id: item.trabajo_id || null, accion: pedido.accion, lugar: pedido.lugar || null, rollos: rollos.length ? usados : null } });
+            if (error) { avisar(errorTexto(error), 'error'); return; }
+            if (pedido.accion === 'lugar') avisar(`Guardada en ${pedido.lugar}`);
+            const quedan = pedido.accion === 'despues' ? [] : rollos.filter(x => !usados.includes(x.id));
+            if (!quedan.length) return;
+            rollos = quedan;
+        }
+    }
+
+    // Los trabajos que recién terminaron: pregunta por cada tela a la que le quedó algo
+    async function guardarTrabajos(ids) {
+        ponerEstilos();
+        const { data, error } = await db().rpc('telas_para_guardar', { p: { trabajos: ids } });
+        if (error) { console.warn('Telas para guardar:', errorTexto(error)); return; }
+        for (const t of (data && data.telas) || []) await guardarUna(t, data.lugares || []);
+    }
+
+    // Una tela suelta (Ver detalle, o las que quedaron para después)
+    async function guardarTela(item) {
+        ponerEstilos();
+        const { data, error } = await db().rpc('telas_para_guardar', { p: { trabajos: [] } });
+        if (error) { avisar(errorTexto(error), 'error'); return; }
+        await guardarUna(item, (data && data.lugares) || []);
+    }
+
     // Cuántos metros se apartan de esa tela
     async function cambiarMetros(f, t, alListo) {
         const r = await window.vgDialogo.pedir({ titulo: `Metros de ${nombreTela(t)}`, texto: 'Cuántos metros de esta tela van en el trabajo, sin contar lo ya usado.',
@@ -253,6 +323,7 @@
             ${telas.map((t, i) => `<div class="ft-fila"><span><b>${esc(nombreTela(t))}</b> · ${t.dueno === 'taller' ? 'del taller' : 'del cliente'} · ${esc(t.codigo)}<small>${esc(datosTela(t))}</small></span>
                 <span class="ft-acc" style="margin:0;"><button type="button" data-d="cambiar" data-i="${i}">Cambiar</button>
                 ${Number(t.apartado) > 0 ? `<button type="button" data-d="metros" data-i="${i}">Metros</button>` : ''}
+                <button type="button" data-d="guardar" data-i="${i}">📍 Guardar</button>
                 ${window.vgTelaVida ? `<button type="button" data-d="vida" data-i="${i}">Historia</button>` : ''}</span></div>`).join('') || '<div class="ft-fila">Este trabajo no tiene tela.</div>'}
             <div class="ft-acc"><button type="button" class="ft-fuerte" data-d="sumar">🧵 ${telas.length ? 'Sumar otra tela' : 'Elegir tela'}</button></div>
             ${archivos.length ? `<h4>Archivos</h4>${archivos.map((a, i) => `<div class="ft-fila"><span>${esc(a.nombre)}<small>${num(a.metros)} m · ${estado(a)}${rollosDe(a) ? ' · ' + esc(rollosDe(a)) : ''}</small></span>
@@ -283,6 +354,7 @@
                 if (b.dataset.d === 'metros') await cambiarMetros(f, f.telas[i], recargar);
                 if (b.dataset.d === 'real') await metrosReales(f.archivos[i], recargar);
                 if (b.dataset.d === 'vida') window.vgTelaVida.abrir(f.telas[i].partida_id);
+                if (b.dataset.d === 'guardar') { await guardarTela(f.telas[i]); await recargar(); }
             });
             return () => true;
         });
@@ -306,5 +378,5 @@
         });
     }
 
-    window.vgFichaTela = { usar: (c) => { sb = c; }, html, tarjetaTrabajo, escuchar, abrir, elegir };
+    window.vgFichaTela = { usar: (c) => { sb = c; }, html, tarjetaTrabajo, escuchar, abrir, elegir, guardarTrabajos, guardarTela };
 })();
