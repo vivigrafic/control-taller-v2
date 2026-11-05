@@ -5,7 +5,9 @@
 // La usan la tarjeta del Kanban, Contactos, Telas y el taller (al terminar de calandrar).
 //   vgEtiquetas.usar(clienteSupabase)                           → la conexión de la pantalla (el taller)
 //   vgEtiquetas.elegir({ trabajo_id | cliente_id | partida_id })  → ventana para elegir cuáles y las imprime
-//   vgEtiquetas.imprimir(etiquetas)                             → imprime esas y las anota como impresas
+//   vgEtiquetas.imprimir(etiquetas)                             → imprime esas, con la pantalla de impresión, y las anota
+//   vgEtiquetas.enSegundoPlano(etiquetas)                       → sin interrumpir: salen solas en la PC preparada o quedan pendientes
+//   vgEtiquetas.pendientes()                                    → las que quedaron sin imprimir
 //   vgEtiquetas.disenar()                                       → ventana para cambiar el diseño, con vista previa
 //   vgEtiquetas.recepcion([partidaId, …])                       → las etiquetas para pegar en los rollos al recibir la tela
 // Para que salgan solas sin preguntar, Chrome se abre con --kiosk-printing en la PC del calandrado.
@@ -89,29 +91,75 @@
         </section>`;
     }
 
-    // Imprime en una ventana aparte: una por hoja del tamaño de la etiqueta, o varias por hoja A4
+    // La hoja para imprimir: una por hoja del tamaño de la etiqueta, o varias por hoja A4
+    function htmlHoja(lista, c) {
+        const a4 = c.hoja === 'a4';
+        return `<!doctype html><html><head><meta charset="utf-8"><title>Etiquetas de rollos</title><style>
+            @page { size: ${a4 ? 'A4' : `${c.ancho_mm}mm ${c.alto_mm}mm`}; margin: ${a4 ? '8mm' : '0'}; }
+            body { margin: 0; }
+            ${a4 ? '.hoja { display: flex; flex-wrap: wrap; gap: 2mm; } .et { border: 0.2mm dashed; page-break-inside: avoid; }'
+                 : '.et { page-break-after: always; } .et:last-child { page-break-after: auto; }'}
+            ${cssEtiqueta(c, '')}
+        </style></head><body><div class="hoja">${lista.map(e => htmlEtiqueta(e, c)).join('')}</div></body></html>`;
+    }
+    async function marcarImpresas(lista) {
+        const piezas = lista.flatMap(e => e.piezas || []);
+        if (piezas.length) await db().rpc('etiquetas_impresas', { p: { piezas } });
+    }
+
+    // Imprime en una ventana aparte, con la pantalla de impresión: cuando la persona lo pide a propósito
     async function imprimir(etiquetas) {
         const lista = (etiquetas || []).filter(Boolean);
         if (!lista.length) { avisar('No hay etiquetas para imprimir.', 'error'); return false; }
         const c = await traerConfig();
         const win = window.open('', '_blank', 'width=520,height=420');
         if (!win) { avisar('Habilitá las ventanas emergentes del navegador para imprimir las etiquetas.', 'error'); return false; }
-        const a4 = c.hoja === 'a4';
-        win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Etiquetas de rollos</title><style>
-            @page { size: ${a4 ? 'A4' : `${c.ancho_mm}mm ${c.alto_mm}mm`}; margin: ${a4 ? '8mm' : '0'}; }
-            body { margin: 0; }
-            ${a4 ? '.hoja { display: flex; flex-wrap: wrap; gap: 2mm; } .et { border: 0.2mm dashed; page-break-inside: avoid; }'
-                 : '.et { page-break-after: always; } .et:last-child { page-break-after: auto; }'}
-            ${cssEtiqueta(c, '')}
-        </style></head><body><div class="hoja">${lista.map(e => htmlEtiqueta(e, c)).join('')}</div></body></html>`);
+        win.document.write(htmlHoja(lista, c));
         win.document.close();
         await new Promise(r => setTimeout(r, 350));
         win.focus();
         win.print();
         setTimeout(() => { try { win.close(); } catch (e) { /* nada */ } }, 800);
-        const piezas = lista.flatMap(e => e.piezas || []);
-        if (piezas.length) await db().rpc('etiquetas_impresas', { p: { piezas } });
+        await marcarImpresas(lista);
         return true;
+    }
+
+    // Sin interrumpir, al terminar de calandrar. En una PC con la impresora preparada (Chrome con impresión directa, opción
+    // "Esta PC imprime sola") salen solas; en cualquier otro equipo quedan guardadas en "Etiquetas por imprimir".
+    const CLAVE_SOLA = 'vg_etiquetas_sola';
+    const imprimeSola = () => { try { return localStorage.getItem(CLAVE_SOLA) === '1'; } catch (e) { return false; } };
+    const ponerSola = (v) => { try { localStorage.setItem(CLAVE_SOLA, v ? '1' : '0'); } catch (e) { /* nada */ } };
+    async function enSegundoPlano(etiquetas) {
+        const lista = (etiquetas || []).filter(Boolean);
+        if (!lista.length) return false;
+        if (!imprimeSola()) {
+            avisar(lista.length === 1 ? '🏷️ La etiqueta quedó para imprimir' : `🏷️ ${lista.length} etiquetas quedaron para imprimir`);
+            return false;
+        }
+        const c = await traerConfig();
+        const marco = document.createElement('iframe');
+        marco.style.cssText = 'position:fixed; width:0; height:0; border:0;';
+        document.body.appendChild(marco);
+        marco.contentDocument.open();
+        marco.contentDocument.write(htmlHoja(lista, c));
+        marco.contentDocument.close();
+        await new Promise(r => setTimeout(r, 350));
+        marco.contentWindow.print();
+        setTimeout(() => marco.remove(), 60000);
+        await marcarImpresas(lista);
+        return true;
+    }
+
+    // Las que quedaron sin imprimir
+    async function pendientes() {
+        const { data, error } = await db().rpc('etiquetas_rollos', { p: {} });
+        if (error) { avisar(error.message, 'error'); return false; }
+        const lista = (data || []).filter(x => !Number(x.impresa));
+        if (!lista.length) { avisar('No hay etiquetas por imprimir.'); return false; }
+        const marcadas = await window.vgDialogo.casillas({ titulo: `🏷️ ${lista.length} etiqueta${lista.length === 1 ? '' : 's'} por imprimir`, aceptar: 'Imprimir',
+            opciones: lista.map((x, i) => ({ valor: i, titulo: `${x.cliente || ''} · ${x.tela || ''}`, detalle: `${x.tarjeta || ''} · rollo ${x.rollo}`, marcada: true })) });
+        if (!marcadas || !marcadas.length) return false;
+        return imprimir(marcadas.map(i => lista[i]));
     }
 
     // Elegir cuáles imprimir (vienen marcadas las que nunca se imprimieron)
@@ -199,5 +247,5 @@
         return imprimir(data || []);
     }
 
-    window.vgEtiquetas = { elegir, imprimir, disenar, recepcion, usar: (cliente) => { sb = cliente; config = null; } };
+    window.vgEtiquetas = { elegir, imprimir, enSegundoPlano, pendientes, imprimeSola, ponerSola, disenar, recepcion, usar: (cliente) => { sb = cliente; config = null; } };
 })();

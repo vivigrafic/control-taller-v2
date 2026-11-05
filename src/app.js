@@ -2106,7 +2106,8 @@ async function preguntarRollosCalandrados(regs) {
   const { data: g, error: e2 } = await sb().rpc("calandrado_metros_guardar", { p: { lote: regs[0].batch_id || null, quien: STATE.usuarioActual, archivos: lista } });
   if (e2) { toast("No se guardaron los metros: " + e2.message, "error"); return; }
   toast("🧵 Metros anotados");
-  if (resp.imprimir && window.vgEtiquetas && (g.etiquetas || []).length) await window.vgEtiquetas.imprimir(g.etiquetas);
+  // Sin interrumpir: no abre ninguna pantalla de impresión y sigue con lo próximo
+  if (resp.imprimir && window.vgEtiquetas && (g.etiquetas || []).length) window.vgEtiquetas.enSegundoPlano(g.etiquetas);
 }
 
 // ===== Archivos de la fila ↔ tarjetas del Kanban =====
@@ -3133,6 +3134,7 @@ async function separarTiradasMarcadas() {
 // Con los archivos muy largos la terminal no llega a 1600 px: se baja a 800 y, si no, a 300.
 const imagenesGrandes = new Map();
 function traerImagenGrande(fileId) {
+  if (window.vgImagenPrueba) return Promise.resolve(window.vgImagenPrueba(fileId));
   const terminal = window.VG_CONEXION && window.VG_CONEXION.terminalUrl;
   if (!fileId || !terminal) return Promise.resolve("");
   const pedir = (lado) => fetch(`${terminal}?action=miniatura&id=${encodeURIComponent(fileId)}&lado=${lado}`)
@@ -3141,6 +3143,59 @@ function traerImagenGrande(fileId) {
     imagenesGrandes.set(fileId, pedir(1600).then(u => u || pedir(800)).then(u => u || pedir(300)));
   }
   return imagenesGrandes.get(fileId);
+}
+
+// La imagen del kiosko: reintenta sola (la vista previa de un archivo pesado puede tardar unos minutos en estar) y, si son varios
+// archivos anidados, se pasan como un carrusel, con las flechas o deslizando el dedo.
+let pedidoImagenKiosco = 0;
+async function mostrarImagenKiosco(ids) {
+  const img = document.getElementById("kioscoImagenImg");
+  const msg = document.getElementById("kioscoImagenMsg");
+  if (!img || !msg) return;
+  const pedido = ++pedidoImagenKiosco;
+  if (!ids.length) { img.style.display = "none"; msg.textContent = "🖼️ Este trabajo no tiene imagen"; msg.style.display = ""; return; }
+  const i = Math.min(STATE.kiosco.imagenIdx || 0, ids.length - 1);
+  const fid = ids[i];
+  const cont = document.getElementById("kioscoImagenCont");
+  if (cont) cont.textContent = `${i + 1} de ${ids.length}`;
+  const nom = document.getElementById("kioscoImagenNom");
+  if (nom) nom.textContent = (STATE.pendientesDrive.find(p => p.file_id === fid) || {}).nombre_archivo || "";
+  img.style.display = "none";
+  msg.textContent = "⏳ Cargando la imagen…";
+  msg.style.display = "";
+  for (let intento = 0; intento < 8; intento++) {
+    const url = await traerImagenGrande(fid);
+    if (pedido !== pedidoImagenKiosco) return;
+    if (url) {
+      img.src = url;
+      img.style.display = "";
+      msg.style.display = "none";
+      if (ids.length > 1) { traerImagenGrande(ids[(i + 1) % ids.length]); traerImagenGrande(ids[(i - 1 + ids.length) % ids.length]); }
+      return;
+    }
+    imagenesGrandes.delete(fid);
+    msg.textContent = "⏳ Preparando la imagen, puede tardar unos minutos…";
+    await new Promise(r => setTimeout(r, 45000));
+    if (pedido !== pedidoImagenKiosco) return;
+  }
+  msg.innerHTML = `🖼️ Todavía no hay imagen<br><button type="button" id="kioscoImagenOtraVez" class="kio-cola-btn">🔄 Probar de nuevo</button>`;
+  document.getElementById("kioscoImagenOtraVez")?.addEventListener("click", () => mostrarImagenKiosco(ids));
+}
+function prepararImagenKiosco(ids) {
+  const caja = document.getElementById("kioscoImagen");
+  if (!caja) return;
+  const mover = (d) => { STATE.kiosco.imagenIdx = ((STATE.kiosco.imagenIdx || 0) + d + ids.length) % ids.length; mostrarImagenKiosco(ids); };
+  document.getElementById("kioscoImgAnt")?.addEventListener("click", (e) => { e.stopPropagation(); mover(-1); });
+  document.getElementById("kioscoImgSig")?.addEventListener("click", (e) => { e.stopPropagation(); mover(1); });
+  let inicioX = null;
+  caja.addEventListener("touchstart", (e) => { inicioX = e.touches[0].clientX; }, { passive: true });
+  caja.addEventListener("touchend", (e) => {
+    if (inicioX === null || ids.length < 2) return;
+    const d = e.changedTouches[0].clientX - inicioX;
+    inicioX = null;
+    if (Math.abs(d) > 40) mover(d < 0 ? 1 : -1);
+  }, { passive: true });
+  mostrarImagenKiosco(ids);
 }
 
 function abrirSeparadorDtf(tiradaId) {
@@ -5755,23 +5810,17 @@ function renderContenidoModalKiosco() {
   const fileIds = (trabActual.file_ids && trabActual.file_ids.length > 0)
     ? trabActual.file_ids
     : String(trabActual.file_id || "").split(",").map(s => s.trim()).filter(Boolean);
-  const thumbIdActual = fileIds.length > 0 ? extraerThumbIdDrive(fileIds[0]) : null;
-  const driveUrlActual = thumbIdActual ? `https://drive.google.com/file/d/${escHtml(thumbIdActual)}/view` : null;
-  const clickAttrActual = driveUrlActual ? `onclick="event.stopPropagation(); window.open('${driveUrlActual}', '_blank');" title="Tocar para ver en Drive"` : "";
-  const thumbUrl = thumbIdActual ? `https://drive.google.com/thumbnail?id=${escHtml(thumbIdActual)}&sz=w600-h600` : "";
-  const fallback1 = thumbIdActual ? `https://lh3.googleusercontent.com/d/${escHtml(thumbIdActual)}=s600` : "";
-  const fallbackDirect = thumbIdActual ? `https://drive.usercontent.google.com/download?id=${escHtml(thumbIdActual)}` : "";
-
-  const imgPreviewHtml = thumbIdActual
-    ? `<div class="kio-img" style="position:relative; width:100%; height:clamp(150px, 34dvh, 340px); background:#000; border:2px solid var(--accent-magenta); border-radius:8px; overflow:hidden; margin-bottom:6px; cursor:pointer;" ${clickAttrActual}>
-        <img class="kiosk-preview-img" src="${thumbUrl}" alt="${nombreLimpio}" referrerpolicy="no-referrer" style="width:100%; height:100%; object-fit:contain; display:block;" onerror="if(this.dataset.step!=='1'&&this.dataset.step!=='2'){this.dataset.step='1';this.src='${fallback1}';}else if(this.dataset.step==='1'){this.dataset.step='2';this.src='${fallbackDirect}';}else{this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='flex';}" />
-        <div class="kiosk-preview-ph" style="display:none; width:100%; height:100%; position:absolute; top:0; left:0; align-items:center; justify-content:center; flex-direction:column; background:#111; color:#aaa; font-size:11px; font-weight:bold; padding:8px; text-align:center;">
-          <span style="font-size:22px;">🖼️</span>
-          <span style="margin-top:4px; max-width:90%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escHtml(nombreLimpio || "Ver en Drive")}</span>
-        </div>
-      </div>`
-    : `<div class="kiosk-preview-ph" style="width:100%; height:55px; background:#111; border:2px dashed #444; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#888; font-weight:bold; margin-bottom:6px; font-size:11px; padding:4px; text-align:center;">🖼️ ${escHtml(nombreLimpio || "SIN VISTA PREVIA")}</div>`;
-
+  // La imagen de lo que se está calandrando; si son varios archivos anidados, un carrusel
+  const idsImg = [...new Set(fileIds.map(fid => extraerThumbIdDrive(fid) || (window.vgImagenPrueba ? fid : null)).filter(Boolean))];
+  if (STATE.kiosco.imagenTrabajo !== trabActual.id) { STATE.kiosco.imagenTrabajo = trabActual.id; STATE.kiosco.imagenIdx = 0; }
+  const imgPreviewHtml = `<div class="kio-img" id="kioscoImagen">
+      <img id="kioscoImagenImg" alt="Imagen del trabajo" style="display:none;" />
+      <div class="kio-img-msg" id="kioscoImagenMsg"></div>
+      ${idsImg.length > 1 ? `<button type="button" id="kioscoImgAnt" class="kio-nav kio-ant" title="Imagen anterior">‹</button>
+        <button type="button" id="kioscoImgSig" class="kio-nav kio-sig" title="Imagen siguiente">›</button>
+        <span class="kio-cont" id="kioscoImagenCont"></span>` : ""}
+    </div>
+    <div class="kio-img-nom" id="kioscoImagenNom"></div>`;
 
   const labelMetros = esLaser ? "METROS A CORTAR" : "METROS A CALANDRAR";
   const metrosVal = fmtNum(trabActual.metros_totales || trabActual.metros || 0);
@@ -5955,6 +6004,7 @@ function renderContenidoModalKiosco() {
   });
   const masK = document.getElementById("kioscoMas");
   if (masK) masK.open = false;
+  prepararImagenKiosco(idsImg);
 
   // Control para abrir y cerrar el cajón de la cola
   const btnToggleCola = document.getElementById("btnKioscoToggleCola");
@@ -7177,6 +7227,12 @@ window.addEventListener("DOMContentLoaded", async () => {
   window.vgTiradas?.usar(sb(), { terminal: window.VG_CONEXION?.terminalUrl || null });
   window.vgFichaTela?.escuchar(document.getElementById("kioscoSubtitulo"), { alCambiar: async () => { await cargarDatosTodo(); renderContenidoModalKiosco(); } });
   document.getElementById("btnArmarTiradas")?.addEventListener("click", () => window.vgTiradas?.abrir({ alTerminar: cargarDatosTodo }));
+  document.getElementById("btnEtiquetasPendientes")?.addEventListener("click", () => window.vgEtiquetas?.pendientes());
+  const chkSola = document.getElementById("chkEtiquetasSola");
+  if (chkSola && window.vgEtiquetas) {
+    chkSola.checked = window.vgEtiquetas.imprimeSola();
+    chkSola.addEventListener("change", () => window.vgEtiquetas.ponerSola(chkSola.checked));
+  }
   window.vgBandeja?.usar(sb(), { erp: "https://erpvivigrafic.netlify.app", quien: () => STATE.usuarioActual, avisar: (t, tipo) => toast(t, tipo === "error" ? "error" : "info") });
   window.vgBandeja?.actualizar();
 });

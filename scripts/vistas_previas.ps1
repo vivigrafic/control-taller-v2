@@ -15,6 +15,9 @@ param(
     [string]$Raiz = "G:\Mi unidad\VIVI GRAFIC",
     [string]$Destino = "",
     [int]$MinMB = 45,
+    # Drive tampoco arma la vista previa de las imágenes muy largas aunque pesen poco (28 m de sublimación: 7 MB y 630 megapíxeles)
+    [int]$MinMP = 250,
+    [int]$MaxMedidas = 400,
     [int]$Dias = 30,
     [int]$MaxPorVuelta = 40,
     # En una segunda PC de respaldo: solo arma las que lleven más de 30 minutos sin vista previa (si la principal está
@@ -47,16 +50,43 @@ $hechos = 0
 $tmpDir = Join-Path $env:TEMP "vvgrafic_vistas"
 New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
 
+# Las medidas ya leídas (nombre|bytes|megapíxeles): leer cada archivo en Drive lleva tiempo y no cambian
+$archivoMedidas = Join-Path $dirLog "vistas_medidas.txt"
+$medidas = @{}
+if (Test-Path -LiteralPath $archivoMedidas) {
+    Get-Content -LiteralPath $archivoMedidas -Encoding UTF8 | ForEach-Object {
+        $p = $_ -split '\|'
+        if ($p.Count -ge 3) { $medidas[($p[0] + '|' + $p[1])] = [double]$p[2] }
+    }
+}
+$leidas = 0
+function Megapixeles([string]$ruta) {
+    try {
+        $d = [System.Windows.Media.Imaging.BitmapDecoder]::Create((New-Object Uri($ruta)), [System.Windows.Media.Imaging.BitmapCreateOptions]::DelayCreation, [System.Windows.Media.Imaging.BitmapCacheOption]::None)
+        return [Math]::Round(($d.Frames[0].PixelWidth * $d.Frames[0].PixelHeight) / 1000000, 1)
+    } catch { return 0 }
+}
+
 foreach ($fila in $filas) {
     if (-not (Test-Path -LiteralPath $fila)) { continue }
-    $pesados = Get-ChildItem -LiteralPath $fila -Recurse -File -ErrorAction SilentlyContinue |
-        Where-Object { $_.Extension -match '^\.(png|jpe?g|tiff?)$' -and $_.Length -ge ($MinMB * 1MB) -and $_.LastWriteTime -ge $desde } |
+    $recientes = Get-ChildItem -LiteralPath $fila -Recurse -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Extension -match '^\.(png|jpe?g|tiff?)$' -and $_.LastWriteTime -ge $desde } |
         Sort-Object LastWriteTime -Descending   # primero lo más nuevo (lo que está en la fila)
-    foreach ($archivo in $pesados) {
+    foreach ($archivo in $recientes) {
         if ($hechos -ge $MaxPorVuelta) { break }
         if ($Respaldo -and $archivo.LastWriteTime -gt (Get-Date).AddMinutes(-30)) { continue }
         $salida = Join-Path $Destino ("{0} [{1}].jpg" -f $archivo.Name, $archivo.Length)
         if (Test-Path -LiteralPath $salida) { continue }
+        if ($archivo.Length -lt ($MinMB * 1MB)) {
+            $clave = "$($archivo.Name)|$($archivo.Length)"
+            if (-not $medidas.ContainsKey($clave)) {
+                if ($leidas -ge $MaxMedidas) { continue }
+                $leidas++
+                $medidas[$clave] = Megapixeles $archivo.FullName
+                Add-Content -LiteralPath $archivoMedidas -Value "$clave|$($medidas[$clave])" -Encoding UTF8
+            }
+            if ($medidas[$clave] -lt $MinMP) { continue }
+        }
         $reloj = [Diagnostics.Stopwatch]::StartNew()
         try {
             $uri = New-Object Uri($archivo.FullName)
@@ -72,7 +102,13 @@ foreach ($fila in $filas) {
             $bi.EndInit()
             $enc = New-Object System.Windows.Media.Imaging.JpegBitmapEncoder
             $enc.QualityLevel = 82
-            $enc.Frames.Add([System.Windows.Media.Imaging.BitmapFrame]::Create($bi))
+            # Muy larga (rollos enteros): entera sería una tirita finita, así que se guarda el comienzo del diseño
+            $fuente = $bi
+            if ($alto -gt ($ancho * 8)) {
+                $rect = New-Object System.Windows.Int32Rect(0, 0, $bi.PixelWidth, [Math]::Min($bi.PixelHeight, [int]($bi.PixelWidth * 1.4)))
+                $fuente = New-Object System.Windows.Media.Imaging.CroppedBitmap($bi, $rect)
+            }
+            $enc.Frames.Add([System.Windows.Media.Imaging.BitmapFrame]::Create($fuente))
             # Se arma afuera de Drive y se mueve terminada (así Drive no sube un archivo a medias)
             $tmp = Join-Path $tmpDir ([Guid]::NewGuid().ToString() + ".jpg")
             $fs = [IO.File]::Create($tmp)

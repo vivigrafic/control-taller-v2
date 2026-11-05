@@ -806,3 +806,13 @@ th, td { border: 1px solid var(--border); padding: 8px; text-align: left; } th {
 @media (max-width: 768px) { #modalKioscoOperativo { padding: 0 !important; } }
 #kioscoFooterAcciones { padding: 8px 14px !important; gap: 8px !important; }
 body.kiosco-abierto .vga-boton { display: none; }
+
+/* La imagen del kiosko, con carrusel */
+.kio-img { position: relative; width: 100%; height: clamp(170px, 36dvh, 380px); border-radius: 10px; overflow: hidden; background: var(--vg-bg-app); border: 1px solid var(--vg-surface-border); }
+.kio-img img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.kio-img-msg { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 8px; align-items: center; justify-content: center; padding: 12px; text-align: center; color: var(--vg-text-secondary); font-size: 14px; }
+.kio-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 52px !important; height: 72px; margin: 0; padding: 0; border: none; border-radius: 10px; background: color-mix(in srgb, var(--vg-bg-app) 70%, transparent); color: var(--vg-text-primary); font-size: 34px; line-height: 1; cursor: pointer; }
+.kio-ant { left: 6px; }
+.kio-sig { right: 6px; }
+.kio-cont { position: absolute; top: 8px; right: 8px; padding: 3px 10px; border-radius: 999px; background: color-mix(in srgb, var(--vg-bg-app) 75%, transparent); color: var(--vg-text-primary); font-size: 13px; font-weight: 700; }
+.kio-img-nom { margin-top: 4px; text-align: center; font-size: 12px; color: var(--vg-text-secondary); overflow-wrap: anywhere; }

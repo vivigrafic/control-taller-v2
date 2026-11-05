@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261105_04" />
+  <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261105_05" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./src/config/conexion.js?v=20261022_04"></script>
   <script src="./src/ver_clave.js?v=20261022_02"></script>
@@ -24,7 +24,7 @@
   <script src="./src/componentes/dialogo.js?v=20261105_01"></script>
   <script src="./src/componentes/ficha_tela.js?v=20261105_04"></script>
   <script src="./src/componentes/tiradas.js?v=20261105_01"></script>
-  <script src="./src/componentes/etiquetas_rollos.js?v=20261105_01"></script>
+  <script src="./src/componentes/etiquetas_rollos.js?v=20261105_05"></script>
   <script src="./src/miniaturas.js?v=20261022_01"></script>
   <script src="./src/assets/logo.js?v=20261020_02"></script>
 </head>
@@ -260,11 +260,14 @@
           <input type="datetime-local" id="calInputFechaManual" style="width:190px; padding:6px;" />
         </div>
         <div style="display:flex; gap:8px;">
+          <button type="button" id="btnEtiquetasPendientes" class="btn-secondary" style="width:auto; padding:8px 15px;">🏷️ Etiquetas por imprimir</button>
           <button type="button" id="btnPapelCliente" class="btn-secondary" style="width:auto; padding:8px 15px;" title="El cliente trae el papel ya impreso: entra a la cola sin pasar por impresión">+ Papel del cliente</button>
           <button type="button" class="btn-secondary btn-crud-add" data-table="prod_cola_calandrado" style="width:auto; padding:8px 15px;">+ Agregar Trabajo</button>
           <button type="button" id="btnOrdenCalandra" class="btn-secondary" style="width: auto; padding: 8px 15px;">⬇️ Orden: Más antiguos primero</button>
         </div>
-      </div></details>
+      </div>
+      <label class="dtf-motivo" title="Solo en la PC con la impresora de etiquetas conectada y Chrome con impresión directa"><input type="checkbox" id="chkEtiquetasSola" /> 🖨️ Esta PC imprime las etiquetas sola, sin preguntar</label>
+      </details>
       <div id="contenedorRollosCalandrado">Cargando Rollos...</div>
     </div>
 
@@ -1040,7 +1043,7 @@
   <datalist id="listColores"></datalist>
   <div id="vgToastContainer" style="position:fixed; top:16px; right:16px; z-index:3000; max-width:360px;"></div>
 
-  <script type="module" src="./src/app.js?v=20261105_04"></script>
+  <script type="module" src="./src/app.js?v=20261105_05"></script>
   <script>
     // Registro del Service Worker PWA
     if ('serviceWorker' in navigator) {
