@@ -7,6 +7,7 @@
 //   vgEtiquetas.elegir({ trabajo_id | cliente_id | partida_id })  → ventana para elegir cuáles y las imprime
 //   vgEtiquetas.imprimir(etiquetas)                             → imprime esas y las anota como impresas
 //   vgEtiquetas.disenar()                                       → ventana para cambiar el diseño, con vista previa
+//   vgEtiquetas.recepcion([partidaId, …])                       → las etiquetas para pegar en los rollos al recibir la tela
 // Para que salgan solas sin preguntar, Chrome se abre con --kiosk-printing en la PC del calandrado.
 (function () {
     if (window.vgEtiquetas) return;
@@ -53,8 +54,22 @@
             ${raiz} .extra { font-weight: 700; }`;
     }
 
+    // La etiqueta para pegar en el rollo cuando la tela llega: el código bien grande
+    function htmlRecepcion(e, c) {
+        const cuanto = e.metros_rollo != null ? `${num(e.metros_rollo)} m` : (e.kilos != null ? `${num(e.kilos)} kg` : '');
+        const tela = [e.tela, e.color].filter(Boolean).join(' · ');
+        return `<section class="et">
+            <div class="cab"><b>${esc(e.empresa || '')}</b><span>${esc(fecha(e.fecha))}</span></div>
+            <div class="cli">${esc(e.cliente || '')}</div>
+            <div class="tela">${esc(tela)}</div>
+            <div class="fila">${e.rollo ? `<div class="rollo">ROLLO<b>${esc(e.rollo)}</b></div>` : ''}<div class="metros"><b>${esc(e.partida || '')}</b><small>${esc([cuanto, e.lugar].filter(Boolean).join(' · '))}</small></div></div>
+            ${c.texto_extra ? `<div class="extra">${esc(c.texto_extra)}</div>` : ''}
+        </section>`;
+    }
+
     function htmlEtiqueta(e, c) {
         const k = Object.assign({}, POR_DEFECTO.campos, c.campos || {});
+        if (e.recepcion) return htmlRecepcion(e, c);
         const hayReales = e.reales != null;
         const metros = hayReales ? num(e.reales) : num(e.teoricos);
         const nota = !k.teoricos ? '' : hayReales ? (Math.abs(Number(e.reales) - Number(e.teoricos)) > 0.009 ? `teórico ${num(e.teoricos)} m` : '') : 'teórico (sin calandrar)';
@@ -130,6 +145,7 @@
             texto: 'Lo que cambies vale para todas las etiquetas de rollos (sistema y taller).' }, (zona) => {
             zona.innerHTML = `<style>${cssEtiqueta(c, '#vge-previa')}
                 .vge { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+                .vge > div { min-width: 0; }
                 @media (max-width: 640px) { .vge { grid-template-columns: 1fr; } }
                 .vge label { display: block; font-size: 12px; color: var(--vg-text-secondary); margin: 6px 0 2px; }
                 .vge input[type=number], .vge input[type=text], .vge select { width: 100%; padding: 7px 9px; border-radius: 8px; border: 1px solid var(--vg-surface-border); background: var(--vg-bg-app); color: var(--vg-text-primary); }
@@ -176,5 +192,12 @@
         return true;
     }
 
-    window.vgEtiquetas = { elegir, imprimir, disenar, usar: (cliente) => { sb = cliente; config = null; } };
+    // Las etiquetas de la tela recién recibida: una por rollo anotado, o una por partida
+    async function recepcion(partidas) {
+        const { data, error } = await db().rpc('etiquetas_recepcion', { p: { partidas } });
+        if (error) { avisar(error.message, 'error'); return false; }
+        return imprimir(data || []);
+    }
+
+    window.vgEtiquetas = { elegir, imprimir, disenar, recepcion, usar: (cliente) => { sb = cliente; config = null; } };
 })();
