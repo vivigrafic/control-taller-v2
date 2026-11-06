@@ -4548,10 +4548,11 @@ function renderModuloMetricasBI() {
     const cli = String(r.cliente_archivo || "").split(" - ")[0]?.trim() || "Cliente";
     conteoCli[cli] = (conteoCli[cli] || 0) + (Number(r.metros_impresos) || 0);
   });
+  cargarHistoricoCompleto().catch(e => console.warn("Histórico completo:", e));
   const arrCli = Object.entries(conteoCli).map(([cli, mts]) => ({ cli, mts })).sort((a, b) => b.mts - a.mts);
   const maxC = arrCli[0]?.mts || 1;
   const elTopCli = document.getElementById("dashTopClientes");
-  if (elTopCli) {
+  if (elTopCli && !(STATE.impresosResumen && (STATE.impresosResumen.clientes || []).length)) {
     elTopCli.innerHTML = arrCli.slice(0, 5).map((c, i) => `
       <div style="margin-bottom:10px;">
         <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:2px; color:#aaa;">
@@ -4562,6 +4563,53 @@ function renderModuloMetricasBI() {
         </div>
       </div>
     `).join("");
+  }
+}
+
+// Histórico completo: todo lo impreso, de los archivos de las carpetas de impresos y de lo que registró el sistema.
+// Se trae solo al entrar a Métricas y cada 30 minutos: junta miles de filas.
+let historicoTraido = 0;
+async function cargarHistoricoCompleto() {
+  if (!document.getElementById("sec-metricas")?.classList.contains("active")) return;
+  if (STATE.impresosResumen) pintarHistoricoCompleto();
+  if (Date.now() - historicoTraido < 30 * 60 * 1000) return;
+  historicoTraido = Date.now();
+  const { data, error } = await sb().rpc("impresos_resumen");
+  if (error) { historicoTraido = 0; console.warn("Histórico completo:", error.message); return; }
+  STATE.impresosResumen = data || {};
+  pintarHistoricoCompleto();
+}
+
+function pintarHistoricoCompleto() {
+  const r = STATE.impresosResumen || {};
+  const caja = document.getElementById("biHistoricoCuerpo");
+  if (!caja || !r.totales) return;
+  const m = (n) => `${fmtNum(n, 0)} m`;
+  const fila = (nombre, a, b) => `<tr><td>${escHtml(nombre)}</td><td class="bi-num">${m(a)}</td><td class="bi-num">${m(b)}</td><td class="bi-num"><b>${m(Number(a) + Number(b))}</b></td></tr>`;
+  const tabla = (filas, titulo) => `<div class="bi-tabla"><table><thead><tr><th>${titulo}</th><th class="bi-num">Sublimación</th><th class="bi-num">DTF</th><th class="bi-num">Total</th></tr></thead><tbody>${filas}</tbody></table></div>`;
+  const mesTexto = (t) => { const [a, me] = String(t).split("-"); return `${["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"][Number(me) - 1]} ${a}`; };
+  const t = r.totales;
+  const clientes = r.clientes || [];
+  caja.innerHTML = `
+    <div class="bi-kpis">
+      <div><span>Sublimación</span><b>${m(t.sublimacion)}</b></div>
+      <div><span>DTF</span><b>${m(t.dtf)}</b></div>
+      <div><span>Repos</span><b>${m(t.repos)}</b></div>
+      <div><span>Muestras</span><b>${m(t.muestras)}</b></div>
+      <div><span>Archivos</span><b>${fmtNum(t.archivos, 0)}</b></div>
+    </div>
+    ${tabla((r.anios || []).map(a => fila(String(a.anio), a.sublimacion, a.dtf)).join(""), "Año")}
+    <details class="bi-mas"><summary>Ver mes por mes</summary>${tabla((r.meses || []).slice().reverse().map(x => fila(mesTexto(x.mes), x.sublimacion, x.dtf)).join(""), "Mes")}</details>
+    <details class="bi-mas"><summary>Ver los ${clientes.length} clientes que más imprimieron</summary>${tabla(clientes.map(c => fila(c.nombre, c.sublimacion, c.dtf)).join(""), "Cliente")}</details>
+    <p class="bi-nota">Hasta el primer registro del sistema sale de los archivos de impresos; después, de lo registrado en el taller. Solo es estadística: no cambia rollos, stock, ventas ni caja.</p>`;
+  const elTop = document.getElementById("dashTopClientes");
+  if (elTop && clientes.length) {
+    const maxC = Number(clientes[0].metros) || 1;
+    elTop.innerHTML = clientes.slice(0, 5).map((c, i) => `
+      <div style="margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; gap:8px; font-size:12px; margin-bottom:2px; color:var(--vg-text-secondary);"><span>${i + 1}. ${escHtml(c.nombre)}</span><span>${fmtNum(c.metros, 0)}m</span></div>
+        <div style="width:100%; background:var(--vg-surface-border); border-radius:4px; height:10px; overflow:hidden;"><div style="width:${(Number(c.metros) / maxC) * 100}%; background:var(--vg-brand-primary); height:100%;"></div></div>
+      </div>`).join("");
   }
 }
 
@@ -6462,6 +6510,7 @@ export function inicializarEventosUI() {
       document.querySelectorAll(".tab-content").forEach(sec => {
         sec.classList.toggle("active", sec.id === `sec-${tab}`);
       });
+      if (tab === "metricas") cargarHistoricoCompleto().catch(e => console.warn("Histórico completo:", e));
     });
   });
 
