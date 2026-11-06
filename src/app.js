@@ -930,19 +930,22 @@ function aplicarAutodeteccionAlSeleccionarArchivos() {
   };
   const auto = consolidarAutodeteccionLote(seleccionados, catObj);
   // La tela que la tarjeta tiene reservada o confirmada manda si el nombre del archivo no la dice
-  const telasFicha = fichasDeSeleccion(seleccionados).flatMap(f => f.telas || []);
+  const todosConTela = seleccionados.every(s => s.partida_id);
+  const telasFicha = fichasDeSeleccion(seleccionados).flatMap(f => f.telas || []).filter(t => !todosConTela || seleccionados.some(s => s.partida_id === t.partida_id));
   const telaTarjeta = telasFicha[0] || null;
   if (telaTarjeta) {
     const unir = (l) => [...new Set(l.filter(Boolean))].join(" + ");
     auto.tela = unir(telasFicha.map(t => t.tela));
     auto.color = unir(telasFicha.map(t => t.color));
-    auto.rollo = unir(telasFicha.map(t => t.codigo + ((t.rollos || []).length ? ` R${t.rollos.join("-")}` : "")));
+    auto.rollo = unir(telasFicha.flatMap(t => t.rollos || []));
   }
 
   STATE.impForm.perfil = auto.perfil || "";
   STATE.impForm.tela = auto.tela || "";
+  STATE.impForm.telaAuto = auto.tela || "";
   STATE.impForm.rolloTela = auto.rollo || "";
   STATE.impForm.color = auto.color || "";
+  STATE.impForm.colorAuto = auto.color || "";
   if (auto.ruta) STATE.impForm.ruta = auto.ruta;
   STATE.impForm.diseno = seleccionados.length === 1
     ? seleccionados[0].nombre_archivo
@@ -970,7 +973,6 @@ function sincronizarInputsImpresionConState() {
   setVal("impInput_color", STATE.impForm.color);
   setVal("impInput_diseno", STATE.impForm.diseno);
   setVal("impInput_observaciones", STATE.impForm.observaciones);
-  pintarFichaImpresion();
 
   const thumb = document.getElementById("thumbPreviewBox");
   if (thumb) {
@@ -1995,29 +1997,8 @@ function htmlFichas(fichas, op = {}) {
   return fichas.map(f => window.vgFichaTela.html(f, { tarjeta: fichas.length > 1, ...op })).join("");
 }
 
-// Impresión: la ficha reemplaza a los casilleros de tela, rollo y color cuando todos los archivos marcados tienen tarjeta
-function pintarFichaImpresion() {
-  const caja = document.getElementById("impFichaTela");
-  if (!caja) return;
-  const seleccionados = STATE.pendientesDrive.filter(p => STATE.impForm.archivosSeleccionadosIds.has(p.id));
-  const conTarjeta = seleccionados.length > 0 && seleccionados.every(s => s.trabajo_id);
-  const htmlF = conTarjeta && !/solo impresi/i.test(STATE.impForm.ruta || "") ? htmlFichas(fichasDeSeleccion(seleccionados)) : "";
-  caja.innerHTML = htmlF;
-  caja.hidden = !htmlF;
-  document.querySelectorAll(".imp-campo-tela").forEach(d => { d.style.display = htmlF ? "none" : ""; });
-  if (window.vgFichaTela) window.vgFichaTela.escuchar(caja, { alCambiar: async () => { await cargarDatosTodo(); aplicarAutodeteccionAlSeleccionarArchivos(); } });
-}
-
-// Antes de imprimir: si el trabajo no tiene tela, se pide ("La elijo después" sigue igual); si la tirada pasa el máximo, avisa
-async function revisarTelaAntesDeImprimir(seleccionados, metrosManual) {
-  if (!/solo impresi/i.test(STATE.impForm.ruta || "") && window.vgFichaTela) {
-    for (const f of fichasDeSeleccion(seleccionados)) {
-      if ((f.telas || []).length || !(Number(f.necesita) > 0.5)) continue;
-      const r = await window.vgFichaTela.elegir(f.trabajo_id, { despues: true, titulo: "🧵 Este trabajo no tiene tela" });
-      if (r === null) return false;
-      if (r === "elegida") { await cargarDatosTodo(); aplicarAutodeteccionAlSeleccionarArchivos(); }
-    }
-  }
+// Antes de imprimir: la tela no se pregunta (se resuelve en Telas requeridas); si la tirada pasa el máximo, avisa
+async function revisarTiradaAntesDeImprimir(seleccionados, metrosManual) {
   const max = Number((STATE.telaAjustes || {}).tirada_max) || 126;
   const metros = metrosManual > 0 ? metrosManual : seleccionados.reduce((a, b) => a + faltaMetros(b), 0);
   if (metros > max && !(await confirmarTaller(`Esta tirada pasa de ${fmtNum(max)} m`, `Son ${fmtNum(metros)} m y el ripeador llega hasta ${fmtNum(max)} m continuos. ¿Seguís igual?`, "Seguir"))) return false;
@@ -2042,16 +2023,6 @@ async function preguntarDondeGuardar() {
   await cargarDatosTodo();
 }
 
-// Al terminar de calandrar un trabajo sin tela: se pide la que se usó y se descuenta en ese momento
-async function preguntarSinTelaCalandrada(regs) {
-  if (!window.vgFichaTela) return;
-  const fileIds = regs.map(r => r.file_id).filter(Boolean).join(",");
-  for (const f of fichasDeTrabajos(trabajosDeArchivos(fileIds))) {
-    if ((f.telas || []).length || !(Number(f.necesita) > 0.5)) continue;
-    if (await window.vgFichaTela.elegir(f.trabajo_id, { despues: true, titulo: "🧵 ¿Qué tela se usó?" }) === "elegida") await cargarDatosTodo();
-  }
-}
-
 function chipTelaTrabajo(fileIdsCsv) {
   const fichas = fichasDeTrabajos(trabajosDeArchivos(fileIdsCsv));
   if (fichas.length && window.vgFichaTela) return htmlFichas(fichas);
@@ -2063,9 +2034,9 @@ function chipTelaTrabajo(fileIdsCsv) {
 // Al terminar de calandrar: ¿se usó la tela reservada? (se descuenta de la tela guardada del cliente)
 async function preguntarTelaCalandrada(regs) {
   const fileIds = regs.map(r => r.file_id).filter(Boolean).join(",");
-  const pendientes = telasDeArchivos(fileIds).filter(r => r.estado === "sugerida");
+  const pendientes = telasDeArchivos(fileIds).filter(r => r.estado === "sugerida" && r.dueno === "cliente" && r.sin_rinde);
   for (const r of pendientes) {
-    const enKilos = r.dueno === "cliente" && r.sin_rinde;
+    const enKilos = true;
     const resp = await ventanaTaller({
       titulo: "🧵 ¿Se usó esta tela?",
       texto: `Para <b>T${String(r.trabajo_numero || "").padStart(4, "0")}</b> ${escHtml(r.trabajo_titulo || "")} estaba reservada <b>${escHtml(textoTela(r))}</b>. Si se usó, se descuenta de la tela guardada${r.dueno === "taller" ? " (la del taller sale del stock al vender)" : " del cliente"}.`,
@@ -4915,7 +4886,7 @@ async function procesarImpresionLote() {
     toast("Seleccione al menos un archivo o ingrese los Metros a Descontar.", "warn");
     return;
   }
-  if (!(await revisarTelaAntesDeImprimir(seleccionados, metrosManualInput))) return;
+  if (!(await revisarTiradaAntesDeImprimir(seleccionados, metrosManualInput))) return;
 
   const infoRollo = obtenerRolloPapelActivo();
   const batchId = `BATCH-${Date.now()}`;
@@ -5085,6 +5056,11 @@ async function procesarImpresionLote() {
     registrarUsoMRU("COLOR", color)
   ]);
 
+  if (tela && (tela !== STATE.impForm.telaAuto || color !== STATE.impForm.colorAuto)) {
+    const { error: errTela } = await sb().rpc("tela_archivos_por_texto", { p: { archivos: impresos.map(s => s.id), tela, color } });
+    if (errTela) console.warn("Tela escrita a mano:", errTela.message);
+  }
+
   STATE.impForm.dirty = false;
   STATE.impForm.archivosSeleccionadosIds.clear();
   STATE.impForm.metrosLote = 0;
@@ -5230,8 +5206,7 @@ async function finalizarTrabajoCalandrado(idCalOrCsv, minutosExtra = 0, skipRelo
     await cargarDatosTodo();
   }
   // Los rollos (metros reales y etiquetas) y la tela reservada en la tarjeta: se anotan acá, que es donde se usan
-  preguntarSinTelaCalandrada(regs).catch(e => console.warn("Tela del trabajo:", e))
-    .then(() => preguntarRollosCalandrados(regs)).catch(e => console.warn("Rollos del calandrado:", e))
+  preguntarRollosCalandrados(regs).catch(e => console.warn("Rollos del calandrado:", e))
     .then(() => preguntarTelaCalandrada(regs))
     .then(() => anotarParaGuardar(regs.filter(r => !/l[aá]ser|corte/i.test(r.ruta || "")).map(r => r.file_id).filter(Boolean).join(","))).catch(e => console.warn("Tela de la tarjeta:", e));
 }
