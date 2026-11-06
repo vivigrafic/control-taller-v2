@@ -7245,11 +7245,19 @@ export function inicializarEventosUI() {
   });
 }
 
+// Los accesos directos de la app instalada (manifest.json → shortcuts) abren en su módulo: ./#sec-calandrado, ./#sec-laser, ./#sec-telas
+function abrirModuloDelEnlace() {
+  const m = /^#sec-([a-z]+)$/.exec(location.hash || "");
+  if (m) document.querySelector(`.tab-btn[data-tab="${m[1]}"]`)?.click();
+}
+
 window.addEventListener("DOMContentLoaded", async () => {
   STATE.perfil = window.VG_ACCESO ? await window.VG_ACCESO.listo : null; // sin usuario del equipo no se carga nada
   if (window.VG_ACCESO?.pin) STATE.usuarioActual = window.VG_ACCESO.nombreOperario();
   else window.VG_ACCESO?.operario(STATE.usuarioActual); // el nombre que se ve elegido es el que queda en cada cambio
   inicializarEventosUI();
+  abrirModuloDelEnlace();
+  window.addEventListener("hashchange", abrirModuloDelEnlace);
   cargarDatosTodo();
   suscribirRealtime();
   revisarFilaSola();
