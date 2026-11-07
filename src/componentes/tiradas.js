@@ -403,7 +403,8 @@
             });
             return;
         }
-        const r = await db().rpc('carpeta_pedir', { p: { tipo: 'imprimir', trabajo_id: t.id, archivos: archivos.map(({ _x, ...a }) => a) } });
+        const r = await pedirImprimir(db(), { tipo: 'imprimir', trabajo_id: t.id, archivos: archivos.map(({ _x, ...a }) => a) });
+        if (r.cancelado) { avisar('No se mandó nada: ya estaba en la fila.'); return; }
         if (r.error) { avisar(errorTexto(r.error), 'error'); return; }
         const hecho = await esperar(r.data.pedido, `Creando ${archivos.length} archivo(s) en la fila…`);
         if (!hecho) return;
@@ -499,5 +500,27 @@
         } catch (e) { avisar('No se pudo armar la hoja: ' + errorTexto(e), 'error'); }
     }
 
-    window.vgTiradas = { usar: (c, o = {}) => { sb = c; terminal = o.terminal === undefined ? terminal : o.terminal; }, abrir, repartir, armar };
+    // Pide imprimir (carpeta_pedir tipo 'imprimir'). Si esos diseños ya están en la fila de la tarjeta, la base no manda nada
+    // (hint YA_EN_FILA) y acá se pregunta: No mandar (lo normal: se tocó dos veces) o Imprimir otra vez (reimpresión a propósito).
+    async function pedirImprimir(cliente, p) {
+        let r = await cliente.rpc('carpeta_pedir', { p });
+        if (!r.error || r.error.hint !== 'YA_EN_FILA') return r;
+        let lista = [];
+        try { lista = JSON.parse(r.error.details || '[]'); } catch (e) { lista = []; }
+        const que = await window.vgDialogo.elegir({
+            titulo: '⚠️ Ya está en la fila de impresión',
+            texto: `${lista.length === 1 ? 'Este diseño ya se mandó' : `Estos ${lista.length} diseños ya se mandaron`} a imprimir para esta tarjeta. No se mandó nada.\n\n`
+                + lista.slice(0, 8).map(x => `• ${x.ya} (${x.cuando}${x.copiando ? ', copiándose' : x.impreso ? ', ya impreso' : ', sin imprimir'})`).join('\n')
+                + (lista.length > 8 ? `\n• y ${lista.length - 8} más` : ''),
+            opciones: [
+                { valor: 'no', titulo: 'No mandar', detalle: 'Lo normal: seguramente se tocó dos veces', icono: '✋' },
+                { valor: 'otra', titulo: 'Sí, imprimir otra vez', detalle: 'Solo si es una reimpresión a propósito (se arruinó, falta una parte…)', icono: '🔁' }
+            ],
+            elegida: 'no', aceptar: 'Seguir'
+        });
+        if (que !== 'otra') return { data: null, error: null, cancelado: true };
+        return cliente.rpc('carpeta_pedir', { p: { ...p, reimprimir: true } });
+    }
+
+    window.vgTiradas = { usar: (c, o = {}) => { sb = c; terminal = o.terminal === undefined ? terminal : o.terminal; }, abrir, repartir, armar, pedirImprimir };
 })();
