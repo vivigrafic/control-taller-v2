@@ -89,10 +89,11 @@
         return tiradas;
     }
     const textoRollos = (t) => {
-        const n = t.rollos.map(r => r.numero);
+        // Siempre con guion y en orden ("ROLLOS 11-12", "ROLLOS 3-4-7"): la terminal del taller no entiende la coma
+        const n = [...new Set(t.rollos.map(r => r.numero))].sort((a, b) => Number(a) - Number(b));
         if (n.length === 1) return `ROLLO ${n[0]}`;
         const seguidos = n.every((x, i) => i === 0 || Number(x) === Number(n[i - 1]) + 1);
-        return seguidos ? `ROLLOS ${n[0]}-${n[n.length - 1]}` : `ROLLOS ${n.join(', ')}`;
+        return seguidos ? `ROLLOS ${n[0]}-${n[n.length - 1]}` : `ROLLOS ${n.join('-')}`;
     };
     // "DISEÑO FLORES.jpg" → "DISEÑO FLORES"
     const nombreDiseno = (archivo) => String(archivo || '').replace(/\.[A-Za-z0-9]{2,4}$/, '').replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase().slice(0, 40);
