@@ -20,6 +20,9 @@
     const avisar = (t, tipo) => window.vgDialogo.avisar(t, tipo);
     const dormir = (ms) => new Promise(r => setTimeout(r, ms));
     const PAPEL = 160;
+    // El último perfil que se usó en esta PC (para no escribirlo cada vez)
+    const recordado = (k) => { try { return localStorage.getItem('vg_tiradas_' + k) || ''; } catch (e) { return ''; } };
+    const recordar = (k, v) => { try { localStorage.setItem('vg_tiradas_' + k, v || ''); } catch (e) { /* sin almacenamiento */ } };
 
     function ponerEstilos() {
         if (document.getElementById('tr-estilos')) return;
@@ -180,7 +183,8 @@
         const estado = {
             disenos: disenos.map((d, i) => ({ ...d, usar: !/muestra/i.test(d.nombre) || disenos.length === 1, titulo: nombreDiseno(d.nombre) || `DISEÑO ${i + 1}`, local: null })),
             rollos: todos.map(r => ({ ...r, usar: hayApartados ? apartados.has(r.rollo_id) : (partidas.length === 1), diseno: 0 })),
-            plan: []
+            plan: [],
+            nombres: {}   // los nombres que se cambiaron a mano
         };
         let pedido = null;
         const ok = await window.vgDialogo.ventana({ titulo: `🧩 Armar archivos de impresión · ${t.tarjeta}`, aceptar: 'Crear archivos', ancho: '780px' }, (zona) => {
@@ -197,11 +201,12 @@
                 <div class="tr-g">
                     <div><label>Máximo por tirada (m)</label><input type="number" data-c="max" value="${esc(ajustes.tirada_max)}"></div>
                     <div><label>Artículo</label><input type="text" data-c="articulo" value="${esc(((datos.telas || [])[0] || {}).tela || (partidas[0] || {}).tela || '')}"></div>
-                    <div><label>Perfil</label><input type="text" data-c="perfil" placeholder="V-V 3P"></div>
+                    <div><label>Perfil</label><input type="text" data-c="perfil" placeholder="V-V 3P" value="${esc(recordado('perfil'))}"></div>
                     <div><label>Ruta</label><select data-c="ruta"><option>Solo Calandrado</option><option ${t.lleva_corte ? 'selected' : ''}>Calandrado + Corte Láser</option></select></div>
                     <div><label>Muestra de cada diseño (m)</label><input type="number" data-c="muestra" min="0" step="0.1" value="0" title="0 = sin muestra"></div>
                 </div>
-                <div class="tr-tit"><span>4. Lo que se va a crear</span></div>
+                <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" data-c="condis"> Poner el nombre del diseño en el archivo</label>
+                <div class="tr-tit"><span>4. Lo que se va a crear <small>(tocá un nombre para cambiarlo)</small></span><button type="button" class="tr-btn" data-c="renombrar" hidden>↺ Volver a los nombres automáticos</button></div>
                 <div class="tr-lista" data-c="plan"></div><div class="tr-res" data-c="res"></div>
             </div>`;
             const q = (c) => zona.querySelector(`[data-c="${c}"]`);
@@ -254,6 +259,14 @@
             };
             const rollosPegados = () => (String(q('metros').value).match(/\d+(?:[.,]\d+)?/g) || []).map((x, i) => ({ numero: i + 1, metros: Number(x.replace(',', '.')),
                 partida_id: (partidas[0] || {}).partida_id || null, color: (partidas[0] || {}).color || '' })).filter(r => r.metros > 0);
+            const limpio = (t) => String(t || '').toUpperCase().replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, ' ').trim();
+            const cifra = (n) => String(Math.round(Number(n) * 100) / 100);
+            const nombreArchivo = (x, d) => {
+                const cliente = limpio(String(t.cliente || '').replace(/\s*\(.*$/, ''));
+                const partes = [q('articulo').value, x.color, q('condis').checked ? d.titulo : ''].map(limpio).filter(Boolean).map(p => `(${p})`).join('');
+                const perfil = limpio(q('perfil').value);
+                return `${cliente} ${partes} ${String(x.numero).padStart(2, '0')} (${limpio(x.rollosTexto)}) ${cifra(x.largo)} X ${x.reps} (${cifra(x.largo * x.reps)} MTS)${perfil ? `(${perfil})` : ''}`.replace(/\s+/g, ' ').trim();
+            };
             const pintarPlan = () => {
                 const us = usados();
                 const max = maximo();
@@ -271,13 +284,24 @@
                 const muestras = m > 0 ? us.map(d => ({ muestra: true, diseno: d.i, metros: m, rollos: [], color: (lista[0] || {}).color || '', partida_id: (lista[0] || {}).partida_id || null })) : [];
                 estado.plan = muestras.concat(plan);
                 let n = 0, nm = 0;
-                q('plan').innerHTML = estado.plan.map(x => {
+                estado.plan.forEach(x => {
                     const d = estado.disenos[x.diseno] || {};
-                    const cual = x.muestra ? `Muestra ${++nm}` : `Tirada ${++n}`;
+                    x.numero = x.muestra ? 'M' + (++nm) : String(++n);
+                    x.largo = x.muestra ? x.metros : 1;
+                    x.reps = x.muestra ? 1 : Math.ceil(x.metros);
+                    x.rollosTexto = x.muestra ? 'MUESTRA' : textoRollos(x);
+                    x.clave = `${x.numero}|${x.diseno}|${x.rollosTexto}`;
+                    x.auto = nombreArchivo(x, d);
+                    x.nombre = estado.nombres[x.clave] || x.auto;
+                });
+                q('plan').innerHTML = estado.plan.map((x, i) => {
+                    const d = estado.disenos[x.diseno] || {};
                     const pasa = !x.muestra && x.metros > max;
-                    return `<div class="tr-t ${pasa ? 'tr-mal' : ''}"><span><b>${cual}</b> · ${esc(d.titulo || '')}${x.muestra ? '' : ' · ' + esc(textoRollos(x))}${x.color ? ' · ' + esc(x.color) : ''}</span>
-                        <b>${num(x.metros)} m${pasa ? ' · un rollo solo pasa el máximo' : ''}</b></div>`;
+                    return `<div class="tr-t ${pasa ? 'tr-mal' : ''}" style="display:block;"><div class="tr-fila" style="justify-content:space-between;"><span><b>${x.muestra ? 'Muestra' : 'Tirada'} ${esc(x.numero)}</b> · ${esc(d.titulo || '')}${x.muestra ? '' : ' · ' + esc(x.rollosTexto)}</span>
+                        <b>${num(x.metros)} m${pasa ? ' · un rollo solo pasa el máximo' : ''}</b></div>
+                        <input type="text" class="tr-nombre" data-nombre="${i}" value="${esc(x.nombre)}" style="margin-top:5px; ${estado.nombres[x.clave] ? 'border-color: var(--vg-brand-primary);' : ''}"></div>`;
                 }).join('') || '<div class="tr-t">Marcá al menos un diseño y sus rollos.</div>';
+                q('renombrar').hidden = !Object.keys(estado.nombres).length;
                 const total = estado.plan.reduce((a, x) => a + x.metros, 0);
                 const malos = us.filter(d => juicio(d).estado === 'mal').length;
                 q('res').innerHTML = estado.plan.length ? `${estado.plan.length} archivo${estado.plan.length === 1 ? '' : 's'} · ${num(total)} m${malos ? ` · <span class="tr-err">${malos} diseño${malos === 1 ? '' : 's'} con problemas</span>` : ''}` : '';
@@ -294,14 +318,25 @@
                 else if (el.dataset.rollo !== undefined) { estado.rollos[el.dataset.rollo].usar = el.checked; repartirEnOrden(); todo(); }
                 else if (el.dataset.dis !== undefined) { estado.rollos[el.dataset.dis].diseno = Number(el.value); pintarPlan(); }
                 else if (el === q('ruta')) { pintarDisenos(); pintarPlan(); }
+                else if (el === q('condis')) pintarPlan();
                 else if (el === q('local')) revisarLocal(el.files);
             });
             zona.addEventListener('input', (e) => {
                 const el = e.target;
+                if (el.dataset.nombre !== undefined) {
+                    const x = estado.plan[el.dataset.nombre];
+                    const v = el.value.toUpperCase();
+                    if (v.trim() && v.trim() !== x.auto) estado.nombres[x.clave] = v; else delete estado.nombres[x.clave];
+                    x.nombre = estado.nombres[x.clave] || x.auto;
+                    el.style.borderColor = estado.nombres[x.clave] ? 'var(--vg-brand-primary)' : '';
+                    q('renombrar').hidden = !Object.keys(estado.nombres).length;
+                    return;
+                }
                 if (el.dataset.titulo !== undefined) { estado.disenos[el.dataset.titulo].titulo = el.value.toUpperCase(); pintarPlan(); pintarRollosSinFoco(); }
-                else if (el === q('max') || el === q('muestra') || el === q('metros')) pintarPlan();
+                else if (el === q('max') || el === q('muestra') || el === q('metros') || el === q('articulo') || el === q('perfil')) pintarPlan();
             });
             const pintarRollosSinFoco = () => { zona.querySelectorAll('[data-dis] option').forEach(o => { const d = estado.disenos[o.value]; if (d) o.textContent = d.titulo; }); };
+            q('renombrar').onclick = () => { estado.nombres = {}; pintarPlan(); };
             q('repartir').onclick = () => { repartirEnOrden(); pintarRollos(); pintarPlan(); };
             q('revisar').onclick = () => q('local').click();
             // La revisión completa, con los archivos de esta PC (la carpeta del Drive sincronizada): se buscan por el nombre
@@ -323,12 +358,16 @@
             }
             return () => {
                 if (!estado.plan.length) { avisar('Marcá al menos un diseño y sus rollos.', 'error'); return undefined; }
+                const repetido = estado.plan.find((x, i) => estado.plan.findIndex(y => y.nombre.trim() === x.nombre.trim()) !== i);
+                if (repetido) { avisar('Hay dos archivos con el mismo nombre: ' + repetido.nombre, 'error'); return undefined; }
+                if (estado.plan.some(x => !x.nombre.trim())) { avisar('Hay un archivo sin nombre.', 'error'); return undefined; }
                 return { max: maximo(), ruta: q('ruta').value, articulo: q('articulo').value, perfil: q('perfil').value,
                          anotar: !estado.rollos.length && !!(q('guardar') && q('guardar').checked), pegados: estado.rollos.length ? [] : rollosPegados() };
             };
         });
         if (!ok) return;
         pedido = ok;
+        recordar('perfil', pedido.perfil);
 
         // Diseños con problemas: se avisa antes de crear
         const malos = estado.disenos.filter((d, i) => estado.plan.some(x => x.diseno === i)).filter(d => {
@@ -344,17 +383,15 @@
             const { error } = await db().rpc('actualizar_partida', { p: { partida_id: partidas[0].partida_id, detalle_rollos: pedido.pegados.map(r => ({ metros: r.metros })), motivo: 'Rollos anotados al armar las tiradas' } });
             if (error) avisar('Los rollos no se anotaron: ' + errorTexto(error), 'error');
         }
-        let nT = 0, nM = 0;
         const archivos = estado.plan.map(x => {
             const d = estado.disenos[x.diseno];
             const ext = (String(d.nombre).match(/\.[A-Za-z0-9]{2,4}$/) || ['.jpg'])[0];
-            const numero = x.muestra ? 'M' + (++nM) : String(++nT);
-            return { file_id: d.file_id, nombre: 'base' + ext, modulo: 'SUBLIMACION', ruta: pedido.ruta,
-                largo: x.muestra ? x.metros : 1, reps: x.muestra ? 1 : Math.ceil(x.metros),
-                tirada: { numero, rollos: x.muestra ? 'MUESTRA' : textoRollos(x), articulo: pedido.articulo, color: x.color || '', diseno: d.titulo, perfil: pedido.perfil },
+            return { file_id: d.file_id, nombre: 'base' + ext, modulo: 'SUBLIMACION', ruta: pedido.ruta, largo: x.largo, reps: x.reps,
+                nombre_final: x.nombre.trim(),
+                tirada: { numero: x.numero, rollos: x.rollosTexto, articulo: pedido.articulo, color: x.color || '', diseno: d.titulo, perfil: pedido.perfil },
                 _x: x };
         });
-        const nombres = archivos.map(a => `${t.cliente || ''} (${a.tirada.articulo})(${a.tirada.color})(${a.tirada.diseno}) ${String(a.tirada.numero).padStart(2, '0')} (${a.tirada.rollos}) ${num(a.largo)} X ${a.reps} (${num(a.largo * a.reps)} MTS)${a.tirada.perfil ? `(${a.tirada.perfil})` : ''}`.toUpperCase());
+        const nombres = archivos.map(a => a.nombre_final);
         if (!terminal || estado.disenos.some(d => d.prueba)) {
             await window.vgDialogo.ventana({ titulo: 'Versión de prueba: estos archivos se crearían', aceptar: 'Listo', ancho: '760px' }, (zona) => {
                 zona.innerHTML = `<div class="tr-v">En esta prueba no hay Drive: en el sistema de verdad el ayudante copia cada diseño con estos nombres, y cada archivo queda con su tela y sus rollos.
