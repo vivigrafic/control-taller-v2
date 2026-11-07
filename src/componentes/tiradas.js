@@ -230,13 +230,19 @@
                 if (!estado.rollos.length) { q('rollos').style.display = 'none'; q('pegar').style.display = ''; return; }
                 q('pegar').style.display = 'none';
                 let anterior = null;
+                // Con rollos apartados se muestran esos (y los marcados); los demás, con un toque
+                const visible = (r) => estado.verTodos || !hayApartados || apartados.has(r.rollo_id) || r.usar;
+                const ocultos = estado.rollos.filter(r => !visible(r)).length;
                 q('rollos').innerHTML = estado.rollos.map((r, i) => {
-                    const cab = anterior !== r.partida_id ? `<div class="tr-t" style="background: var(--vg-bg-app);"><b>${esc([r.codigo, r.tela, r.color].filter(Boolean).join(' · '))}</b><small>${r.lugar ? '📍 ' + esc(r.lugar) : ''}</small></div>` : '';
+                    if (!visible(r)) return '';
+                    const cab =anterior !== r.partida_id ? `<div class="tr-t" style="background: var(--vg-bg-app);"><b>${esc([r.codigo, r.tela, r.color].filter(Boolean).join(' · '))}</b><small>${r.lugar ? '📍 ' + esc(r.lugar) : ''}</small></div>` : '';
                     anterior = r.partida_id;
                     return cab + `<div class="tr-r"><input type="checkbox" data-rollo="${i}" ${r.usar ? 'checked' : ''}>
                         <span>Rollo ${esc(r.numero)} · ${num(r.metros)} m${apartados.has(r.rollo_id) ? ' <small>(apartado)</small>' : ''}</span>
                         <select data-dis="${i}" ${r.usar && us.length > 1 ? '' : 'disabled'}>${us.map(d => `<option value="${d.i}" ${r.diseno === d.i ? 'selected' : ''}>${esc(d.titulo)}</option>`).join('')}</select></div>`;
-                }).join('');
+                }).join('') + (ocultos ? `<div class="tr-t"><button type="button" class="tr-btn" data-c="vertodos">Ver los otros ${ocultos} rollos de la tela</button></div>` : '');
+                const b = q('vertodos');
+                if (b) b.onclick = () => { estado.verTodos = true; pintarRollos(); };
             };
             // Reparte los rollos marcados entre los diseños, en orden: N rollos para cada uno
             const repartirEnOrden = () => {
