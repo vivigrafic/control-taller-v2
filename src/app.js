@@ -6130,7 +6130,7 @@ function renderContenidoModalKiosco() {
       if (!reg && STATE.kiosco.modulo === "laser") {
         reg = STATE.kiosco.trabajos.find(c => c.id === id) || STATE.colaLaser.find(c => c.id === id);
       }
-      if (reg) await reportarFallaConReposicion(reg, est);
+      if (reg) await (/calandr|l[aá]ser/i.test(est || "") ? reponerDesdeEstacion(reg, /l[aá]ser/i.test(est) ? "Láser" : "Calandra") : reportarFallaConReposicion(reg, est));
     };
   });
 }
@@ -6445,6 +6445,44 @@ function vincularBotonesAccionesKiosco() {
       await cargarDatosTodo();
     };
   }
+}
+
+// Reposición desde Calandra o Láser (09/11/2026): copia real del archivo en la fila, unida a la tarjeta y al cliente.
+// Culpa del taller → sin cargo; culpa del cliente (su diseño o su tela) → se cobra. Siempre en metros. No avisa al cliente.
+const MOTIVOS_REPO = [
+  { valor: "Corte mal hecho", culpa: "taller" },
+  { valor: "Quemado o marcado en la calandra", culpa: "taller" },
+  { valor: "Mancha o falla de impresión", culpa: "taller" },
+  { valor: "Tela del taller fallada", culpa: "taller" },
+  { valor: "Tela del cliente fallada", culpa: "cliente" },
+  { valor: "Error en el diseño del cliente", culpa: "cliente" },
+  { valor: "Otro", culpa: "taller" }
+];
+async function reponerDesdeEstacion(reg, estacion) {
+  if (!reg) return;
+  const ids = String(reg.file_id || "").split(",").map(s => s.trim()).filter(Boolean);
+  if (!ids.length) return reportarFallaConReposicion(reg, estacion);   // registro viejo sin archivo: como antes
+  const nombres = String(reg.cliente_archivo || "").split(" | ");
+  const campos = [];
+  if (ids.length > 1) campos.push({ nombre: "archivo", etiqueta: "Archivo que salió mal", valor: ids[0], opciones: ids.map((id, i) => ({ valor: id, titulo: nombres[i] || id })) });
+  campos.push(
+    { nombre: "metros", etiqueta: "Metros a reponer", tipo: "number", valor: ids.length > 1 ? "" : (reg.metros || reg.metros_impresos || "") },
+    { nombre: "motivo", etiqueta: "Motivo", valor: MOTIVOS_REPO[0].valor, opciones: MOTIVOS_REPO.map(m => ({ valor: m.valor, titulo: m.valor })) },
+    { nombre: "culpa", etiqueta: "¿Quién lo paga?", valor: "auto", opciones: [
+      { valor: "auto", titulo: "Según el motivo (del taller: sin cargo · del cliente: se cobra)" },
+      { valor: "taller", titulo: "El taller (sin cargo)" },
+      { valor: "cliente", titulo: "El cliente (se cobra)" }] });
+  const r = await ventanaTaller({ titulo: "⚠️ Reposición", texto: escHtml(reg.cliente_archivo || ""), campos, aceptar: "Reponer", color: "var(--danger)",
+    validar: (x) => (x.metros > 0 ? null : "Poné cuántos metros hay que reponer.") });
+  if (!r) return;
+  const culpa = r.culpa === "auto" ? ((MOTIVOS_REPO.find(m => m.valor === r.motivo) || {}).culpa || "taller") : r.culpa;
+  const maquina = window.VG_MAQUINAS ? await window.VG_MAQUINAS.pedir(estacion === "Láser" ? "laser" : "calandra") : null;
+  const { data, error } = await sb().rpc("taller_reposicion", { p: {
+    file_id: r.archivo || ids[0], metros: r.metros, motivo: r.motivo, culpa, estacion, maquina_id: maquina,
+    tela: reg.tela_destino || reg.tela_rollo_color || null } });
+  if (error) { toast("Error: " + error.message, "error"); return; }
+  toast(data && data.a_revisar ? "⚠️ Reposición anotada: espera el OK del encargado." : `🔁 Reposición en la fila${culpa === "cliente" ? " (se cobra)" : " (sin cargo)"}.`, data && data.a_revisar ? "warn" : "ok");
+  await cargarDatosTodo();
 }
 
 async function reportarFallaConReposicion(reg, estacion) {
@@ -7087,7 +7125,7 @@ export function inicializarEventosUI() {
     const btnCalFalla = e.target.closest(".btn-cal-falla");
     if (btnCalFalla) {
       const reg = STATE.colaCalandrado.find(c => c.id === btnCalFalla.getAttribute("data-id"));
-      reportarFallaConReposicion(reg, "Calandrado");
+      reponerDesdeEstacion(reg, "Calandra");
       return;
     }
 
@@ -7110,7 +7148,7 @@ export function inicializarEventosUI() {
     const btnLasRepo = e.target.closest(".btn-laser-repo");
     if (btnLasRepo) {
       const reg = STATE.colaLaser.find(l => l.id === btnLasRepo.getAttribute("data-id"));
-      if (reg) reportarFallaConReposicion(reg, "Láser");
+      if (reg) reponerDesdeEstacion(reg, "Láser");
       return;
     }
 
