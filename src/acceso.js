@@ -88,6 +88,14 @@
     d.querySelector("button").addEventListener("click", salir);
   }
 
+  // El taller no tiene contratado el módulo Taller (sistema vendido por módulos)
+  function mostrarSinModulo(perfil) {
+    const d = capa(`<div class="caja"><h2>El Taller no está en tu plan</h2>
+      <p>${esc(perfil && perfil.taller ? perfil.taller : "Tu taller")} no tiene contratado el módulo Taller. Si lo querés sumar, escribinos.</p>
+      <button type="button">Entrar con otro usuario</button></div>`);
+    d.querySelector("button").addEventListener("click", salir);
+  }
+
   // Las ventanas y carteles del taller (los pone app.js); si todavía no cargó, los del navegador
   const preguntar = (titulo, texto, aceptar) => window.confirmarTaller ? window.confirmarTaller(titulo, texto, aceptar) : Promise.resolve(confirm(titulo + "\n\n" + texto));
   const avisar = (texto) => (window.toastTaller ? window.toastTaller(texto, "error") : alert(texto));
@@ -224,6 +232,7 @@
     const { data: perfil } = await sb.rpc("mi_perfil");
     if (!perfil || !perfil.activo) { await mostrarEntrada("Ese usuario está desactivado."); return new Promise(() => {}); }
     if (!(perfil.total || (perfil.permisos || []).includes("taller"))) { mostrarSinPermiso(perfil); return new Promise(() => {}); }
+    if (Array.isArray(perfil.modulos) && !perfil.modulos.includes("taller")) { mostrarSinModulo(perfil); return new Promise(() => {}); }
     let cfg = null;
     try { cfg = (await sb.rpc("taller_operarios")).data; } catch (e) { /* sin PIN */ }
     ACCESO.pin = !!(cfg && cfg.pin);
