@@ -346,6 +346,7 @@ export async function cargarDatosTodo() {
   const client = sb();
   if (!client) return;
 
+  if (window.VG_MAQUINAS) window.VG_MAQUINAS.cargar(client);   // varias máquinas (09/11/2026)
   const [
     resRollosSaldos,
     resBloques,
@@ -2896,6 +2897,9 @@ function abrirImprimirDtf() {
     } });
     if (error) { ok.disabled = false; ok.textContent = "✓ Ya se imprimió"; toast("Error: " + error.message, "error"); return; }
     cerrar();
+    // Si hay varias impresoras DTF: en cuál se imprimió esta tirada
+    const maqDtf = window.VG_MAQUINAS ? await window.VG_MAQUINAS.pedir("impresora_dtf") : null;
+    if (maqDtf && data && data.tirada_id) await sb().rpc("taller_tirada_maquina", { p_tirada: data.tirada_id, p_maquina: maqDtf });
     STATE.dtfSeleccion.clear();
     if (corte) await anotarCortes(corte, "DTF", rollo);
     toast(`✅ Tirada ${data.codigo}${fecha ? ` (impresa el ${fechaHoraCorta(fecha)})` : ""}: ${data.archivos} archivo(s) completos${data.partes ? `, ${data.partes} a medias (quedan en la cola con lo que falta)` : ""}. ${cortado ? "Poné el rollo nuevo: 🔄 Cambiar film o + Rollo Nuevo." : "Pasan a IMPRESOS y a Vender."}`);
@@ -4985,7 +4989,9 @@ async function procesarImpresionLote() {
   const obs = document.getElementById("impInput_observaciones")?.value.trim() || STATE.impForm.observaciones;
   const ruta = STATE.impForm.ruta || "Solo Calandrado";
 
+  const maqImp = window.VG_MAQUINAS ? await window.VG_MAQUINAS.pedir("plotter_sublimacion") : null;  // si hay varios plotters
   const { error: errImp } = await sb().from("prod_impresiones").insert({
+    ...(maqImp ? { maquina_id: maqImp } : {}),
     batch_id: batchId,
     fecha_hora: fechaIso,
     id_rollo_papel: infoRollo.bloqueActual,
@@ -5202,6 +5208,8 @@ async function finalizarTrabajoCalandrado(idCalOrCsv, minutosExtra = 0, skipRelo
     fecha_terminado: fechaFinIso,
     minutos_trabajados: minTrabajados
   };
+  const maqCal = window.VG_MAQUINAS ? await window.VG_MAQUINAS.pedir("calandra") : null;  // si hay varias calandras
+  if (maqCal) updatePayload.maquina_id = maqCal;
   if (velocidad !== null && !isNaN(velocidad)) updatePayload.velocidad = velocidad;
   if (temperatura !== null && !isNaN(temperatura)) updatePayload.temperatura = temperatura;
   if (obsFinal) updatePayload.observaciones = obsFinal;
@@ -5290,10 +5298,12 @@ async function cortarLoteLaser(idsCsv) {
   const inputFechaLaser = document.getElementById("laserInputFechaManual")?.value;
   const fechaFinIso = inputFechaLaser ? new Date(inputFechaLaser).toISOString() : new Date().toISOString();
 
+  const maqLas = window.VG_MAQUINAS ? await window.VG_MAQUINAS.pedir("laser") : null;  // si hay varios láser
   for (const id of ids) {
     await sb().from("prod_cola_laser").update({
       estado: "Terminado",
-      fecha_terminado: fechaFinIso
+      fecha_terminado: fechaFinIso,
+      ...(maqLas ? { maquina_id: maqLas } : {})
     }).eq("id", id);
   }
 
