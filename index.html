@@ -36,6 +36,12 @@
   <!-- LOGO OFICIAL V&V GRAFIC (Idéntico a Index.html línea 13) -->
   <div style="text-align: center; margin-bottom: 10px; position: relative;">
     <img id="imgLogoVV" src="" alt="V&amp;V Grafic Logo" style="height: 60px; object-fit: contain;" />
+    <!-- Volver al Kanban: siempre arriba a la izquierda, como en todo el sistema (09/11/2026) -->
+    <a id="vgVolverKanban" href="/index.html" target="_top" class="badge" style="position:absolute; left:0; top:0; margin:0; text-decoration:none; font-weight:800; display:inline-flex; align-items:center; gap:6px;" title="Volver al Kanban del sistema">🏠 Kanban</a>
+    <script>
+      // Abierto desde la dirección del sistema (/taller/) va a /index.html; abierto suelto (GitHub Pages) va al sistema publicado
+      if (!location.pathname.startsWith('/taller')) document.getElementById('vgVolverKanban').href = 'https://erpvivigrafic.netlify.app/index.html';
+    </script>
     <div class="vg-cabecera-acciones" style="position:absolute; right:0; top:0; display:flex; gap:6px; align-items:center;">
       <button type="button" class="badge" data-bandeja style="cursor:pointer; margin:0;" title="Para hacer: lo que hay que resolver, en un solo lugar">📥 Para hacer</button>
       <button type="button" id="btnVgBuscar" class="badge" style="cursor:pointer; margin:0;" title="Buscar en todo el taller">🔎 Buscar</button>
