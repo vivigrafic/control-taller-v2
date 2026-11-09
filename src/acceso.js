@@ -69,7 +69,7 @@
     if (window.vgOjitoClaves) window.vgOjitoClaves();
     d.querySelector("#vgOlvide").addEventListener("click", () => {
       const u = d.querySelector("#vgUsuario").value.trim();
-      const erp = (window.VG_CONEXION && window.VG_CONEXION.erpUrl) || "https://erpvivigrafic.netlify.app";
+      const erp = (window.VG_CONEXION && window.VG_CONEXION.erpUrl) || location.origin;
       window.open(erp + "/login.html?olvide=1" + (u ? "&usuario=" + encodeURIComponent(u) : ""), "_blank", "noopener");
     });
     d.querySelector("form").addEventListener("submit", async (e) => {

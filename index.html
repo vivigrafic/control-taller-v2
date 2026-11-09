@@ -16,10 +16,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./src/styles/cobalt_enterprise.css?v=20261106_01" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./src/config/conexion.js?v=20261022_04"></script>
+  <script src="./src/config/conexion.js?v=20261109_01"></script>
   <script src="./src/ver_clave.js?v=20261022_02"></script>
   <script src="./src/acceso.js?v=20261109_01"></script>
-  <script src="./src/componentes/ayuda.js?v=20261029_01" data-ayuda="taller" data-vivi="https://erpvivigrafic.netlify.app/vivi.html"></script>
+  <script src="./src/componentes/ayuda.js?v=20261029_01" data-ayuda="taller" data-vivi="https://erp-vvgrafic.vivigrafic.workers.dev/vivi.html"></script>
   <script src="./src/componentes/bandeja.js?v=20261030_01"></script>
   <script src="./src/componentes/dialogo.js?v=20261105_02"></script>
   <script src="./src/componentes/ficha_tela.js?v=20261106_01"></script>
@@ -40,7 +40,7 @@
     <a id="vgVolverKanban" href="/index.html" target="_top" class="badge" style="position:absolute; left:0; top:0; margin:0; text-decoration:none; font-weight:800; display:inline-flex; align-items:center; gap:6px;" title="Volver al Kanban del sistema">🏠 Kanban</a>
     <script>
       // Abierto desde la dirección del sistema (/taller/) va a /index.html; abierto suelto (GitHub Pages) va al sistema publicado
-      if (!location.pathname.startsWith('/taller')) document.getElementById('vgVolverKanban').href = 'https://erpvivigrafic.netlify.app/index.html';
+      if (!location.pathname.startsWith('/taller')) document.getElementById('vgVolverKanban').href = window.VG_CONEXION.erpUrl + '/index.html';
     </script>
     <div class="vg-cabecera-acciones" style="position:absolute; right:0; top:0; display:flex; gap:6px; align-items:center;">
       <button type="button" class="badge" data-bandeja style="cursor:pointer; margin:0;" title="Para hacer: lo que hay que resolver, en un solo lugar">📥 Para hacer</button>

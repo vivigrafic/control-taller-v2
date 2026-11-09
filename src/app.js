@@ -6954,7 +6954,7 @@ export function inicializarEventosUI() {
 
     // Las compras se cargan en Compras del sistema (con proveedor, caja y stock); acá ya no se escribe en las cajas.
     if (await confirmarTaller(`Compra de ${tipo} (${detalle}, ${cant})`, "Las compras de insumos se cargan en Compras del sistema, así entran en la caja y en el stock. ¿Abro Compras?", "Abrir Compras")) {
-      window.open("https://erpvivigrafic.netlify.app/src/modulos/comercial/compras.html", "_blank");
+      window.open(window.VG_CONEXION.erpUrl + "/src/modulos/comercial/compras.html", "_blank");
     }
     return;
     document.getElementById("finCompraDetalle").value = "";
@@ -7333,7 +7333,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     chkSola.checked = window.vgEtiquetas.imprimeSola();
     chkSola.addEventListener("change", () => window.vgEtiquetas.ponerSola(chkSola.checked));
   }
-  window.vgBandeja?.usar(sb(), { erp: "https://erpvivigrafic.netlify.app", quien: () => STATE.usuarioActual, avisar: (t, tipo) => toast(t, tipo === "error" ? "error" : "info") });
+  window.vgBandeja?.usar(sb(), { erp: window.VG_CONEXION.erpUrl, quien: () => STATE.usuarioActual, avisar: (t, tipo) => toast(t, tipo === "error" ? "error" : "info") });
   window.vgBandeja?.actualizar();
 });
 

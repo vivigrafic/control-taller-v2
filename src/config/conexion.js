@@ -21,7 +21,8 @@
     projectRef: 'rqgzirimgpyvfhzbfoig',
     url: 'https://rqgzirimgpyvfhzbfoig.supabase.co',
     key: 'sb_publishable_wPnEZ16KdHDHX3xyw7PyQw_-iNnrTCn',
-    erpUrl: 'https://erpvivigrafic.netlify.app', // el sistema publicado (base real)
+    // El sistema publicado (base real). Dentro del sistema (/taller/) es la misma dirección de la página.
+    erpUrl: (location.pathname.startsWith('/taller') ? location.origin : 'https://erp-vvgrafic.vivigrafic.workers.dev'),
     terminalUrl: 'https://script.google.com/macros/s/AKfycbwyqBeRS80Q2mg7CCFSt2736LQlnRcc73eXxaADOJk1PSkGcTcioYw2n__dnLBNWoc-AA/exec', // terminal de Google: miniaturas de la fila (carpetas privadas)
     sandboxBridgeUrl: 'https://script.google.com/macros/s/AKfycbwyqBeRS80Q2mg7CCFSt2736LQlnRcc73eXxaADOJk1PSkGcTcioYw2n__dnLBNWoc-AA/exec'
   };
