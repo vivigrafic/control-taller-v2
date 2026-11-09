@@ -5264,7 +5264,8 @@ async function finalizarTrabajoCalandrado(idCalOrCsv, minutosExtra = 0, skipRelo
   // Los rollos (metros reales y etiquetas) y la tela reservada en la tarjeta: se anotan acá, que es donde se usan
   preguntarRollosCalandrados(regs).catch(e => console.warn("Rollos del calandrado:", e))
     .then(() => preguntarTelaCalandrada(regs))
-    .then(() => anotarParaGuardar(regs.filter(r => !/l[aá]ser|corte/i.test(r.ruta || "")).map(r => r.file_id).filter(Boolean).join(","))).catch(e => console.warn("Tela de la tarjeta:", e));
+    // La tela que sobra se guarda acá, siempre (09/11/2026): al Láser llega solo la tela sublimada para cortar
+    .then(() => anotarParaGuardar(regs.map(r => r.file_id).filter(Boolean).join(","))).catch(e => console.warn("Tela de la tarjeta:", e));
 }
 
 async function procesarRolloCompletoCalandrado(rolloId) {
@@ -5326,7 +5327,7 @@ async function cortarLoteLaser(idsCsv) {
   STATE.ultimoCorte = { ids, nombre: (primero[0] && primero[0].cliente_archivo) || "lote" };
   toast(`⚡ Lote cortado en Láser.`);
   await cargarDatosTodo();
-  anotarParaGuardar(primero.map(l => l.file_id).filter(Boolean).join(","));
+  // El Láser no pregunta dónde guardar la tela: eso se hizo al calandrar (09/11/2026)
 }
 
 function imprimirEtiquetaRollo(loteId, metrosTotales) {
@@ -6302,7 +6303,7 @@ function vincularBotonesAccionesKiosco() {
         STATE.kiosco.completadosIds.add(trabActual.id);
         if (trabActual.ids) trabActual.ids.forEach(id => STATE.kiosco.completadosIds.add(id));
         toast(`✅ Corte Láser finalizado (Vel: ${vel}mm/s | Poder: ${valParam2}%).`);
-        anotarParaGuardar(trabActual.file_id);
+        // Sin preguntar dónde guardar la tela: eso se hizo al calandrar (09/11/2026)
       } else {
         const idsCsv = trabActual.ids ? trabActual.ids.join(",") : trabActual.id;
         await finalizarTrabajoCalandrado(idsCsv, min, true, vel, valParam2, notaExtra);
